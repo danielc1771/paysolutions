@@ -192,5 +192,8 @@ export const createLoanAgreementEnvelope = (loanData: LoanData): docusign.Envelo
     status: 'sent'
   };
 
+  // TODO: Add eventNotification configuration once we have a publicly accessible webhook URL
+  // For now, we'll rely on the frontend polling mechanism for status updates
+
   return envelopeDefinition;
 };

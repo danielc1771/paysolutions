@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? '', {
   apiVersion: '2025-05-28.basil',
 });
 
@@ -76,11 +76,19 @@ export async function POST(
     });
 
     console.log('✅ Payment setup created for loan:', loan.loan_number);
+    console.log('Setup Intent Client Secret:', setupIntent.client_secret);
+    console.log('Setup Intent ID:', setupIntent.id);
+
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+    const setupUrl = new URL('/payment-setup', baseUrl);
+    setupUrl.searchParams.set('setup_intent', setupIntent.client_secret);
+
+    console.log('Redirecting to setup URL:', setupUrl.href);
 
     return NextResponse.json({
       success: true,
       message: 'Payment setup initiated',
-      setupUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/payment-setup?setup_intent=${setupIntent.client_secret}`,
+      setupUrl: setupUrl.href,
       clientSecret: setupIntent.client_secret,
       customerId
     });

@@ -4,14 +4,44 @@ import { notFound } from 'next/navigation';
 import AdminLayout from '@/components/AdminLayout';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Trash2, FileText, Clock, CheckCircle, ExternalLink, Download, CreditCard } from 'lucide-react';
+import { ArrowLeft, Trash2, FileText, Clock, CheckCircle, ExternalLink, Download, CreditCard, Share2, Copy, Mail } from 'lucide-react';
 
 interface LoanDetailProps {
   params: Promise<{ id: string }>;
 }
 
+interface Loan {
+  id: string;
+  loan_number: string;
+  borrower: {
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone: string;
+    date_of_birth: string;
+    address_line1: string;
+    city: string;
+    state: string;
+    zip_code: string;
+    employment_status: string;
+    annual_income: string;
+    kyc_status: string;
+  };
+  principal_amount: string;
+  interest_rate: string;
+  term_months: string;
+  monthly_payment: string;
+  purpose: string;
+  created_at: string;
+  funding_date: string;
+  status: string;
+  docusign_status: string;
+  docusign_envelope_id: string;
+  remaining_balance: string;
+}
+
 // Generate payment schedule
-function generatePaymentSchedule(loan: any) {
+function generatePaymentSchedule(loan: Loan) {
   const schedule = [];
   const monthlyPayment = parseFloat(loan.monthly_payment);
   const principalAmount = parseFloat(loan.principal_amount);
@@ -45,38 +75,83 @@ function generatePaymentSchedule(loan: any) {
 }
 
 export default function LoanDetail({ params }: LoanDetailProps) {
-  const [loan, setLoan] = useState<any>(null);
+  const [loan, setLoan] = useState<Loan | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [docusignLoading, setDocusignLoading] = useState(false);
   const [approvingLoan, setApprovingLoan] = useState(false);
   const [settingUpPayments, setSettingUpPayments] = useState(false);
   const [downloadingPDF, setDownloadingPDF] = useState(false);
   const [viewingDocuSign, setViewingDocuSign] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [copyingLink, setCopyingLink] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
 
+  // Function to fetch/refetch loan data
+  const fetchLoanData = async () => {
+    try {
+      const { id } = await params;
+      const response = await fetch(`/api/loans/${id}`);
+      const result = await response.json();
+
+      if (response.ok) {
+        setLoan(result.loan);
+        setError(null);
+      } else {
+        setError(result.error || 'Failed to load loan');
+      }
+    } catch (err) {
+      setError('Failed to load loan');
+      console.error('Error fetching loan:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Initial load
   useEffect(() => {
-    const fetchLoan = async () => {
-      try {
-        const { id } = await params;
-        
-        // Use API route instead of direct Supabase access
-        const response = await fetch(`/api/loans/${id}`);
-        const result = await response.json();
+    fetchLoanData();
+  }, []);
 
-        if (!response.ok) {
-          setError(result.error || 'Failed to fetch loan');
-        } else {
-          setLoan(result.loan);
+  // Polling effect for DocuSign status updates
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout;
+
+    // Only poll when DocuSign status is 'sent' (awaiting signature)
+    if (loan?.docusign_status === 'sent' && loan?.docusign_envelope_id) {
+      console.log('🔄 Starting DocuSign status polling for envelope:', loan.docusign_envelope_id);
+      
+      intervalId = setInterval(async () => {
+        try {
+          console.log('📡 Polling DocuSign status...');
+          
+          // Use the new DocuSign status API endpoint
+          const response = await fetch(`/api/docusign/status/${loan.docusign_envelope_id}`);
+          
+          if (response.ok) {
+            const statusData = await response.json();
+            console.log('📋 DocuSign status response:', statusData);
+            
+            // If status changed, refetch the loan data
+            if (statusData.statusChanged) {
+              console.log('✅ Status changed! Refetching loan data...');
+              await fetchLoanData();
+            }
+          } else {
+            console.error('❌ Failed to check DocuSign status:', response.status);
+          }
+        } catch (error) {
+          console.error('❌ Error polling DocuSign status:', error);
         }
-      } catch (err) {
-        setError('Failed to fetch loan');
-      } finally {
-        setLoading(false);
+      }, 15000); // Poll every 15 seconds
+    }
+
+    return () => {
+      if (intervalId) {
+        console.log('🛑 Stopping DocuSign status polling');
+        clearInterval(intervalId);
       }
     };
-
-    fetchLoan();
-  }, [params]);
+  }, [loan?.docusign_status, loan?.docusign_envelope_id]);
 
   const handleSendDocuSign = async () => {
     if (!loan) return;
@@ -175,10 +250,7 @@ export default function LoanDetail({ params }: LoanDetailProps) {
       }
 
       // Refresh loan data to show updated status
-      const { id } = await params;
-      const responseRefresh = await fetch(`/api/loans/${id}`);
-      const resultRefresh = await responseRefresh.json();
-      setLoan(resultRefresh.loan);
+      await fetchLoanData();
       
       alert('Loan approved successfully! Ready for funding.');
     } catch (error) {
@@ -192,7 +264,38 @@ export default function LoanDetail({ params }: LoanDetailProps) {
   const handleSetupStripePayments = async () => {
     setSettingUpPayments(true);
     try {
-      const response = await fetch(`/api/loans/${loan.id}/setup-payments`, {
+      console.log('🚀 Redirecting to payment collection page for loan:', loan?.id);
+      
+      // Redirect to the new comprehensive payment collection page
+      window.open(`/payment-collection/${loan?.id}`, '_blank');
+    } catch (error) {
+      console.error('💥 Navigation error:', error);
+      alert('Failed to open payment collection page. Please try again.');
+    } finally {
+      setSettingUpPayments(false);
+    }
+  };
+
+  const handleCopyPaymentSummaryLink = async () => {
+    setCopyingLink(true);
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
+      const paymentSummaryUrl = `${baseUrl}/payment-summary/${loan?.id}`;
+      
+      await navigator.clipboard.writeText(paymentSummaryUrl);
+      alert('Payment summary link copied to clipboard!');
+    } catch (error) {
+      console.error('Error copying link:', error);
+      alert('Failed to copy link. Please try again.');
+    } finally {
+      setCopyingLink(false);
+    }
+  };
+
+  const handleEmailPaymentSummary = async () => {
+    setSendingEmail(true);
+    try {
+      const response = await fetch(`/api/loans/${loan?.id}/send-payment-summary`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -200,22 +303,15 @@ export default function LoanDetail({ params }: LoanDetailProps) {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to setup payments');
+        throw new Error('Failed to send payment summary email');
       }
 
-      const result = await response.json();
-      
-      // Open Stripe setup URL if provided
-      if (result.setupUrl) {
-        window.open(result.setupUrl, '_blank');
-      }
-      
-      alert('Payment collection setup initiated!');
+      alert('Payment summary email sent successfully!');
     } catch (error) {
-      console.error('Error setting up payments:', error);
-      alert('Failed to setup payments. Please try again.');
+      console.error('Error sending email:', error);
+      alert('Failed to send email. Please try again.');
     } finally {
-      setSettingUpPayments(false);
+      setSendingEmail(false);
     }
   };
 
@@ -344,6 +440,80 @@ export default function LoanDetail({ params }: LoanDetailProps) {
               </div>
             </div>
           </div>
+
+          {/* Funding Status */}
+          {loan.status === 'funded' && (
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-green-400 rounded-xl shadow-lg p-6">
+              <div className="flex items-start">
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 bg-green-400 rounded-full flex items-center justify-center">
+                    <CheckCircle className="w-5 h-5 text-white" />
+                  </div>
+                </div>
+                <div className="ml-4 flex-1">
+                  <h3 className="text-lg font-bold text-green-800 mb-2">✅ Loan Approved & Funded</h3>
+                  <p className="text-green-700 mb-4 text-sm">
+                    This loan has been approved and funded. Payment collection is now active.
+                  </p>
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      onClick={handleSetupStripePayments}
+                      disabled={settingUpPayments}
+                      className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-semibold shadow-md transition-all"
+                    >
+                      {settingUpPayments ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          Setting up...
+                        </>
+                      ) : (
+                        <>
+                          <CreditCard className="w-4 h-4" />
+                          Open Payment Collection with Summary
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={handleCopyPaymentSummaryLink}
+                      disabled={copyingLink}
+                      className="flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 font-semibold shadow-md transition-all"
+                    >
+                      {copyingLink ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          Copying...
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-4 h-4" />
+                          Copy Payment Summary Link
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={handleEmailPaymentSummary}
+                      disabled={sendingEmail}
+                      className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-semibold shadow-md transition-all"
+                    >
+                      {sendingEmail ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          Sending...
+                        </>
+                      ) : (
+                        <>
+                          <Mail className="w-4 h-4" />
+                          Email to Customer
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Admin Approval Section - Moved to top for high visibility */}
           {isDocuSignCompleted(loan.docusign_status) && loan.status !== 'funded' && (
@@ -601,42 +771,6 @@ export default function LoanDetail({ params }: LoanDetailProps) {
               </div>
             )}
           </div>
-
-          {/* Funding Status */}
-          {loan.status === 'funded' && (
-            <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-green-400 rounded-xl shadow-lg p-6">
-              <div className="flex items-start">
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-green-400 rounded-full flex items-center justify-center">
-                    <CheckCircle className="w-5 h-5 text-white" />
-                  </div>
-                </div>
-                <div className="ml-4 flex-1">
-                  <h3 className="text-lg font-bold text-green-800 mb-2">✅ Loan Approved & Funded</h3>
-                  <p className="text-green-700 mb-4 text-sm">
-                    This loan has been approved and funded. Payment collection is now active.
-                  </p>
-                  <button
-                    onClick={handleSetupStripePayments}
-                    disabled={settingUpPayments}
-                    className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-semibold shadow-md transition-all"
-                  >
-                    {settingUpPayments ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        Setting up...
-                      </>
-                    ) : (
-                      <>
-                        <CreditCard className="w-4 h-4" />
-                        Setup Payment Collection
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </AdminLayout>
