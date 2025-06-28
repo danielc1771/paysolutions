@@ -1,0 +1,380 @@
+'use client';
+
+import { createClient } from '@/utils/supabase/client';
+import AdminLayout from '@/components/AdminLayout';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+
+interface Borrower {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string;
+  date_of_birth: string;
+  ssn: string;
+  annual_income: string;
+  employment_status: string;
+  employer_name: string;
+  address_line1: string;
+  address_line2: string;
+  city: string;
+  state: string;
+  zip_code: string;
+  kyc_status: string;
+  kyc_verified_at: string;
+  created_at: string;
+  updated_at: string;
+  loans?: Array<{
+    id: string;
+    loan_number: string;
+    principal_amount: string;
+    status: string;
+  }>;
+}
+
+export default function BorrowersPage() {
+  const [borrowers, setBorrowers] = useState<Borrower[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const supabase = createClient();
+
+  useEffect(() => {
+    const fetchBorrowers = async () => {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('borrowers')
+          .select(`
+            *,
+            loans(
+              id,
+              loan_number,
+              principal_amount,
+              status
+            )
+          `)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          setError(error.message);
+          console.error('Error fetching borrowers:', error);
+        } else {
+          setBorrowers(data || []);
+        }
+      } catch (err) {
+        setError('Failed to fetch borrowers');
+        console.error('Error:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBorrowers();
+  }, []);
+
+  const getKycStatusColor = (status: string) => {
+    switch (status) {
+      case 'verified': return 'bg-green-100 text-green-800';
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'rejected': return 'bg-red-100 text-red-800';
+      case 'not_started': return 'bg-gray-100 text-gray-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getEmploymentStatusColor = (status: string) => {
+    switch (status) {
+      case 'employed': return 'bg-green-100 text-green-800';
+      case 'self_employed': return 'bg-blue-100 text-blue-800';
+      case 'unemployed': return 'bg-red-100 text-red-800';
+      case 'retired': return 'bg-purple-100 text-purple-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  // Calculate stats
+  const totalBorrowers = borrowers?.length || 0;
+  const verifiedBorrowers = borrowers?.filter(b => b.kyc_status === 'verified').length || 0;
+  const pendingBorrowers = borrowers?.filter(b => b.kyc_status === 'pending').length || 0;
+  const borrowersWithLoans = borrowers?.filter(b => b.loans && b.loans.length > 0).length || 0;
+
+  return (
+    <AdminLayout>
+      <div className="p-8">
+        {/* Page Header */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent mb-3">
+                Borrower Management
+              </h1>
+              <p className="text-gray-600 text-lg">Comprehensive borrower database and KYC management</p>
+            </div>
+            <div>
+              <button className="bg-gradient-to-r from-purple-500 to-blue-500 text-white px-6 py-3 rounded-2xl font-semibold hover:from-purple-600 hover:to-blue-600 transition-all duration-300 flex items-center space-x-2 shadow-lg hover:shadow-xl">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span>Export CSV</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-10">
+          <div className="group bg-white/70 backdrop-blur-sm rounded-3xl p-8 shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-white/20">
+            <div className="flex items-center justify-between mb-6">
+              <div className="p-4 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-2xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+                </svg>
+              </div>
+              <div className="text-right">
+                <p className="text-3xl font-bold text-gray-800 mb-1">{totalBorrowers}</p>
+                <div className="flex items-center text-green-600 text-sm font-medium">
+                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                  </svg>
+                  +15% this month
+                </div>
+              </div>
+            </div>
+            <h3 className="text-gray-700 font-semibold text-lg">Total Borrowers</h3>
+            <p className="text-gray-500 text-sm mt-1">All registered users</p>
+          </div>
+
+          <div className="group bg-white/70 backdrop-blur-sm rounded-3xl p-8 shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-white/20">
+            <div className="flex items-center justify-between mb-6">
+              <div className="p-4 bg-gradient-to-br from-green-400 to-emerald-500 rounded-2xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="text-right">
+                <p className="text-3xl font-bold text-gray-800 mb-1">{verifiedBorrowers}</p>
+                <div className="flex items-center text-green-600 text-sm font-medium">
+                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                  </svg>
+                  +8% this month
+                </div>
+              </div>
+            </div>
+            <h3 className="text-gray-700 font-semibold text-lg">Verified KYC</h3>
+            <p className="text-gray-500 text-sm mt-1">Completed verification</p>
+          </div>
+
+          <div className="group bg-white/70 backdrop-blur-sm rounded-3xl p-8 shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-white/20">
+            <div className="flex items-center justify-between mb-6">
+              <div className="p-4 bg-gradient-to-br from-orange-400 to-red-500 rounded-2xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="text-right">
+                <p className="text-3xl font-bold text-gray-800 mb-1">{pendingBorrowers}</p>
+                <div className="flex items-center text-orange-600 text-sm font-medium">
+                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Awaiting review
+                </div>
+              </div>
+            </div>
+            <h3 className="text-gray-700 font-semibold text-lg">Pending KYC</h3>
+            <p className="text-gray-500 text-sm mt-1">Needs verification</p>
+          </div>
+
+          <div className="group bg-white/70 backdrop-blur-sm rounded-3xl p-8 shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-white/20">
+            <div className="flex items-center justify-between mb-6">
+              <div className="p-4 bg-gradient-to-br from-purple-400 to-pink-500 rounded-2xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <div className="text-right">
+                <p className="text-3xl font-bold text-gray-800 mb-1">{borrowersWithLoans}</p>
+                <div className="flex items-center text-green-600 text-sm font-medium">
+                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                  </svg>
+                  Active borrowers
+                </div>
+              </div>
+            </div>
+            <h3 className="text-gray-700 font-semibold text-lg">With Loans</h3>
+            <p className="text-gray-500 text-sm mt-1">Has loan history</p>
+          </div>
+        </div>
+
+        {/* Borrowers Table */}
+        <div className="bg-white/70 backdrop-blur-sm rounded-3xl shadow-xl border border-white/20 overflow-hidden">
+          <div className="px-8 py-6 bg-gradient-to-r from-gray-50 to-gray-100/50">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">All Borrowers</h2>
+                <p className="text-gray-600">Complete borrower database with KYC status and loan history</p>
+              </div>
+              <div className="flex items-center gap-4">
+                <span className="text-sm text-gray-600 font-medium bg-white/60 px-4 py-2 rounded-2xl">{totalBorrowers} total borrowers</span>
+              </div>
+            </div>
+          </div>
+          
+          {loading ? (
+            <div className="p-12 text-center">
+              <div className="relative">
+                <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-200 border-t-purple-500 mx-auto"></div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-3 h-3 bg-purple-500 rounded-full animate-pulse"></div>
+                </div>
+              </div>
+              <p className="mt-4 text-gray-600 font-medium">Loading borrowers...</p>
+            </div>
+          ) : error ? (
+            <div className="p-12 text-center">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Unable to load borrowers</h3>
+              <p className="text-red-600 mb-4">{error}</p>
+              <button 
+                onClick={() => window.location.reload()}
+                className="bg-red-500 text-white px-6 py-3 rounded-2xl font-semibold hover:bg-red-600 transition-colors"
+              >
+                Try Again
+              </button>
+            </div>
+          ) : !borrowers || borrowers.length === 0 ? (
+            <div className="p-12 text-center">
+              <div className="w-20 h-20 bg-gradient-to-br from-purple-100 to-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg className="w-10 h-10 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-3">No borrowers yet</h3>
+              <p className="text-gray-600 mb-6 max-w-md mx-auto">Borrowers will appear here once they complete the registration process and apply for loans.</p>
+            </div>
+          ) : (
+            <div className="p-6">
+              <div className="space-y-4">
+                {borrowers.map((borrower: Borrower) => {
+                  const needsKycReview = borrower.kyc_status === 'pending';
+                  const loanCount = borrower.loans?.length || 0;
+                  
+                  return (
+                    <div 
+                      key={borrower.id} 
+                      className={`group relative bg-white/60 backdrop-blur-sm rounded-2xl p-6 shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer hover:-translate-y-1 border border-white/30 ${needsKycReview ? 'ring-2 ring-orange-400 bg-orange-50/70' : ''}`}
+                      onClick={() => window.location.href = `/admin/borrowers/${borrower.id}`}
+                    >
+                      {needsKycReview && (
+                        <div className="absolute -top-2 -right-2 w-6 h-6 bg-orange-400 rounded-full flex items-center justify-center">
+                          <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
+                        </div>
+                      )}
+                      
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-6">
+                          <div className="flex-shrink-0">
+                            <div className="w-14 h-14 bg-gradient-to-br from-purple-400 to-blue-500 rounded-2xl flex items-center justify-center shadow-lg">
+                              <span className="text-white font-bold text-lg">
+                                {borrower.first_name?.[0]}{borrower.last_name?.[0]}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center space-x-3 mb-2">
+                              <h3 className="text-lg font-bold text-gray-900 truncate">
+                                {borrower.first_name} {borrower.last_name}
+                              </h3>
+                              <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${getKycStatusColor(borrower.kyc_status)}`}>
+                                {borrower.kyc_status?.replace('_', ' ')}
+                              </span>
+                              {needsKycReview && (
+                                <span className="inline-flex items-center px-3 py-1 text-xs font-bold rounded-full bg-orange-100 text-orange-800 border border-orange-300">
+                                  🚨 Review Required
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center space-x-6 text-sm text-gray-600">
+                              <span className="flex items-center">
+                                <svg className="w-4 h-4 mr-1 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                </svg>
+                                {borrower.email}
+                              </span>
+                              <span className="flex items-center">
+                                <svg className="w-4 h-4 mr-1 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                </svg>
+                                {borrower.phone || 'No phone'}
+                              </span>
+                              <span className="flex items-center">
+                                <svg className="w-4 h-4 mr-1 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2v2m8 0V6a2 2 0 002 2h2a2 2 0 002-2V4a2 2 0 00-2-2h-2a2 2 0 00-2 2z" />
+                                </svg>
+                                {borrower.employment_status?.replace('_', ' ') || 'N/A'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center space-x-8">
+                          <div className="text-right">
+                            <p className="text-lg font-bold text-gray-900">
+                              {loanCount} {loanCount === 1 ? 'Loan' : 'Loans'}
+                            </p>
+                            <p className="text-sm text-gray-500 font-medium">
+                              ${borrower.annual_income ? parseFloat(borrower.annual_income).toLocaleString() : 'N/A'} income
+                            </p>
+                          </div>
+                          
+                          <div className="flex items-center space-x-2">
+                            {loanCount > 0 && (
+                              <div className="flex -space-x-1">
+                                {borrower.loans?.slice(0, 3).map((loan, index) => (
+                                  <div
+                                    key={loan.id}
+                                    className="w-8 h-8 bg-gradient-to-br from-purple-100 to-blue-100 border-2 border-white rounded-full flex items-center justify-center text-xs font-bold text-purple-600 shadow-sm"
+                                    title={`Loan ${loan.loan_number} - ${loan.status}`}
+                                  >
+                                    {index + 1}
+                                  </div>
+                                ))}
+                                {loanCount > 3 && (
+                                  <div className="w-8 h-8 bg-gray-100 border-2 border-white rounded-full flex items-center justify-center text-xs font-bold text-gray-600 shadow-sm">
+                                    +{loanCount - 3}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            
+                            <button 
+                              className={`p-3 rounded-2xl transition-all duration-300 group-hover:scale-110 ${needsKycReview ? 'bg-orange-100 text-orange-600' : 'bg-purple-100 text-purple-600'}`}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </AdminLayout>
+  );
+}

@@ -6,6 +6,8 @@ export async function POST(request: NextRequest) {
     const webhookData = await request.json();
     
     console.log('🔔 DocuSign webhook received:', JSON.stringify(webhookData, null, 2));
+    console.log('📊 Webhook headers:', Object.fromEntries(request.headers.entries()));
+    console.log('⏰ Webhook timestamp:', new Date().toISOString());
     
     // DocuSign webhook can have different structures, handle both formats
     let envelopeId: string;
@@ -111,13 +113,27 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`✅ Loan ${loan.id} updated successfully: DocuSign ${docusignStatus}, Loan status: ${newLoanStatus}`);
+    
+    // Log successful webhook processing for monitoring
+    console.log('📈 Webhook processing summary:', {
+      envelopeId,
+      loanId: loan.id,
+      oldDocuSignStatus: loan.docusign_status,
+      newDocuSignStatus: docusignStatus,
+      oldLoanStatus: loan.status,
+      newLoanStatus,
+      completedDateTime,
+      statusChangedDateTime,
+      timestamp: new Date().toISOString()
+    });
 
     return NextResponse.json({ 
       success: true, 
       message: 'Webhook processed successfully',
       loanId: loan.id,
       docusignStatus,
-      loanStatus: newLoanStatus
+      loanStatus: newLoanStatus,
+      timestamp: new Date().toISOString()
     });
 
   } catch (error) {

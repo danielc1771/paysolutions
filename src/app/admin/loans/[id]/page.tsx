@@ -1,10 +1,9 @@
 'use client';
 
-import { notFound } from 'next/navigation';
 import AdminLayout from '@/components/AdminLayout';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Trash2, FileText, Clock, CheckCircle, ExternalLink, Download, CreditCard, Share2, Copy, Mail } from 'lucide-react';
+import { CheckCircle, ExternalLink, CreditCard, Copy, Mail } from 'lucide-react';
 
 interface LoanDetailProps {
   params: Promise<{ id: string }>;
@@ -81,7 +80,6 @@ export default function LoanDetail({ params }: LoanDetailProps) {
   const [docusignLoading, setDocusignLoading] = useState(false);
   const [approvingLoan, setApprovingLoan] = useState(false);
   const [settingUpPayments, setSettingUpPayments] = useState(false);
-  const [downloadingPDF, setDownloadingPDF] = useState(false);
   const [viewingDocuSign, setViewingDocuSign] = useState(false);
   const [copyingLink, setCopyingLink] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
@@ -110,11 +108,13 @@ export default function LoanDetail({ params }: LoanDetailProps) {
   // Initial load
   useEffect(() => {
     fetchLoanData();
-  }, []);
+  }, [fetchLoanData]);
 
-  // Polling effect for DocuSign status updates
+  // Optimized polling effect for DocuSign status updates
   useEffect(() => {
     let intervalId: NodeJS.Timeout;
+    let pollCount = 0;
+    const maxPolls = 20; // Stop polling after 5 minutes (20 * 15s)
 
     // Only poll when DocuSign status is 'sent' (awaiting signature)
     if (loan?.docusign_status === 'sent' && loan?.docusign_envelope_id) {
@@ -122,7 +122,8 @@ export default function LoanDetail({ params }: LoanDetailProps) {
       
       intervalId = setInterval(async () => {
         try {
-          console.log('📡 Polling DocuSign status...');
+          pollCount++;
+          console.log(`📡 Polling DocuSign status... (${pollCount}/${maxPolls})`);
           
           // Use the new DocuSign status API endpoint
           const response = await fetch(`/api/docusign/status/${loan.docusign_envelope_id}`);
@@ -135,6 +136,19 @@ export default function LoanDetail({ params }: LoanDetailProps) {
             if (statusData.statusChanged) {
               console.log('✅ Status changed! Refetching loan data...');
               await fetchLoanData();
+              // Stop polling once status changes
+              if (intervalId) {
+                clearInterval(intervalId);
+                console.log('🛑 Status changed - stopping polling');
+              }
+            }
+            
+            // Stop polling after max attempts to avoid infinite polling
+            if (pollCount >= maxPolls) {
+              console.log('🛑 Max polling attempts reached - stopping');
+              if (intervalId) {
+                clearInterval(intervalId);
+              }
             }
           } else {
             console.error('❌ Failed to check DocuSign status:', response.status);
@@ -208,32 +222,6 @@ export default function LoanDetail({ params }: LoanDetailProps) {
     }
   };
 
-  const handleDownloadPDF = async () => {
-    setDownloadingPDF(true);
-    try {
-      const response = await fetch(`/api/docusign/envelope?envelopeId=${loan.docusign_envelope_id}&download=true`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to download PDF');
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = url;
-      a.download = `loan-agreement-${loan.loan_number}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (error) {
-      console.error('Error downloading PDF:', error);
-      alert('Failed to download PDF. Please try again.');
-    } finally {
-      setDownloadingPDF(false);
-    }
-  };
 
   const handleApproveLoan = async () => {
     setApprovingLoan(true);
@@ -315,21 +303,6 @@ export default function LoanDetail({ params }: LoanDetailProps) {
     }
   };
 
-  const getDocuSignStatusBadge = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case 'completed':
-      case 'signed':
-        return 'bg-green-100 text-green-800';
-      case 'sent':
-        return 'bg-blue-100 text-blue-800';
-      case 'declined':
-      case 'voided':
-        return 'bg-red-100 text-red-800';
-      case 'not_sent':
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
 
   const isDocuSignCompleted = (status: string) => {
     return status?.toLowerCase() === 'completed' || status?.toLowerCase() === 'signed';
@@ -367,19 +340,6 @@ export default function LoanDetail({ params }: LoanDetailProps) {
   const paidAmount = totalLoanAmount - remainingBalance;
   const progressPercentage = (paidAmount / totalLoanAmount) * 100;
 
-  // Status badge styling
-  const getStatusBadge = (status: string) => {
-    const styles = {
-      'new': 'bg-blue-100 text-blue-800',
-      'pending': 'bg-yellow-100 text-yellow-800',
-      'approved': 'bg-green-100 text-green-800',
-      'funded': 'bg-purple-100 text-purple-800',
-      'active': 'bg-green-100 text-green-800',
-      'completed': 'bg-gray-100 text-gray-800',
-      'defaulted': 'bg-red-100 text-red-800'
-    };
-    return styles[status as keyof typeof styles] || 'bg-gray-100 text-gray-800';
-  };
 
   return (
     <AdminLayout>
