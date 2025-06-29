@@ -108,7 +108,7 @@ export default function LoanDetail({ params }: LoanDetailProps) {
   // Initial load
   useEffect(() => {
     fetchLoanData();
-  }, [fetchLoanData]);
+  }, []); // Remove fetchLoanData dependency to prevent infinite loop
 
   // Optimized polling effect for DocuSign status updates
   useEffect(() => {
@@ -135,7 +135,7 @@ export default function LoanDetail({ params }: LoanDetailProps) {
             // If status changed, refetch the loan data
             if (statusData.statusChanged) {
               console.log('✅ Status changed! Refetching loan data...');
-              await fetchLoanData();
+              fetchLoanData();
               // Stop polling once status changes
               if (intervalId) {
                 clearInterval(intervalId);
@@ -238,7 +238,7 @@ export default function LoanDetail({ params }: LoanDetailProps) {
       }
 
       // Refresh loan data to show updated status
-      await fetchLoanData();
+      fetchLoanData();
       
       alert('Loan approved successfully! Ready for funding.');
     } catch (error) {
