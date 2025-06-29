@@ -2,7 +2,6 @@ import { pgTable, index, unique, pgPolicy, uuid, varchar, date, numeric, timesta
 import { sql } from "drizzle-orm"
 
 
-
 export const borrowers = pgTable("borrowers", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	firstName: varchar("first_name", { length: 255 }).notNull(),
@@ -17,7 +16,6 @@ export const borrowers = pgTable("borrowers", {
 	employmentStatus: varchar("employment_status", { length: 50 }),
 	annualIncome: numeric("annual_income", { precision: 12, scale:  2 }),
 	kycStatus: varchar("kyc_status", { length: 50 }).default('pending'),
-	ssn: varchar({ length: 11 }),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 }, (table) => [
