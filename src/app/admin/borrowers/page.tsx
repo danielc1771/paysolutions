@@ -85,22 +85,14 @@ export default function BorrowersPage() {
   const getKycStatusColor = (status: string) => {
     switch (status) {
       case 'verified': return 'bg-green-100 text-green-800';
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'rejected': return 'bg-red-100 text-red-800';
-      case 'not_started': return 'bg-gray-100 text-gray-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const getEmploymentStatusColor = (status: string) => {
-    switch (status) {
-      case 'employed': return 'bg-green-100 text-green-800';
-      case 'self_employed': return 'bg-blue-100 text-blue-800';
-      case 'unemployed': return 'bg-red-100 text-red-800';
-      case 'retired': return 'bg-purple-100 text-purple-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
+  const getKycStatusText = (status: string) => {
+    return status === 'verified' ? 'Verified' : 'Not Verified';
   };
+
 
   const handleDeleteBorrower = async (borrowerId: string) => {
     try {
@@ -306,21 +298,14 @@ export default function BorrowersPage() {
             <div className="p-6">
               <div className="space-y-4">
                 {borrowers.map((borrower: Borrower) => {
-                  const needsKycReview = borrower.kyc_status === 'pending';
                   const loanCount = borrower.loans?.length || 0;
                   
                   return (
                     <div 
                       key={borrower.id} 
-                      className={`group relative bg-white/60 backdrop-blur-sm rounded-2xl p-6 shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer hover:-translate-y-1 border border-white/30 ${needsKycReview ? 'ring-2 ring-orange-400 bg-orange-50/70' : ''}`}
+                      className="group relative bg-white/60 backdrop-blur-sm rounded-2xl p-6 shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer hover:-translate-y-1 border border-white/30"
                       onClick={() => window.location.href = `/admin/borrowers/${borrower.id}`}
                     >
-                      {needsKycReview && (
-                        <div className="absolute -top-2 -right-2 w-6 h-6 bg-orange-400 rounded-full flex items-center justify-center">
-                          <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
-                        </div>
-                      )}
-                      
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-6">
                           <div className="flex-shrink-0">
@@ -337,13 +322,8 @@ export default function BorrowersPage() {
                                 {borrower.first_name} {borrower.last_name}
                               </h3>
                               <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${getKycStatusColor(borrower.kyc_status)}`}>
-                                {borrower.kyc_status?.replace('_', ' ')}
+                                {getKycStatusText(borrower.kyc_status)}
                               </span>
-                              {needsKycReview && (
-                                <span className="inline-flex items-center px-3 py-1 text-xs font-bold rounded-full bg-orange-100 text-orange-800 border border-orange-300">
-                                  🚨 Review Required
-                                </span>
-                              )}
                             </div>
                             <div className="flex items-center space-x-6 text-sm text-gray-600">
                               <span className="flex items-center">
@@ -379,32 +359,16 @@ export default function BorrowersPage() {
                           </div>
                           
                           <div className="flex items-center space-x-2">
-                            {loanCount > 0 && (
-                              <div className="flex -space-x-1">
-                                {borrower.loans?.slice(0, 3).map((loan, index) => (
-                                  <div
-                                    key={loan.id}
-                                    className="w-8 h-8 bg-gradient-to-br from-purple-100 to-blue-100 border-2 border-white rounded-full flex items-center justify-center text-xs font-bold text-purple-600 shadow-sm"
-                                    title={`Loan ${loan.loan_number} - ${loan.status}`}
-                                  >
-                                    {index + 1}
-                                  </div>
-                                ))}
-                                {loanCount > 3 && (
-                                  <div className="w-8 h-8 bg-gray-100 border-2 border-white rounded-full flex items-center justify-center text-xs font-bold text-gray-600 shadow-sm">
-                                    +{loanCount - 3}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                            
                             <button 
-                              className={`p-3 rounded-2xl transition-all duration-300 group-hover:scale-110 ${needsKycReview ? 'bg-orange-100 text-orange-600 hover:bg-orange-200' : 'bg-blue-100 text-blue-600 hover:bg-blue-200'}`}
-                              onClick={(e) => e.stopPropagation()}
+                              className="p-3 bg-blue-100 text-blue-600 rounded-2xl transition-all duration-300 group-hover:scale-110 hover:bg-blue-200"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                window.location.href = `/admin/borrowers/${borrower.id}`;
+                              }}
                               title="View Details"
                             >
                               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 616 0z" />
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                               </svg>
                             </button>

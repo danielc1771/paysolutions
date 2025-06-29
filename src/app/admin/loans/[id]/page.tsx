@@ -424,30 +424,12 @@ export default function LoanDetail({ params }: LoanDetailProps) {
                       {settingUpPayments ? (
                         <>
                           <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                          Setting up...
+                          Processing...
                         </>
                       ) : (
                         <>
                           <CreditCard className="w-4 h-4" />
-                          Open Payment Collection with Summary
-                        </>
-                      )}
-                    </button>
-
-                    <button
-                      onClick={handleCopyPaymentSummaryLink}
-                      disabled={copyingLink}
-                      className="flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 font-semibold shadow-md transition-all"
-                    >
-                      {copyingLink ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                          Copying...
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-4 h-4" />
-                          Copy Payment Summary Link
+                          Manually Input Customer Payments
                         </>
                       )}
                     </button>
@@ -465,7 +447,25 @@ export default function LoanDetail({ params }: LoanDetailProps) {
                       ) : (
                         <>
                           <Mail className="w-4 h-4" />
-                          Email to Customer
+                          Send Payment Request
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={handleCopyPaymentSummaryLink}
+                      disabled={copyingLink}
+                      className="flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 font-semibold shadow-md transition-all"
+                    >
+                      {copyingLink ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          Copying...
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-4 h-4" />
+                          Share Payment Link
                         </>
                       )}
                     </button>

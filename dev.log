@@ -619,3 +619,4 @@ Error fetching loan: {
  GET /api/notifications 200 in 34ms
  GET /api/notifications 200 in 27ms
  GET /api/notifications 200 in 31ms
+ GET /api/notifications 200 in 32ms

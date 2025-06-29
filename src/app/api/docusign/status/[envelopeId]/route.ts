@@ -92,7 +92,8 @@ export async function GET(
       
       // Create notification for document signing
       try {
-        const borrowerName = loan.borrower ? `${loan.borrower.first_name} ${loan.borrower.last_name}` : 'Borrower';
+        const borrower = Array.isArray(loan.borrower) ? loan.borrower[0] : loan.borrower;
+        const borrowerName = borrower ? `${borrower.first_name} ${borrower.last_name}` : 'Borrower';
         const notificationResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/notifications`, {
           method: 'POST',
           headers: {

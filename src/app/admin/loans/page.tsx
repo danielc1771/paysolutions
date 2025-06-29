@@ -299,7 +299,10 @@ export default function LoansPage() {
                         <div className="flex items-center space-x-2">
                           <button 
                             className="p-3 bg-blue-100 text-blue-600 rounded-2xl transition-all duration-300 group-hover:scale-110 hover:bg-blue-200"
-                            onClick={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.location.href = `/admin/loans/${loan.id}`;
+                            }}
                             title="View Details"
                           >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
