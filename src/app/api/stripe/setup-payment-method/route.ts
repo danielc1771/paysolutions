@@ -3,7 +3,7 @@ import Stripe from 'stripe';
 import { createClient } from '@/utils/supabase/server';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-06-20',
+  apiVersion: '2025-05-28.basil',
 });
 
 export async function POST(request: NextRequest) {
@@ -61,10 +61,16 @@ export async function POST(request: NextRequest) {
       // Create new customer
       customer = await stripe.customers.create({
         email: customerEmail,
-        name: customerName || `${loan.borrower.first_name} ${loan.borrower.last_name}`,
+        name: customerName || (() => {
+          const borrower = Array.isArray(loan.borrower) ? loan.borrower[0] : loan.borrower;
+          return borrower ? `${borrower.first_name} ${borrower.last_name}` : 'Unknown';
+        })(),
         metadata: {
           loanId: loanId,
-          borrowerId: loan.borrower.id,
+          borrowerId: (() => {
+            const borrower = Array.isArray(loan.borrower) ? loan.borrower[0] : loan.borrower;
+            return borrower?.id || '';
+          })(),
         },
       });
       console.log('✅ Created new Stripe customer:', customer.id);
@@ -88,7 +94,10 @@ export async function POST(request: NextRequest) {
     await supabase
       .from('borrowers')
       .update({ stripe_customer_id: customer.id })
-      .eq('id', loan.borrower.id);
+      .eq('id', (() => {
+        const borrower = Array.isArray(loan.borrower) ? loan.borrower[0] : loan.borrower;
+        return borrower?.id || '';
+      })());
 
     return NextResponse.json({
       clientSecret: setupIntent.client_secret,

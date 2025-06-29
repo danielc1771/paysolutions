@@ -107,7 +107,7 @@ export default function CreateLoan() {
         throw new Error(errorData.error || 'Failed to create loan');
       }
 
-      const loan = await loanResponse.json();
+      await loanResponse.json();
       
       // Show success message
       alert('Loan created successfully!');
@@ -118,8 +118,8 @@ export default function CreateLoan() {
       // Redirect to loans list
       router.push('/admin/loans');
       
-    } catch (err: any) {
-      setError(err.message || 'Failed to create loan');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to create loan');
       console.error('Create loan error:', err);
     } finally {
       setIsSubmitting(false);

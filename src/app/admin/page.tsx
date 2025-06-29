@@ -61,6 +61,7 @@ export default function AdminDashboard() {
     };
 
     fetchLoans();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const getStatusColor = (status: string) => {
@@ -91,7 +92,7 @@ export default function AdminDashboard() {
               <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent mb-3">
                 Welcome Back!
               </h1>
-              <p className="text-gray-600 text-lg">Here's what's happening with your loan portfolio today</p>
+              <p className="text-gray-600 text-lg">Here&apos;s what&apos;s happening with your loan portfolio today</p>
             </div>
           </div>
 

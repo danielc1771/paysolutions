@@ -42,6 +42,7 @@ export default function LoansPage() {
 
   useEffect(() => {
     fetchLoans();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchLoans = async () => {
@@ -79,8 +80,8 @@ export default function LoansPage() {
         })) || [];
         setLoans(transformedData);
       }
-    } catch (err) {
-      setError(typeof err === 'string' ? err : 'Failed to fetch loans');
+    } catch {
+      setError('Failed to fetch loans');
     } finally {
       setLoading(false);
     }

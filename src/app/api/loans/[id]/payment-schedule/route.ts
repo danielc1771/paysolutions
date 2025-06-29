@@ -4,11 +4,11 @@ import { getPaymentSchedule } from '@/utils/payment-schedule';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createClient();
-    const loanId = params.id;
+    const { id: loanId } = await params;
 
     console.log('📊 Payment schedule API called for loan:', loanId);
 

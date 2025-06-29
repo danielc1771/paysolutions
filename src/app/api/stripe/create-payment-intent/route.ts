@@ -42,7 +42,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify borrower email matches
-    if (loan.borrower.email !== borrowerEmail) {
+    const borrower = Array.isArray(loan.borrower) ? loan.borrower[0] : loan.borrower;
+    if (borrower?.email !== borrowerEmail) {
       return NextResponse.json(
         { error: 'Borrower email mismatch' },
         { status: 403 }

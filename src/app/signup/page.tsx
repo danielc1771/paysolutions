@@ -15,7 +15,6 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const router = useRouter();
   
   const supabase = createClient();
 
@@ -37,7 +36,7 @@ export default function SignupPage() {
     }
 
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -52,7 +51,7 @@ export default function SignupPage() {
       } else {
         setSuccess(true);
       }
-    } catch (err) {
+    } catch {
       setError('An unexpected error occurred');
     } finally {
       setLoading(false);
@@ -68,7 +67,7 @@ export default function SignupPage() {
               <CheckCircle className="w-8 h-8 text-green-500" />
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Check Your Email!</h2>
-            <p className="text-gray-600 mb-6">We've sent you a confirmation link at <span className="font-semibold">{email}</span></p>
+            <p className="text-gray-600 mb-6">We&apos;ve sent you a confirmation link at <span className="font-semibold">{email}</span></p>
             <Link 
               href="/login"
               className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-2xl font-semibold hover:from-purple-600 hover:to-blue-600 transition-all duration-300 shadow-lg hover:shadow-xl"

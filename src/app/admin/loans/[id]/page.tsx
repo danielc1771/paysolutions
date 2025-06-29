@@ -108,6 +108,7 @@ export default function LoanDetail({ params }: LoanDetailProps) {
   // Initial load
   useEffect(() => {
     fetchLoanData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Remove fetchLoanData dependency to prevent infinite loop
 
   // Optimized polling effect for DocuSign status updates
@@ -165,6 +166,7 @@ export default function LoanDetail({ params }: LoanDetailProps) {
         clearInterval(intervalId);
       }
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loan?.docusign_status, loan?.docusign_envelope_id]);
 
   const handleSendDocuSign = async () => {
@@ -197,7 +199,7 @@ export default function LoanDetail({ params }: LoanDetailProps) {
   };
 
   const handleViewInDocuSign = async () => {
-    if (!loan.docusign_envelope_id) {
+    if (!loan?.docusign_envelope_id) {
       alert('No DocuSign envelope found for this loan');
       return;
     }
@@ -226,7 +228,7 @@ export default function LoanDetail({ params }: LoanDetailProps) {
   const handleApproveLoan = async () => {
     setApprovingLoan(true);
     try {
-      const response = await fetch(`/api/loans/${loan.id}/approve`, {
+      const response = await fetch(`/api/loans/${loan?.id}/approve`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

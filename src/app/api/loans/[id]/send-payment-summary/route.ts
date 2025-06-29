@@ -3,11 +3,11 @@ import { createClient } from '@/utils/supabase/server';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createClient();
-    const loanId = params.id;
+    const { id: loanId } = await params;
 
     if (!loanId) {
       return NextResponse.json(
@@ -65,8 +65,10 @@ export async function POST(
     // 
     // For this example, we'll simulate sending the email
     
+    const borrower = Array.isArray(loan.borrower) ? loan.borrower[0] : loan.borrower;
+    
     const emailData = {
-      to: loan.borrower.email,
+      to: borrower?.email || '',
       subject: `Payment Summary for Loan #${loan.loan_number}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -76,7 +78,7 @@ export async function POST(
           </div>
           
           <div style="background: #f8f9fa; padding: 25px; border-radius: 10px; margin-bottom: 25px;">
-            <h2 style="color: #333; margin-top: 0;">Hello ${loan.borrower.first_name},</h2>
+            <h2 style="color: #333; margin-top: 0;">Hello ${borrower?.first_name || 'Borrower'},</h2>
             <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
               Your loan payment summary is now available. You can view your complete payment schedule, 
               upcoming due dates, and payment history using the secure link below.
@@ -134,7 +136,7 @@ export async function POST(
       .insert({
         loan_id: loanId,
         activity_type: 'payment_summary_sent',
-        description: `Payment summary email sent to ${loan.borrower.email}`,
+        description: `Payment summary email sent to ${borrower?.email || 'unknown'}`,
         created_at: new Date().toISOString()
       });
 
@@ -145,7 +147,7 @@ export async function POST(
     return NextResponse.json({
       success: true,
       message: 'Payment summary email sent successfully',
-      recipient: loan.borrower.email,
+      recipient: borrower?.email || '',
       paymentSummaryUrl
     });
 

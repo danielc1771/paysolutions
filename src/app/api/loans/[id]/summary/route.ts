@@ -3,11 +3,11 @@ import { createClient } from '@/utils/supabase/server';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createClient();
-    const loanId = params.id;
+    const { id: loanId } = await params;
 
     if (!loanId) {
       return NextResponse.json(
@@ -56,7 +56,10 @@ export async function GET(
     // Transform the data to match expected interface
     const transformedLoan = {
       ...loan,
-      borrower_name: loan.borrower ? `${loan.borrower.first_name} ${loan.borrower.last_name}` : 'Unknown',
+      borrower_name: (() => {
+        const borrower = Array.isArray(loan.borrower) ? loan.borrower[0] : loan.borrower;
+        return borrower ? `${borrower.first_name} ${borrower.last_name}` : 'Unknown';
+      })(),
       borrower: Array.isArray(loan.borrower) ? loan.borrower[0] : loan.borrower
     };
 

@@ -81,7 +81,7 @@ export async function POST(
 
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
     const setupUrl = new URL('/payment-setup', baseUrl);
-    setupUrl.searchParams.set('setup_intent', setupIntent.client_secret);
+    setupUrl.searchParams.set('setup_intent', setupIntent.client_secret || '');
 
     console.log('Redirecting to setup URL:', setupUrl.href);
 
