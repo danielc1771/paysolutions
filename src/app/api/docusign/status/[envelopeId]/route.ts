@@ -4,10 +4,10 @@ import { createEnvelopesApi } from '@/utils/docusign/client';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { envelopeId: string } }
+  { params }: { params: Promise<{ envelopeId: string }> }
 ) {
   try {
-    const { envelopeId } = params;
+    const { envelopeId } = await params;
 
     if (!envelopeId) {
       return NextResponse.json({ error: 'Envelope ID is required' }, { status: 400 });

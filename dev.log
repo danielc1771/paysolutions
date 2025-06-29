@@ -1,0 +1,84 @@
+
+> paysolutions-loans@0.1.0 dev
+> next dev --turbopack
+
+   ▲ Next.js 15.3.4 (Turbopack)
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.1.151:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+ ⚠ Invalid next.config.ts options detected: 
+ ⚠     Unrecognized key(s) in object: 'serverComponentsExternalPackages' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+ ⚠ `experimental.serverComponentsExternalPackages` has been moved to `serverExternalPackages`. Please update your next.config.ts file accordingly.
+ ✓ Compiled middleware in 104ms
+ ✓ Ready in 703ms
+ ⚠ Webpack is configured while Turbopack is not, which may cause problems.
+ ⚠ See instructions if you need to configure Turbopack:
+  https://nextjs.org/docs/app/api-reference/next-config-js/turbo
+
+ ✓ Compiled /api/docusign/debug in 343ms
+ GET /api/docusign/debug 200 in 610ms
+ GET /api/docusign/debug?action=list-loans-with-envelopes 200 in 287ms
+🔍 Checking envelope status for: 881caf8d-1496-499e-ab61-5508d85ff170
+🔐 Starting DocuSign JWT authentication...
+📋 Environment variables check:
+- Integration Key: f92510aa...
+- User ID: 590d7838...
+- Private Key: Present
+🔑 Private key processed, length: 1675
+🚀 Requesting JWT token...
+✅ JWT token received successfully
+ GET /api/docusign/debug?action=check-envelope-status&envelopeId=881caf8d-1496-499e-ab61-5508d85ff170 200 in 1140ms
+🔄 Force refreshing status for envelope: 881caf8d-1496-499e-ab61-5508d85ff170
+ ✓ Compiled /api/docusign/status/[envelopeId] in 156ms
+Error: Route "/api/docusign/status/[envelopeId]" used `params.envelopeId`. `params` should be awaited before using its properties. Learn more: https://nextjs.org/docs/messages/sync-dynamic-apis
+    at GET (src/app/api/docusign/status/[envelopeId]/route.ts:10:12)
+   8 | ) {
+   9 |   try {
+> 10 |     const { envelopeId } = params;
+     |            ^
+  11 |
+  12 |     if (!envelopeId) {
+  13 |       return NextResponse.json({ error: 'Envelope ID is required' }, { status: 400 });
+🔍 Checking DocuSign envelope status: 881caf8d-1496-499e-ab61-5508d85ff170
+🔐 Starting DocuSign JWT authentication...
+📋 Environment variables check:
+- Integration Key: f92510aa...
+- User ID: 590d7838...
+- Private Key: Present
+🔑 Private key processed, length: 1675
+🚀 Requesting JWT token...
+✅ JWT token received successfully
+📋 DocuSign envelope data: {
+  envelopeId: '881caf8d-1496-499e-ab61-5508d85ff170',
+  status: 'completed',
+  completedDateTime: '2025-06-28T19:06:54.4600000Z',
+  statusChangedDateTime: '2025-06-28T19:06:54.4600000Z',
+  hasSignedRecipients: true,
+  recipients: [
+    {
+      name: 'Jhoam Garcia',
+      email: 'jgarcia@easycarus.com',
+      status: 'completed',
+      signedDateTime: '2025-06-28T19:06:54.4600000Z'
+    }
+  ]
+}
+🔍 Current loan status in DB: {
+  loanId: 'eca99f51-906f-4dd2-9992-0e9f6d9c520e',
+  currentDocuSignStatus: 'delivered',
+  currentLoanStatus: 'new',
+  newDocuSignStatus: 'completed'
+}
+🎉 Document is actually signed!
+💾 Updating loan with new status: {
+  docusign_status: 'signed',
+  docusign_status_updated: '2025-06-29T01:02:23.265Z',
+  status: 'signed',
+  docusign_completed_at: '2025-06-28T19:06:54.4600000Z'
+}
+✅ Loan eca99f51-906f-4dd2-9992-0e9f6d9c520e updated: DocuSign signed, Loan status: signed
+ GET /api/docusign/status/881caf8d-1496-499e-ab61-5508d85ff170 200 in 1639ms
+ POST /api/docusign/debug 200 in 1665ms
