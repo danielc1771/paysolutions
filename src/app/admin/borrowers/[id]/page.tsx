@@ -1,6 +1,5 @@
 'use client';
 
-import { notFound } from 'next/navigation';
 import AdminLayout from '@/components/AdminLayout';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';

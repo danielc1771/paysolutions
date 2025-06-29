@@ -66,12 +66,11 @@ export async function POST(request: NextRequest) {
         email,
         phone,
         date_of_birth,
-        ssn_last_four: ssn.slice(-4), // Store only last 4 digits
+        ssn: ssn, // Store full SSN (should be encrypted in real app)
         address_line1: address, // Map address to address_line1
         city,
         state,
         zip_code,
-        country: 'US', // Default to US
         employment_status,
         annual_income,
         kyc_status: 'pending', // Default status

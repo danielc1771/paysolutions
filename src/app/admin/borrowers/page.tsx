@@ -2,8 +2,7 @@
 
 import { createClient } from '@/utils/supabase/client';
 import AdminLayout from '@/components/AdminLayout';
-import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 
 interface Borrower {
   id: string;
@@ -37,42 +36,51 @@ export default function BorrowersPage() {
   const [borrowers, setBorrowers] = useState<Borrower[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    isOpen: boolean;
+    borrowerId: string;
+    borrowerName: string;
+  }>({
+    isOpen: false,
+    borrowerId: '',
+    borrowerName: ''
+  });
 
   const supabase = createClient();
 
-  useEffect(() => {
-    const fetchBorrowers = async () => {
-      try {
-        setLoading(true);
-        const { data, error } = await supabase
-          .from('borrowers')
-          .select(`
-            *,
-            loans(
-              id,
-              loan_number,
-              principal_amount,
-              status
-            )
-          `)
-          .order('created_at', { ascending: false });
+  const fetchBorrowers = useCallback(async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('borrowers')
+        .select(`
+          *,
+          loans(
+            id,
+            loan_number,
+            principal_amount,
+            status
+          )
+        `)
+        .order('created_at', { ascending: false });
 
-        if (error) {
-          setError(error.message);
-          console.error('Error fetching borrowers:', error);
-        } else {
-          setBorrowers(data || []);
-        }
-      } catch (err) {
-        setError('Failed to fetch borrowers');
-        console.error('Error:', err);
-      } finally {
-        setLoading(false);
+      if (error) {
+        setError(error.message);
+        console.error('Error fetching borrowers:', error);
+      } else {
+        setBorrowers(data || []);
       }
-    };
+    } catch (err) {
+      setError('Failed to fetch borrowers');
+      console.error('Error:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [supabase]);
 
+  useEffect(() => {
     fetchBorrowers();
-  }, []);
+  }, [fetchBorrowers]);
 
   const getKycStatusColor = (status: string) => {
     switch (status) {
@@ -92,6 +100,40 @@ export default function BorrowersPage() {
       case 'retired': return 'bg-purple-100 text-purple-800';
       default: return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const handleDeleteBorrower = async (borrowerId: string) => {
+    try {
+      const response = await fetch(`/api/borrowers/${borrowerId}`, {
+        method: 'DELETE',
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        alert('Borrower deleted successfully');
+        // Refresh the borrowers list
+        fetchBorrowers();
+      } else {
+        alert('Error deleting borrower: ' + (result.details || result.error));
+      }
+    } catch {
+      alert('Failed to delete borrower');
+    } finally {
+      setDeleteConfirm({ isOpen: false, borrowerId: '', borrowerName: '' });
+    }
+  };
+
+  const openDeleteConfirm = (borrowerId: string, borrowerName: string) => {
+    setDeleteConfirm({
+      isOpen: true,
+      borrowerId,
+      borrowerName
+    });
+  };
+
+  const closeDeleteConfirm = () => {
+    setDeleteConfirm({ isOpen: false, borrowerId: '', borrowerName: '' });
   };
 
   // Calculate stats
@@ -357,11 +399,26 @@ export default function BorrowersPage() {
                             )}
                             
                             <button 
-                              className={`p-3 rounded-2xl transition-all duration-300 group-hover:scale-110 ${needsKycReview ? 'bg-orange-100 text-orange-600' : 'bg-purple-100 text-purple-600'}`}
+                              className={`p-3 rounded-2xl transition-all duration-300 group-hover:scale-110 ${needsKycReview ? 'bg-orange-100 text-orange-600 hover:bg-orange-200' : 'bg-blue-100 text-blue-600 hover:bg-blue-200'}`}
                               onClick={(e) => e.stopPropagation()}
+                              title="View Details"
                             >
-                              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                            </button>
+                            
+                            <button 
+                              className="p-3 bg-red-100 text-red-600 rounded-2xl transition-all duration-300 group-hover:scale-110 hover:bg-red-200"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openDeleteConfirm(borrower.id, `${borrower.first_name} ${borrower.last_name}`);
+                              }}
+                              title="Delete Borrower"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                               </svg>
                             </button>
                           </div>
@@ -375,6 +432,37 @@ export default function BorrowersPage() {
           )}
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      {deleteConfirm.isOpen && (
+        <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-8 w-96 border border-white/20">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">Delete Borrower Confirmation</h2>
+              <p className="text-gray-600">Are you sure you want to delete <span className="font-semibold text-gray-900">{deleteConfirm.borrowerName}</span>? This action cannot be undone and will also delete all associated loans.</p>
+            </div>
+            <div className="flex space-x-3">
+              <button
+                className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-6 rounded-2xl transition-colors"
+                onClick={() => handleDeleteBorrower(deleteConfirm.borrowerId)}
+              >
+                Delete Borrower
+              </button>
+              <button
+                className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-900 font-semibold py-3 px-6 rounded-2xl transition-colors"
+                onClick={closeDeleteConfirm}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   );
 }

@@ -27,7 +27,6 @@ export async function POST(request: NextRequest) {
       term_months,
       monthly_payment,
       purpose,
-      collateral_description,
     } = body;
 
     // Validate required fields
@@ -66,7 +65,6 @@ export async function POST(request: NextRequest) {
         term_months,
         monthly_payment,
         purpose,
-        collateral_description,
         status: 'new', // Default status
         remaining_balance: principal_amount, // Initially equals principal
       })
@@ -79,6 +77,30 @@ export async function POST(request: NextRequest) {
         { error: 'Failed to create loan' },
         { status: 500 }
       );
+    }
+
+    // Create notification for new loan
+    try {
+      const notificationResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/notifications`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: 'loan_created',
+          title: 'New Loan Created',
+          message: `Loan ${loanNumber} created for $${principal_amount.toLocaleString()}`,
+          related_id: loan.id,
+          related_table: 'loans'
+        }),
+      });
+
+      if (!notificationResponse.ok) {
+        console.warn('Failed to create notification for new loan');
+      }
+    } catch (notificationError) {
+      console.warn('Error creating notification:', notificationError);
+      // Don't fail the loan creation if notification fails
     }
 
     return NextResponse.json(loan, { status: 201 });

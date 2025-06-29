@@ -57,10 +57,10 @@ export async function GET(
     // Update database with current status
     const supabase = await createClient();
     
-    // Find loan by envelope ID
+    // Find loan by envelope ID and get borrower info for notification
     const { data: loan, error: findError } = await supabase
       .from('loans')
-      .select('id, status, docusign_status')
+      .select('id, status, docusign_status, loan_number, borrower:borrower_id(first_name, last_name)')
       .eq('docusign_envelope_id', envelopeId)
       .single();
 
@@ -89,6 +89,33 @@ export async function GET(
       console.log('🎉 Document is actually signed!');
       docusignStatus = 'signed'; // Normalize to 'signed' for our UI
       newLoanStatus = 'signed'; // Document is signed, ready for admin approval
+      
+      // Create notification for document signing
+      try {
+        const borrowerName = loan.borrower ? `${loan.borrower.first_name} ${loan.borrower.last_name}` : 'Borrower';
+        const notificationResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/notifications`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            type: 'document_signed',
+            title: 'Document Signed',
+            message: `${borrowerName} signed loan agreement #${loan.loan_number}`,
+            related_id: loan.id,
+            related_table: 'loans'
+          }),
+        });
+
+        if (!notificationResponse.ok) {
+          console.warn('Failed to create notification for signed document');
+        } else {
+          console.log('✅ Notification created for signed document');
+        }
+      } catch (notificationError) {
+        console.warn('Error creating notification for signed document:', notificationError);
+        // Don't fail the status update if notification fails
+      }
     } else {
       // Handle other statuses
       switch (docusignStatus) {
