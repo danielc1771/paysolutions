@@ -63,6 +63,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   const navigation = [
     {
+      name: 'Create Loan',
+      href: '/admin/loans/create',
+      icon: <Plus className="w-5 h-5" />,
+    },
+    {
       name: 'Dashboard',
       href: '/admin',
       icon: <LayoutDashboard className="w-5 h-5" />,
@@ -72,11 +77,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       href: '/admin/loans',
       icon: <FileText className="w-5 h-5" />,
     },
-    {
-      name: 'Create Loan',
-      href: '/admin/loans/create',
-      icon: <Plus className="w-5 h-5" />,
-    },
+
     {
       name: 'Borrowers',
       href: '/admin/borrowers',
