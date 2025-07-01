@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { createClient } from '@/utils/supabase/client';
-import { LayoutDashboard, FileText, Plus, Users, Bell, Check, Clock, AlertCircle } from 'lucide-react';
+import { LayoutDashboard, FileText, Plus, Users, Bell, Check, Clock, AlertCircle, UserPlus } from 'lucide-react';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -17,6 +17,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [showAccountDropdown, setShowAccountDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -26,13 +27,22 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   // Get user on mount
   useEffect(() => {
-    const getUser = async () => {
+    const getUserAndProfile = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
+
+      if (user) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+        setProfile(profileData);
+      }
       setLoading(false);
     };
     
-    getUser();
+    getUserAndProfile();
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -190,11 +200,18 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       href: '/admin/loans',
       icon: <FileText className="w-5 h-5" />,
     },
-
     {
       name: 'Borrowers',
       href: '/admin/borrowers',
       icon: <Users className="w-5 h-5" />,
+    },
+  ];
+
+  const adminNavigation = [
+    {
+      name: 'Users',
+      href: '/admin/users',
+      icon: <UserPlus className="w-5 h-5" />,
     },
   ];
 
@@ -258,6 +275,38 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               </Link>
             );
           })}
+
+          {profile?.role === 'admin' && (
+            <>
+              <div className="border-t border-white/20"></div>
+              {adminNavigation.map((item) => {
+                const isActive = pathname === item.href;
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    className={`group flex items-center px-4 py-4 text-sm font-semibold rounded-2xl transition-all duration-300 ${
+                      isActive
+                        ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-lg shadow-purple-500/25'
+                        : 'text-gray-700 hover:bg-white/60 hover:backdrop-blur-sm hover:shadow-lg'
+                    }`}
+                  >
+                    <span className={`mr-4 p-2 rounded-xl transition-all duration-300 ${
+                      isActive 
+                        ? 'bg-white/20' 
+                        : 'bg-gray-100 group-hover:bg-white group-hover:shadow-md'
+                    }`}>
+                      {item.icon}
+                    </span>
+                    <span className="font-medium">{item.name}</span>
+                    {isActive && (
+                      <div className="ml-auto w-2 h-2 bg-white rounded-full"></div>
+                    )}
+                  </Link>
+                );
+              })}
+            </>
+          )}
         </nav>
 
       </div>

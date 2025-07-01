@@ -33,6 +33,26 @@ export default function AdminDashboard() {
     const fetchLoans = async () => {
       try {
         setLoading(true);
+        const { data: { user } } = await supabase.auth.getUser();
+
+        if (!user) {
+          setError('User not authenticated');
+          setLoading(false);
+          return;
+        }
+
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('organization_id')
+          .eq('id', user.id)
+          .single();
+
+        if (profileError || !profile?.organization_id) {
+          setError(profileError?.message || 'Could not retrieve organization ID for user.');
+          setLoading(false);
+          return;
+        }
+
         const { data, error } = await supabase
           .from('loans')
           .select(`
@@ -44,6 +64,7 @@ export default function AdminDashboard() {
               kyc_status
             )
           `)
+          .eq('organization_id', profile.organization_id)
           .order('created_at', { ascending: false });
 
         if (error) {

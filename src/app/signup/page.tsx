@@ -48,8 +48,26 @@ export default function SignupPage() {
 
       if (error) {
         setError(error.message);
-      } else {
-        setSuccess(true);
+      } else if (data.user) {
+        // Insert profile with admin role and hardcoded organization_id
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: data.user.id,
+            organization_id: 'ba658ea8-9ff5-498d-82a4-25a3f1c60f1f', // Hardcoded organization ID
+            role: 'admin',
+            full_name: fullName,
+            email: email,
+          });
+
+        if (profileError) {
+          setError(profileError.message);
+          // Optionally, you might want to delete the user created by auth.signUp here
+          // if profile creation fails, to keep the database consistent.
+          // However, for this task, we'll just report the error.
+        } else {
+          setSuccess(true);
+        }
       }
     } catch {
       setError('An unexpected error occurred');

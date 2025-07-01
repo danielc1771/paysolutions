@@ -1,12 +1,33 @@
-import { pgTable, index, unique, pgPolicy, uuid, varchar, date, numeric, timestamp, foreignKey, integer, text, check } from "drizzle-orm/pg-core"
+import { pgTable, index, unique, pgPolicy, uuid, varchar, date, numeric, timestamp, foreignKey, integer, text, check, pgEnum } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
+// import { organization } from "./auth";
 
+export const organization = pgTable("organizations", {
+	id: uuid("id").defaultRandom().primaryKey(),
+	name: varchar("name", { length: 255 }).notNull(),
+	createdAt: timestamp("created_at").defaultNow(),
+	updatedAt: timestamp("updated_at").defaultNow(),
+  });
+  
+  export const roleEnum = pgEnum('role', ['admin', 'user']);
+  export const profileStatusEnum = pgEnum('profile_status', ['INVITED', 'ACTIVE']);
+  
+  // This table stores user-specific data, linking them to an organization and a role.
+  // The `id` column is the primary key and is intended to match the `id` from Supabase's `auth.users` table.
+  export const profiles = pgTable("profiles", {
+	  id: uuid('id').primaryKey(), // This ID must correspond to the user's ID in auth.users
+	  organizationId: uuid('organization_id').references(() => organization.id),
+	  role: roleEnum('role').default('user'),
+    fullName: varchar("full_name", { length: 255 }),
+    email: varchar("email", { length: 255 }),
+    status: profileStatusEnum('status').default('INVITED'),
+  });
 
 export const borrowers = pgTable("borrowers", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	firstName: varchar("first_name", { length: 255 }).notNull(),
 	lastName: varchar("last_name", { length: 255 }).notNull(),
-	email: varchar({ length: 255 }).notNull(),
+	email: varchar({ length: 255 }),
 	phone: varchar({ length: 20 }),
 	dateOfBirth: date("date_of_birth"),
 	addressLine1: varchar("address_line1", { length: 255 }),
@@ -15,9 +36,21 @@ export const borrowers = pgTable("borrowers", {
 	zipCode: varchar("zip_code", { length: 10 }),
 	employmentStatus: varchar("employment_status", { length: 50 }),
 	annualIncome: numeric("annual_income", { precision: 12, scale:  2 }),
+	currentEmployerName: varchar("current_employer_name", { length: 255 }),
+	timeWithEmployment: varchar("time_with_employment", { length: 50 }),
 	kycStatus: varchar("kyc_status", { length: 50 }).default('pending'),
+	reference1Name: varchar("reference1_name", { length: 255 }),
+	reference1Phone: varchar("reference1_phone", { length: 20 }),
+	reference1Email: varchar("reference1_email", { length: 255 }),
+	reference2Name: varchar("reference2_name", { length: 255 }),
+	reference2Phone: varchar("reference2_phone", { length: 20 }),
+	reference2Email: varchar("reference2_email", { length: 255 }),
+	reference3Name: varchar("reference3_name", { length: 255 }),
+	reference3Phone: varchar("reference3_phone", { length: 20 }),
+	reference3Email: varchar("reference3_email", { length: 255 }),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+	organizationId: uuid('organization_id').references(() => organization.id),
 }, (table) => [
 	index("idx_borrowers_email").using("btree", table.email.asc().nullsLast().op("text_ops")),
 	unique("borrowers_email_key").on(table.email),
@@ -75,7 +108,7 @@ export const payments = pgTable("payments", {
 	pgPolicy("Enable all operations for service role", { as: "permissive", for: "all", to: ["public"], using: sql`true` }),
 ]);
 
-export const loans = pgTable("loans", {
+export const loans = pgTable("loans", { // Added vehicle fields
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	loanNumber: varchar("loan_number", { length: 50 }).notNull(),
 	borrowerId: uuid("borrower_id"),
@@ -91,8 +124,13 @@ export const loans = pgTable("loans", {
 	docusignStatus: varchar("docusign_status", { length: 50 }).default('not_sent'),
 	docusignStatusUpdated: timestamp("docusign_status_updated", { withTimezone: true, mode: 'string' }),
 	docusignCompletedAt: timestamp("docusign_completed_at", { withTimezone: true, mode: 'string' }),
+	vehicleYear: varchar("vehicle_year", { length: 4 }).notNull(),
+	vehicleMake: varchar("vehicle_make", { length: 255 }).notNull(),
+	vehicleModel: varchar("vehicle_model", { length: 255 }).notNull(),
+	vehicleVin: varchar("vehicle_vin", { length: 17 }).notNull(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+	organizationId: uuid('organization_id').references(() => organization.id),
 }, (table) => [
 	index("idx_loans_borrower_id").using("btree", table.borrowerId.asc().nullsLast().op("uuid_ops")),
 	index("idx_loans_docusign_envelope_id").using("btree", table.docusignEnvelopeId.asc().nullsLast().op("text_ops")),
