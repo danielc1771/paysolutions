@@ -1,7 +1,7 @@
 import { Resend } from 'resend';
 import { LoanApplicationTemplate } from '@/components/emails/LoanApplicationTemplate';
 
-const resend = new Resend('re_bq5JrnkW_7ST7xk8HGfNpAAK4qjRaTjEg');
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 interface LoanApplicationEmailData {
   to: string;

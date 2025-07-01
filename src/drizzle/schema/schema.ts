@@ -7,21 +7,31 @@ export const organization = pgTable("organizations", {
 	name: varchar("name", { length: 255 }).notNull(),
 	createdAt: timestamp("created_at").defaultNow(),
 	updatedAt: timestamp("updated_at").defaultNow(),
-  });
-  
-  export const roleEnum = pgEnum('role', ['admin', 'user', 'borrower']);
-  export const profileStatusEnum = pgEnum('profile_status', ['INVITED', 'ACTIVE']);
-  
-  // This table stores user-specific data, linking them to an organization and a role.
-  // The `id` column is the primary key and is intended to match the `id` from Supabase's `auth.users` table.
-  export const profiles = pgTable("profiles", {
-	  id: uuid('id').primaryKey(), // This ID must correspond to the user's ID in auth.users
-	  organizationId: uuid('organization_id').references(() => organization.id),
-	  role: roleEnum('role').default('user'),
-    fullName: varchar("full_name", { length: 255 }),
-    email: varchar("email", { length: 255 }),
-    status: profileStatusEnum('status').default('INVITED'),
-  });
+	email: varchar("email", { length: 255 }),
+	phone: varchar("phone", { length: 255 }),
+	address: varchar("address", { length: 255 }),
+	city: varchar("city", { length: 255 }),
+	state: varchar("state", { length: 255 }),
+	zipCode: varchar("zip_code", { length: 10 }),
+	website: varchar("website", { length: 255 }),
+	description: text("description"),
+	contactPerson: varchar("contact_person", { length: 255 }),
+	taxId: varchar("tax_id", { length: 255 }),
+});
+
+export const roleEnum = pgEnum('role', ['admin', 'user', 'borrower']);
+export const profileStatusEnum = pgEnum('profile_status', ['INVITED', 'ACTIVE']);
+
+// This table stores user-specific data, linking them to an organization and a role.
+// The `id` column is the primary key and is intended to match the `id` from Supabase's `auth.users` table.
+export const profiles = pgTable("profiles", {
+	id: uuid('id').primaryKey(), // This ID must correspond to the user's ID in auth.users
+	organizationId: uuid('organization_id').references(() => organization.id),
+	role: roleEnum('role').default('user'),
+	fullName: varchar("full_name", { length: 255 }),
+	email: varchar("email", { length: 255 }),
+	status: profileStatusEnum('status').default('INVITED'),
+});
 
 export const borrowers = pgTable("borrowers", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
@@ -131,6 +141,8 @@ export const loans = pgTable("loans", { // Added vehicle fields
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	organizationId: uuid('organization_id').references(() => organization.id),
+	applicationStep: integer("application_step").default(1),
+	stripeVerificationSessionId: varchar("stripe_verification_session_id", { length: 255 }),
 }, (table) => [
 	index("idx_loans_borrower_id").using("btree", table.borrowerId.asc().nullsLast().op("uuid_ops")),
 	index("idx_loans_docusign_envelope_id").using("btree", table.docusignEnvelopeId.asc().nullsLast().op("text_ops")),

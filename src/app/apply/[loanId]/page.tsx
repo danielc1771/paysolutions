@@ -21,6 +21,8 @@ interface LoanApplicationData {
     vehicleMake: string;
     vehicleModel: string;
     vehicleVin: string;
+    applicationStep: number;
+    stripeVerificationSessionId?: string;
   };
   dealerName: string;
 }
@@ -51,6 +53,7 @@ export default function ApplyPage() {
     reference3Name: '',
     reference3Phone: '',
     reference3Email: '',
+    stripeVerificationSessionId: '',
     // Stripe verification
     stripeVerificationStatus: 'pending',
     // Consent preferences
@@ -75,7 +78,12 @@ export default function ApplyPage() {
         }
         const data = await response.json();
         setInitialData({...data, loanId});
-        setStep(1); // Move to the first step (Welcome)
+        setFormData({
+          ...formData,
+          ...data.borrower,
+          stripeVerificationSessionId: data.loan.stripeVerificationSessionId ?? '',
+        });
+        setStep(data.loan.applicationStep || 1); // Move to the saved step or first step
       } catch (err: any) {
         setError(err.message);
         setStep(-1); // Move to an error step
@@ -87,13 +95,32 @@ export default function ApplyPage() {
     fetchApplicationData();
   }, [loanId]);
 
-  const handleNext = () => setStep(prev => prev + 1);
+  const saveProgress = async (currentStep: number, data: any) => {
+    try {
+      console.log({ data, currentStep });
+      await fetch(`/api/apply/${loanId}/save-progress`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...data, applicationStep: currentStep }),
+      });
+    } catch (err) {
+      console.error("Failed to save progress", err);
+    }
+  };
+
+  const handleNext = () => {
+    const nextStep = step + 1;
+    saveProgress(nextStep, formData);
+    setStep(nextStep);
+  };
+
   const handlePrev = () => setStep(prev => prev - 1);
 
   const handleSubmit = async () => {
     setLoading(true);
     setError(null);
     try {
+      await saveProgress(step, formData); // Save final data
       const response = await fetch(`/api/apply/${loanId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -126,7 +153,7 @@ export default function ApplyPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 flex flex-col items-center justify-center p-4 font-sans">
-      <div className="w-full max-w-2xl">
+      <div className="w-full max-w-4xl">
         {/* Header and Step Indicator */}
         {step > 1 && step <= 8 && (
           <div className="mb-8">
@@ -161,6 +188,7 @@ export default function ApplyPage() {
                 handlePrev={handlePrev}
                 handleSubmit={handleSubmit}
                 loading={loading}
+                saveProgress={saveProgress}
               />
             )}
 
@@ -433,7 +461,7 @@ function ReferencesStep({ formData, setFormData, handleNext, handlePrev }) {
 }
 
 // Step 5: Stripe Identity Verification
-function StripeVerificationStep({ formData, setFormData, initialData, handleNext, handlePrev }) {
+function StripeVerificationStep({ formData, setFormData, initialData, handleNext, handlePrev, saveProgress }) {
   const [verificationStatus, setVerificationStatus] = useState('not_started'); // not_started, in_progress, completed, failed
   const [isVerifying, setIsVerifying] = useState(false);
   const [stripe, setStripe] = useState(null);
@@ -456,7 +484,12 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
     };
     
     loadStripe();
-  }, []);
+
+    if (formData.stripeVerificationSessionId) {
+      pollVerificationStatus(formData.stripeVerificationSessionId);
+    }
+
+  }, [formData.stripeVerificationSessionId]);
 
   const startVerification = async () => {
     if (!stripe) {
@@ -489,6 +522,10 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
         throw new Error(session.error || 'Failed to create verification session');
       }
 
+      // Save the session ID to the database
+      await saveProgress(5, { ...formData, stripeVerificationSessionId: session.verification_session_id });
+      setFormData({ ...formData, stripeVerificationSessionId: session.verification_session_id });
+
       // Show the verification modal using Stripe.js
       const result = await stripe.verifyIdentity(session.client_secret);
 
@@ -504,7 +541,6 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
         setFormData({
           ...formData, 
           stripeVerificationStatus: 'processing',
-          stripeVerificationSessionId: session.verification_session_id
         });
         
         // Poll for verification results
@@ -766,7 +802,7 @@ function ConsentStep({ formData, setFormData, handleNext, handlePrev }) {
         </div>
 
         {/* Communication Preferences */}
-        {(formData.consentToText || formData.consentToCall) && (
+        {/* {(formData.consentToText || formData.consentToCall) && (
           <div className="bg-white border border-gray-200 rounded-2xl p-6">
             <h3 className="text-lg font-bold text-gray-900 mb-4">Preferred Contact Method</h3>
             <div className="space-y-3">
@@ -811,7 +847,7 @@ function ConsentStep({ formData, setFormData, handleNext, handlePrev }) {
               )}
             </div>
           </div>
-        )}
+        )} */}
       </div>
 
       <div className="mt-10 flex flex-col-reverse md:flex-row md:justify-between gap-4">

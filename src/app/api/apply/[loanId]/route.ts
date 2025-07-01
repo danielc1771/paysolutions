@@ -47,23 +47,23 @@ export async function GET(request: Request, { params }: { params: { loanId: stri
         vehicle_make,
         vehicle_model,
         vehicle_vin,
-        borrower:borrowers!inner(
-          first_name,
-          last_name,
-          email,
-          phone
-        ),
-        organization:organizations!inner(
-          name
-        )
+        application_step,
+        stripe_verification_session_id,
+        borrowers(*),
+        organizations(*)
       `)
       .eq('id', loanId)
       .single();
 
-    if (loanError) throw new Error('Loan not found.');
-    if (loan.status !== 'application_sent') {
+    if (loanError)  {
+      console.log(loanError);
+      throw new Error('Loan not found');
+    }
+    if (loan.status !== 'application_sent' && loan.status !== 'application_in_progress') {
       throw new Error('This application has already been submitted or is invalid.');
     }
+
+    console.log(loan);
 
     return NextResponse.json({
       loan: {
@@ -72,9 +72,11 @@ export async function GET(request: Request, { params }: { params: { loanId: stri
         vehicleMake: loan.vehicle_make,
         vehicleModel: loan.vehicle_model,
         vehicleVin: loan.vehicle_vin,
+        applicationStep: loan.application_step,
+        stripeVerificationSessionId: loan.stripe_verification_session_id,
       },
-      borrower: loan.borrower,
-      dealerName: loan.organization?.name,
+      borrower: loan.borrowers,
+      dealerName: loan.organizations?.name,
     });
 
   } catch (error: any) {

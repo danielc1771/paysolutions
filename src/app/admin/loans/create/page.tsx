@@ -80,7 +80,7 @@ function SendApplicationForm() {
       const response = await fetch('/api/loans/send-application', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fullName, loanAmount: parseFloat(loanAmount), email, vehicleYear, vehicleMake, vehicleModel, vehicleVin }),
+        body: JSON.stringify({ customerName: fullName, loanAmount, customerEmail: email, vehicleYear, vehicleMake, vehicleModel, vehicleVin }),
       });
 
       if (!response.ok) {
