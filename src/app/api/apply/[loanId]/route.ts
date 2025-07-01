@@ -23,6 +23,13 @@ const loanApplicationSchema = z.object({
   reference3Name: z.string().optional(),
   reference3Phone: z.string().optional(),
   reference3Email: z.string().optional(),
+  // Stripe verification
+  stripeVerificationStatus: z.string().optional(),
+  // Consent preferences
+  consentToContact: z.boolean().optional(),
+  consentToText: z.boolean().optional(),
+  consentToCall: z.boolean().optional(),
+  communicationPreferences: z.string().optional(),
 });
 
 // GET handler to fetch initial loan data
@@ -54,7 +61,7 @@ export async function GET(request: Request, { params }: { params: { loanId: stri
       .single();
 
     if (loanError) throw new Error('Loan not found.');
-    if (loan.status !== 'APPLICATION_SENT') {
+    if (loan.status !== 'application_sent') {
       throw new Error('This application has already been submitted or is invalid.');
     }
 
@@ -94,7 +101,7 @@ export async function POST(request: Request, { params }: { params: { loanId: str
       .eq('id', loanId)
       .single();
 
-    if (!loan || loan.status !== 'APPLICATION_SENT') {
+    if (!loan || loan.status !== 'application_sent') {
       throw new Error('This application cannot be updated.');
     }
 
@@ -122,14 +129,28 @@ export async function POST(request: Request, { params }: { params: { loanId: str
         reference3_name: validation.data.reference3Name,
         reference3_phone: validation.data.reference3Phone,
         reference3_email: validation.data.reference3Email,
+        // Update KYC status based on Stripe verification
+        kyc_status: validation.data.stripeVerificationStatus === 'completed' ? 'completed' : 'pending',
       })
       .eq('id', loan.borrower_id);
 
     if (borrowerUpdateError) throw borrowerUpdateError;
 
+    // Store consent preferences in a separate table or add to loan metadata
+    const consentData = {
+      consent_to_contact: validation.data.consentToContact || false,
+      consent_to_text: validation.data.consentToText || false,
+      consent_to_call: validation.data.consentToCall || false,
+      communication_preferences: validation.data.communicationPreferences || 'email',
+      stripe_verification_status: validation.data.stripeVerificationStatus || 'pending'
+    };
+
     const { error: loanUpdateError } = await supabase
       .from('loans')
-      .update({ status: 'APPLICATION_COMPLETED' })
+      .update({ 
+        status: 'application_completed',
+        metadata: consentData 
+      })
       .eq('id', loanId);
 
     if (loanUpdateError) throw loanUpdateError;

@@ -6,6 +6,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { createClient } from '@/utils/supabase/client';
 import { LayoutDashboard, FileText, Plus, Users, Bell, Check, Clock, AlertCircle, UserPlus } from 'lucide-react';
+import { RoleRedirect, useUserProfile } from '@/components/auth/RoleRedirect';
+import { getHomepageForRole, type Role } from '@/lib/auth/roles';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -17,32 +19,23 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [showAccountDropdown, setShowAccountDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [user, setUser] = useState<any>(null);
-  const [profile, setProfile] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
+  
+  // Use the new role system
+  const { profile, loading } = useUserProfile();
 
   // Get user on mount
   useEffect(() => {
-    const getUserAndProfile = async () => {
+    const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
-
-      if (user) {
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .single();
-        setProfile(profileData);
-      }
-      setLoading(false);
     };
     
-    getUserAndProfile();
+    getUser();
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -55,6 +48,17 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
     return () => subscription.unsubscribe();
   }, [supabase.auth, router]);
+
+  // Handle role-based redirects
+  useEffect(() => {
+    if (!loading && profile) {
+      // If user is not admin but accessing admin routes, redirect to their homepage
+      if (profile.role !== 'admin' && pathname.startsWith('/admin')) {
+        const homepage = getHomepageForRole(profile.role as Role);
+        router.push(homepage);
+      }
+    }
+  }, [profile, loading, pathname, router]);
 
   // Fetch notifications
   const fetchNotifications = async () => {

@@ -51,6 +51,13 @@ export default function ApplyPage() {
     reference3Name: '',
     reference3Phone: '',
     reference3Email: '',
+    // Stripe verification
+    stripeVerificationStatus: 'pending',
+    // Consent preferences
+    consentToContact: false,
+    consentToText: false,
+    consentToCall: false,
+    communicationPreferences: 'email',
   });
   const [initialData, setInitialData] = useState<LoanApplicationData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -67,7 +74,7 @@ export default function ApplyPage() {
           throw new Error(err.message || 'Failed to load application details.');
         }
         const data = await response.json();
-        setInitialData(data);
+        setInitialData({...data, loanId});
         setStep(1); // Move to the first step (Welcome)
       } catch (err: any) {
         setError(err.message);
@@ -97,7 +104,7 @@ export default function ApplyPage() {
         const err = await response.json();
         throw new Error(err.message || 'Failed to submit application.');
       }
-      setStep(5); // Move to success step
+      setStep(8); // Move to success step
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -110,7 +117,9 @@ export default function ApplyPage() {
     { id: 2, name: 'Personal Information', component: PersonalDetailsStep },
     { id: 3, name: 'Employment Details', component: EmploymentDetailsStep },
     { id: 4, name: 'References', component: ReferencesStep },
-    { id: 5, name: 'Review & Submit', component: ReviewStep },
+    { id: 5, name: 'Identity Verification', component: StripeVerificationStep },
+    { id: 6, name: 'Consent & Preferences', component: ConsentStep },
+    { id: 7, name: 'Review & Submit', component: ReviewStep },
   ];
 
   const CurrentStepComponent = steps.find(s => s.id === step)?.component;
@@ -119,7 +128,7 @@ export default function ApplyPage() {
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 flex flex-col items-center justify-center p-4 font-sans">
       <div className="w-full max-w-2xl">
         {/* Header and Step Indicator */}
-        {step > 1 && step <= 6 && (
+        {step > 1 && step <= 8 && (
           <div className="mb-8">
             <p className="text-sm font-semibold text-purple-600">Step {step - 1} of {steps.length -1}</p>
             <div className="mt-2 w-full bg-gray-200 rounded-full h-1.5">
@@ -155,7 +164,7 @@ export default function ApplyPage() {
               />
             )}
 
-            {step === 7 && <SuccessMessage />}
+            {step === 8 && <SuccessMessage />}
           </motion.div>
         </AnimatePresence>
       </div>
@@ -317,6 +326,13 @@ function ReviewStep({ formData, initialData, handlePrev, handleSubmit, loading }
         <ReviewItem label="Reference 3 Name" value={reviewData.reference3Name} />
         <ReviewItem label="Reference 3 Phone" value={reviewData.reference3Phone} />
         <ReviewItem label="Reference 3 Email" value={reviewData.reference3Email} />
+        <hr />
+        <h3 className="text-xl font-bold text-gray-900 mb-4">Verification & Consent</h3>
+        <ReviewItem label="Identity Verification" value={reviewData.stripeVerificationStatus === 'completed' ? 'Completed' : 'Pending'} />
+        <ReviewItem label="Communication Consent" value={reviewData.consentToContact ? 'Yes' : 'No'} />
+        <ReviewItem label="Text Message Consent" value={reviewData.consentToText ? 'Yes' : 'No'} />
+        <ReviewItem label="Phone Call Consent" value={reviewData.consentToCall ? 'Yes' : 'No'} />
+        <ReviewItem label="Preferred Contact Method" value={reviewData.communicationPreferences} />
       </div>
 
       <div className="mt-10 flex flex-col-reverse md:flex-row md:justify-between gap-4">
@@ -409,6 +425,402 @@ function ReferencesStep({ formData, setFormData, handleNext, handlePrev }) {
       <div className="mt-10 flex flex-col-reverse md:flex-row md:justify-between gap-4">
         <button onClick={handlePrev} className="w-full md:w-auto px-8 py-4 bg-white/60 backdrop-blur-sm border border-white/30 rounded-2xl text-gray-700 font-semibold hover:bg-white/80 hover:shadow-lg transition-all duration-300 shadow-sm justify-center">Back</button>
         <button onClick={handleNext} className="w-full md:w-auto px-8 py-4 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-2xl font-semibold hover:from-purple-600 hover:to-blue-600 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center">
+          Next <ArrowRight className="w-5 h-5 ml-2" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Step 5: Stripe Identity Verification
+function StripeVerificationStep({ formData, setFormData, initialData, handleNext, handlePrev }) {
+  const [verificationStatus, setVerificationStatus] = useState('not_started'); // not_started, in_progress, completed, failed
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [stripe, setStripe] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    // Load Stripe.js
+    const loadStripe = async () => {
+      if (window.Stripe) {
+        setStripe(window.Stripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY));
+      } else {
+        // Add Stripe.js script if not already loaded
+        const script = document.createElement('script');
+        script.src = 'https://js.stripe.com/v3/';
+        script.onload = () => {
+          setStripe(window.Stripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY));
+        };
+        document.head.appendChild(script);
+      }
+    };
+    
+    loadStripe();
+  }, []);
+
+  const startVerification = async () => {
+    if (!stripe) {
+      setError('Stripe is not loaded yet. Please try again.');
+      return;
+    }
+
+    setIsVerifying(true);
+    setVerificationStatus('in_progress');
+    setError(null);
+    
+    try {
+      // Create verification session on the server
+      const response = await fetch('/api/stripe/create-verification-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: initialData?.borrower.email,
+          firstName: initialData?.borrower.first_name,
+          lastName: initialData?.borrower.last_name,
+          loanId: initialData?.loanId || 'unknown'
+        }),
+      });
+
+      const session = await response.json();
+
+      if (!response.ok) {
+        throw new Error(session.error || 'Failed to create verification session');
+      }
+
+      // Show the verification modal using Stripe.js
+      const result = await stripe.verifyIdentity(session.client_secret);
+
+      if (result.error) {
+        // Handle verification errors
+        console.error('Verification error:', result.error);
+        setVerificationStatus('failed');
+        setError(result.error.message);
+        setFormData({...formData, stripeVerificationStatus: 'failed'});
+      } else {
+        // Verification was submitted successfully
+        setVerificationStatus('processing');
+        setFormData({
+          ...formData, 
+          stripeVerificationStatus: 'processing',
+          stripeVerificationSessionId: session.verification_session_id
+        });
+        
+        // Poll for verification results
+        pollVerificationStatus(session.verification_session_id);
+      }
+    } catch (error) {
+      console.error('Error starting verification:', error);
+      setVerificationStatus('failed');
+      setError(error.message);
+      setFormData({...formData, stripeVerificationStatus: 'failed'});
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const pollVerificationStatus = async (sessionId) => {
+    let attempts = 0;
+    const maxAttempts = 30; // Poll for up to 5 minutes (30 * 10 seconds)
+    
+    const poll = async () => {
+      attempts++;
+      
+      try {
+        const response = await fetch(`/api/stripe/verification-status/${sessionId}`);
+        const statusData = await response.json();
+        
+        if (statusData.status === 'verified') {
+          setVerificationStatus('completed');
+          setFormData({...formData, stripeVerificationStatus: 'completed'});
+          return;
+        } else if (statusData.status === 'requires_input') {
+          setVerificationStatus('failed');
+          setError(statusData.last_error?.reason || 'Verification failed');
+          setFormData({...formData, stripeVerificationStatus: 'failed'});
+          return;
+        } else if (statusData.status === 'processing' || statusData.status === 'submitted') {
+          // Continue polling
+          if (attempts < maxAttempts) {
+            setTimeout(poll, 10000); // Poll every 10 seconds
+          } else {
+            // Timeout - verification is taking too long
+            setError('Verification is taking longer than expected. Please refresh and try again.');
+          }
+        }
+      } catch (error) {
+        console.error('Error polling verification status:', error);
+        if (attempts < maxAttempts) {
+          setTimeout(poll, 10000); // Retry on error
+        } else {
+          setError('Unable to check verification status. Please refresh and try again.');
+        }
+      }
+    };
+    
+    // Start polling after a short delay
+    setTimeout(poll, 5000);
+  };
+
+  const canProceed = verificationStatus === 'completed' || verificationStatus === 'processing';
+
+  return (
+    <div>
+      <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Identity Verification</h1>
+      <p className="text-gray-600 mb-8">To protect against fraud and comply with regulations, we need to verify your identity using Stripe Identity.</p>
+
+      <div className="space-y-6">
+        {/* Information Card */}
+        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6">
+          <div className="flex items-start space-x-4">
+            <div className="flex-shrink-0">
+              <Lock className="w-8 h-8 text-blue-500" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-blue-900 mb-2">Secure Identity Verification</h3>
+              <ul className="text-blue-800 text-sm space-y-2">
+                <li>• Your personal information is encrypted and secure</li>
+                <li>• We use Stripe's industry-leading identity verification</li>
+                <li>• This process typically takes 2-3 minutes</li>
+                <li>• You'll need a government-issued photo ID</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        {/* Error Display */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-6">
+            <div className="flex items-center">
+              <AlertCircle className="w-5 h-5 text-red-500 mr-2" />
+              <span className="text-red-700 text-sm">{error}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Verification Status */}
+        <div className="bg-white border border-gray-200 rounded-2xl p-6">
+          <div className="text-center">
+            {verificationStatus === 'not_started' && (
+              <div>
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Lock className="w-8 h-8 text-gray-400" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Ready to Verify</h3>
+                <p className="text-gray-600 mb-6">Click the button below to start the identity verification process.</p>
+                <button
+                  onClick={startVerification}
+                  disabled={isVerifying}
+                  className="px-8 py-4 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-2xl font-semibold hover:from-green-600 hover:to-teal-600 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
+                >
+                  Start Verification
+                </button>
+              </div>
+            )}
+
+            {verificationStatus === 'in_progress' && (
+              <div>
+                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Starting Verification</h3>
+                <p className="text-gray-600 mb-6">Please complete the identity verification in the Stripe modal...</p>
+              </div>
+            )}
+
+            {verificationStatus === 'processing' && (
+              <div>
+                <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Loader2 className="w-8 h-8 text-yellow-500 animate-spin" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Processing Verification</h3>
+                <p className="text-gray-600 mb-6">Your documents are being verified. This usually takes a few moments...</p>
+              </div>
+            )}
+
+            {verificationStatus === 'completed' && (
+              <div>
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Check className="w-8 h-8 text-green-500" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Identity Verified!</h3>
+                <p className="text-green-600 mb-6">Your identity has been successfully verified. You can now proceed to the next step.</p>
+              </div>
+            )}
+
+            {verificationStatus === 'failed' && (
+              <div>
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <AlertCircle className="w-8 h-8 text-red-500" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Verification Failed</h3>
+                <p className="text-red-600 mb-6">We were unable to verify your identity. Please try again or contact support.</p>
+                <button
+                  onClick={startVerification}
+                  disabled={isVerifying}
+                  className="px-8 py-4 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-2xl font-semibold hover:from-red-600 hover:to-red-700 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
+                >
+                  Try Again
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-10 flex flex-col-reverse md:flex-row md:justify-between gap-4">
+        <button onClick={handlePrev} className="w-full md:w-auto px-8 py-4 bg-white/60 backdrop-blur-sm border border-white/30 rounded-2xl text-gray-700 font-semibold hover:bg-white/80 hover:shadow-lg transition-all duration-300 shadow-sm justify-center">Back</button>
+        <button 
+          onClick={handleNext} 
+          disabled={!canProceed}
+          className="w-full md:w-auto px-8 py-4 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-2xl font-semibold hover:from-purple-600 hover:to-blue-600 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Next <ArrowRight className="w-5 h-5 ml-2" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Step 6: Consent & Communication Preferences
+function ConsentStep({ formData, setFormData, handleNext, handlePrev }) {
+  const canProceed = formData.consentToContact && (formData.consentToText || formData.consentToCall);
+
+  return (
+    <div>
+      <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Communication Consent</h1>
+      <p className="text-gray-600 mb-8">Please review and provide your consent for how we can contact you during your loan period.</p>
+
+      <div className="space-y-6">
+        {/* Important Notice */}
+        <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-6">
+          <div className="flex items-start space-x-4">
+            <div className="flex-shrink-0">
+              <AlertCircle className="w-6 h-6 text-yellow-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-yellow-900 mb-2">Important Notice</h3>
+              <p className="text-yellow-800 text-sm">
+                By proceeding with this loan application, you agree to be contacted regarding loan updates, payment reminders, and account information. 
+                You must consent to at least one form of communication and cannot opt out until your loan is paid in full.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Consent Checkboxes */}
+        <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-6">
+          <h3 className="text-xl font-bold text-gray-900">Communication Consent (Required)</h3>
+          
+          {/* Primary Consent */}
+          <div className="space-y-4">
+            <label className="flex items-start space-x-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formData.consentToContact}
+                onChange={(e) => setFormData({...formData, consentToContact: e.target.checked})}
+                className="mt-1 w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+              />
+              <div>
+                <span className="text-gray-900 font-semibold">I consent to be contacted by PaySolutions regarding my loan</span>
+                <p className="text-sm text-gray-600 mt-1">
+                  This includes loan updates, payment notifications, account information, and customer service communications.
+                </p>
+              </div>
+            </label>
+          </div>
+
+          {/* Communication Methods */}
+          {formData.consentToContact && (
+            <div className="pl-8 space-y-4 border-l-2 border-purple-200">
+              <p className="text-sm font-semibold text-gray-700 mb-3">Select how we can contact you (choose at least one):</p>
+              
+              <label className="flex items-start space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.consentToText}
+                  onChange={(e) => setFormData({...formData, consentToText: e.target.checked})}
+                  className="mt-1 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                />
+                <div>
+                  <span className="text-gray-900 font-medium">Text Messages (SMS)</span>
+                  <p className="text-sm text-gray-600">Receive payment reminders, account alerts, and important updates via text message.</p>
+                </div>
+              </label>
+
+              <label className="flex items-start space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.consentToCall}
+                  onChange={(e) => setFormData({...formData, consentToCall: e.target.checked})}
+                  className="mt-1 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                />
+                <div>
+                  <span className="text-gray-900 font-medium">Phone Calls</span>
+                  <p className="text-sm text-gray-600">Receive calls for payment reminders, account updates, and customer service.</p>
+                </div>
+              </label>
+            </div>
+          )}
+        </div>
+
+        {/* Communication Preferences */}
+        {(formData.consentToText || formData.consentToCall) && (
+          <div className="bg-white border border-gray-200 rounded-2xl p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-4">Preferred Contact Method</h3>
+            <div className="space-y-3">
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="radio"
+                  name="communicationPreferences"
+                  value="email"
+                  checked={formData.communicationPreferences === 'email'}
+                  onChange={(e) => setFormData({...formData, communicationPreferences: e.target.value})}
+                  className="w-4 h-4 text-purple-600 border-gray-300 focus:ring-purple-500"
+                />
+                <span className="text-gray-900">Email (primary contact method)</span>
+              </label>
+              
+              {formData.consentToText && (
+                <label className="flex items-center space-x-3 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="communicationPreferences"
+                    value="text"
+                    checked={formData.communicationPreferences === 'text'}
+                    onChange={(e) => setFormData({...formData, communicationPreferences: e.target.value})}
+                    className="w-4 h-4 text-purple-600 border-gray-300 focus:ring-purple-500"
+                  />
+                  <span className="text-gray-900">Text messages</span>
+                </label>
+              )}
+              
+              {formData.consentToCall && (
+                <label className="flex items-center space-x-3 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="communicationPreferences"
+                    value="phone"
+                    checked={formData.communicationPreferences === 'phone'}
+                    onChange={(e) => setFormData({...formData, communicationPreferences: e.target.value})}
+                    className="w-4 h-4 text-purple-600 border-gray-300 focus:ring-purple-500"
+                  />
+                  <span className="text-gray-900">Phone calls</span>
+                </label>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-10 flex flex-col-reverse md:flex-row md:justify-between gap-4">
+        <button onClick={handlePrev} className="w-full md:w-auto px-8 py-4 bg-white/60 backdrop-blur-sm border border-white/30 rounded-2xl text-gray-700 font-semibold hover:bg-white/80 hover:shadow-lg transition-all duration-300 shadow-sm justify-center">Back</button>
+        <button 
+          onClick={handleNext} 
+          disabled={!canProceed}
+          className="w-full md:w-auto px-8 py-4 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-2xl font-semibold hover:from-purple-600 hover:to-blue-600 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+        >
           Next <ArrowRight className="w-5 h-5 ml-2" />
         </button>
       </div>

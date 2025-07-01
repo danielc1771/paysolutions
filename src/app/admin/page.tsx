@@ -127,13 +127,7 @@ export default function AdminDashboard() {
                   </svg>
                 </div>
                 <div className="text-right">
-                  <p className="text-3xl font-bold text-gray-800 mb-1">{pendingLoans}</p>
-                  <div className="flex items-center text-green-600 text-sm font-medium">
-                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                    </svg>
-                    +12% from last month
-                  </div>
+                  <p className="text-3xl font-bold text-gray-800">{pendingLoans}</p>
                 </div>
               </div>
               <h3 className="text-gray-700 font-semibold text-lg">Pending Loans</h3>
@@ -148,13 +142,7 @@ export default function AdminDashboard() {
                   </svg>
                 </div>
                 <div className="text-right">
-                  <p className="text-3xl font-bold text-gray-800 mb-1">{activeLoans}</p>
-                  <div className="flex items-center text-green-600 text-sm font-medium">
-                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                    </svg>
-                    +8% from last month
-                  </div>
+                  <p className="text-3xl font-bold text-gray-800">{activeLoans}</p>
                 </div>
               </div>
               <h3 className="text-gray-700 font-semibold text-lg">Active Loans</h3>
@@ -169,13 +157,7 @@ export default function AdminDashboard() {
                   </svg>
                 </div>
                 <div className="text-right">
-                  <p className="text-3xl font-bold text-gray-800 mb-1">{totalLoans}</p>
-                  <div className="flex items-center text-green-600 text-sm font-medium">
-                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                    </svg>
-                    +25% from last month
-                  </div>
+                  <p className="text-3xl font-bold text-gray-800">{totalLoans}</p>
                 </div>
               </div>
               <h3 className="text-gray-700 font-semibold text-lg">Total Loans</h3>
@@ -190,13 +172,7 @@ export default function AdminDashboard() {
                   </svg>
                 </div>
                 <div className="text-right">
-                  <p className="text-3xl font-bold text-gray-800 mb-1">${totalPrincipal.toLocaleString()}</p>
-                  <div className="flex items-center text-green-600 text-sm font-medium">
-                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                    </svg>
-                    +18% from last month
-                  </div>
+                  <p className="text-3xl font-bold text-gray-800">${totalPrincipal.toLocaleString()}</p>
                 </div>
               </div>
               <h3 className="text-gray-700 font-semibold text-lg">Total Portfolio</h3>

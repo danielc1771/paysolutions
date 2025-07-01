@@ -54,31 +54,58 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // Check if user is authenticated
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const path = request.nextUrl.pathname
 
-  // If accessing admin routes without authentication, redirect to login
-  if (request.nextUrl.pathname.startsWith('/admin')) {
+  // Public routes that don't require authentication
+  const publicRoutes = [
+    '/',
+    '/login',
+    '/signup',
+    '/apply/',
+    '/payment-setup',
+    '/payment-collection/',
+    '/payment-summary/'
+  ]
+  
+  const isPublic = publicRoutes.some(route => {
+    if (route.endsWith('/')) {
+      return path.startsWith(route)
+    }
+    return path === route
+  })
+
+  // Allow public routes without authentication
+  if (isPublic) {
+    return response
+  }
+
+  // Check if user is authenticated
+  const { data: { user } } = await supabase.auth.getUser()
+
+  // If not authenticated and trying to access protected routes, redirect to login
+  if (!user) {
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  // Handle authenticated user route access
+  // For better performance, we'll do role checking in the actual page components
+  // rather than in middleware to avoid database queries on every request
+
+  // Handle root path - redirect to admin by default (will be corrected in layout)
+  if (path === '/') {
+    return NextResponse.redirect(new URL('/admin', request.url))
+  }
+
+  // Handle login/signup redirects for authenticated users
+  if (path === '/login' || path === '/signup') {
+    return NextResponse.redirect(new URL('/admin', request.url))
+  }
+
+  // Basic route protection - admin routes require authentication
+  if (path.startsWith('/admin') || path.startsWith('/dashboard') || path.startsWith('/borrower')) {
     if (!user) {
       return NextResponse.redirect(new URL('/login', request.url))
     }
-  }
-
-  // If authenticated user tries to access login/signup, redirect to admin
-  if (user && (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/signup')) {
-    return NextResponse.redirect(new URL('/admin', request.url))
-  }
-
-  // If accessing root path and authenticated, redirect to admin
-  if (user && request.nextUrl.pathname === '/') {
-    return NextResponse.redirect(new URL('/admin', request.url))
-  }
-
-  // If accessing root path and not authenticated, redirect to login
-  if (!user && request.nextUrl.pathname === '/') {
-    return NextResponse.redirect(new URL('/login', request.url))
   }
 
   return response

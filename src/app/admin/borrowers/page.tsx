@@ -29,6 +29,7 @@ interface Borrower {
     loan_number: string;
     principal_amount: string;
     status: string;
+    vehicle_vin: string;
   }>;
 }
 
@@ -59,7 +60,8 @@ export default function BorrowersPage() {
             id,
             loan_number,
             principal_amount,
-            status
+            status,
+            vehicle_vin
           )
         `)
         .order('created_at', { ascending: false });
@@ -167,13 +169,7 @@ export default function BorrowersPage() {
                 </svg>
               </div>
               <div className="text-right">
-                <p className="text-3xl font-bold text-gray-800 mb-1">{totalBorrowers}</p>
-                <div className="flex items-center text-green-600 text-sm font-medium">
-                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                  </svg>
-                  +15% this month
-                </div>
+                <p className="text-3xl font-bold text-gray-800">{totalBorrowers}</p>
               </div>
             </div>
             <h3 className="text-gray-700 font-semibold text-lg">Total Borrowers</h3>
@@ -188,13 +184,7 @@ export default function BorrowersPage() {
                 </svg>
               </div>
               <div className="text-right">
-                <p className="text-3xl font-bold text-gray-800 mb-1">{verifiedBorrowers}</p>
-                <div className="flex items-center text-green-600 text-sm font-medium">
-                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                  </svg>
-                  +8% this month
-                </div>
+                <p className="text-3xl font-bold text-gray-800">{verifiedBorrowers}</p>
               </div>
             </div>
             <h3 className="text-gray-700 font-semibold text-lg">Verified KYC</h3>
@@ -209,13 +199,7 @@ export default function BorrowersPage() {
                 </svg>
               </div>
               <div className="text-right">
-                <p className="text-3xl font-bold text-gray-800 mb-1">{pendingBorrowers}</p>
-                <div className="flex items-center text-orange-600 text-sm font-medium">
-                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  Awaiting review
-                </div>
+                <p className="text-3xl font-bold text-gray-800">{pendingBorrowers}</p>
               </div>
             </div>
             <h3 className="text-gray-700 font-semibold text-lg">Pending KYC</h3>
@@ -230,13 +214,7 @@ export default function BorrowersPage() {
                 </svg>
               </div>
               <div className="text-right">
-                <p className="text-3xl font-bold text-gray-800 mb-1">{borrowersWithLoans}</p>
-                <div className="flex items-center text-green-600 text-sm font-medium">
-                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                  </svg>
-                  Active borrowers
-                </div>
+                <p className="text-3xl font-bold text-gray-800">{borrowersWithLoans}</p>
               </div>
             </div>
             <h3 className="text-gray-700 font-semibold text-lg">With Loans</h3>
@@ -354,7 +332,7 @@ export default function BorrowersPage() {
                               {loanCount} {loanCount === 1 ? 'Loan' : 'Loans'}
                             </p>
                             <p className="text-sm text-gray-500 font-medium">
-                              ${borrower.annual_income ? parseFloat(borrower.annual_income).toLocaleString() : 'N/A'} income
+                              VIN: {borrower.loans?.[0]?.vehicle_vin || 'N/A'}
                             </p>
                           </div>
                           

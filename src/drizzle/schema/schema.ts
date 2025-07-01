@@ -9,7 +9,7 @@ export const organization = pgTable("organizations", {
 	updatedAt: timestamp("updated_at").defaultNow(),
   });
   
-  export const roleEnum = pgEnum('role', ['admin', 'user']);
+  export const roleEnum = pgEnum('role', ['admin', 'user', 'borrower']);
   export const profileStatusEnum = pgEnum('profile_status', ['INVITED', 'ACTIVE']);
   
   // This table stores user-specific data, linking them to an organization and a role.
