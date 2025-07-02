@@ -41,7 +41,7 @@ export default function ApplyPage() {
     state: '',
     zipCode: '',
     employmentStatus: 'employed',
-    annualIncome: '',
+    annualIncome: 0,
     currentEmployerName: '',
     timeWithEmployment: '',
     reference1Name: '',
@@ -296,7 +296,7 @@ function EmploymentDetailsStep({ formData, setFormData, handleNext, handlePrev }
             placeholder="Select Employment Status"
           />
         </div>
-        <InputField label="Annual Income" name="annualIncome" type="number" placeholder="50000" value={formData.annualIncome} onChange={(e) => setFormData({ ...formData, annualIncome: e.target.value })} icon={undefined} />
+        <InputField label="Annual Income" name="annualIncome" type="number" placeholder="50000" value={formData.annualIncome} onChange={(e) => setFormData({ ...formData, annualIncome: parseFloat(e.target.value) })} icon={undefined} />
         <InputField label="Current Employer Name" name="currentEmployerName" type="text" value={formData.currentEmployerName} onChange={(e) => setFormData({ ...formData, currentEmployerName: e.target.value })} icon={undefined} />
         <InputField label="Time with Current Employment (Years)" name="timeWithEmployment" type="text" placeholder="e.g., 5 years" value={formData.timeWithEmployment} onChange={(e) => setFormData({ ...formData, timeWithEmployment: e.target.value })} icon={undefined} />
       </div>
@@ -462,7 +462,7 @@ function ReferencesStep({ formData, setFormData, handleNext, handlePrev }) {
 
 // Step 5: Stripe Identity Verification
 function StripeVerificationStep({ formData, setFormData, initialData, handleNext, handlePrev, saveProgress }) {
-  const [verificationStatus, setVerificationStatus] = useState('not_started'); // not_started, in_progress, completed, failed
+  const [verificationStatus, setVerificationStatus] = useState(formData.stripeVerificationStatus || 'not_started'); // not_started, in_progress, completed, failed
   const [isVerifying, setIsVerifying] = useState(false);
   const [stripe, setStripe] = useState(null);
   const [error, setError] = useState(null);
@@ -484,12 +484,39 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
     };
     
     loadStripe();
+  }, []);
 
-    if (formData.stripeVerificationSessionId) {
-      pollVerificationStatus(formData.stripeVerificationSessionId);
+  useEffect(() => {
+    setVerificationStatus(formData.stripeVerificationStatus || 'not_started');
+  }, [formData.stripeVerificationStatus]);
+
+  const handleSkipVerification = async () => {
+    setIsVerifying(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/apply/${initialData?.loanId}/skip-verification`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ loanId: initialData?.loanId }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || 'Failed to skip verification.');
+      }
+
+      setVerificationStatus('completed');
+      setFormData({
+        ...formData,
+        stripeVerificationStatus: 'completed',
+      });
+    } catch (err: any) {
+      console.error('Error skipping verification:', err);
+      setError(err.message);
+    } finally {
+      setIsVerifying(false);
     }
-
-  }, [formData.stripeVerificationSessionId]);
+  };
 
   const startVerification = async () => {
     if (!stripe) {
@@ -556,49 +583,6 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
     }
   };
 
-  const pollVerificationStatus = async (sessionId) => {
-    let attempts = 0;
-    const maxAttempts = 30; // Poll for up to 5 minutes (30 * 10 seconds)
-    
-    const poll = async () => {
-      attempts++;
-      
-      try {
-        const response = await fetch(`/api/stripe/verification-status/${sessionId}`);
-        const statusData = await response.json();
-        
-        if (statusData.status === 'verified') {
-          setVerificationStatus('completed');
-          setFormData({...formData, stripeVerificationStatus: 'completed'});
-          return;
-        } else if (statusData.status === 'requires_input') {
-          setVerificationStatus('failed');
-          setError(statusData.last_error?.reason || 'Verification failed');
-          setFormData({...formData, stripeVerificationStatus: 'failed'});
-          return;
-        } else if (statusData.status === 'processing' || statusData.status === 'submitted') {
-          // Continue polling
-          if (attempts < maxAttempts) {
-            setTimeout(poll, 10000); // Poll every 10 seconds
-          } else {
-            // Timeout - verification is taking too long
-            setError('Verification is taking longer than expected. Please refresh and try again.');
-          }
-        }
-      } catch (error) {
-        console.error('Error polling verification status:', error);
-        if (attempts < maxAttempts) {
-          setTimeout(poll, 10000); // Retry on error
-        } else {
-          setError('Unable to check verification status. Please refresh and try again.');
-        }
-      }
-    };
-    
-    // Start polling after a short delay
-    setTimeout(poll, 5000);
-  };
-
   const canProceed = verificationStatus === 'completed' || verificationStatus === 'processing';
 
   return (
@@ -638,7 +622,7 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
         {/* Verification Status */}
         <div className="bg-white border border-gray-200 rounded-2xl p-6">
           <div className="text-center">
-            {verificationStatus === 'not_started' && (
+            {(verificationStatus === 'not_started' || verificationStatus === 'pending' || verificationStatus === 'requires_action' || verificationStatus === 'canceled' || verificationStatus === 'unverified') && (
               <div>
                 <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Lock className="w-8 h-8 text-gray-400" />
@@ -651,6 +635,13 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
                   className="px-8 py-4 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-2xl font-semibold hover:from-green-600 hover:to-teal-600 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
                 >
                   Start Verification
+                </button>
+                <button
+                  onClick={handleSkipVerification}
+                  disabled={isVerifying}
+                  className="mt-4 px-8 py-4 bg-gray-300 text-gray-800 rounded-2xl font-semibold hover:bg-gray-400 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
+                >
+                  Skip Verification (for testing)
                 </button>
               </div>
             )}

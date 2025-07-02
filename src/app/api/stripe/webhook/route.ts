@@ -57,6 +57,16 @@ export async function POST(request: NextRequest) {
       case 'payment_intent.payment_failed':
         await handlePaymentFailure(event.data.object, supabase);
         break;
+
+      case 'identity.verification_session.created':
+      case 'identity.verification_session.requires_input':
+      case 'identity.verification_session.processing':
+      case 'identity.verification_session.redacted':
+      case 'identity.verification_session.canceled':
+      case 'identity.verification_session.verified':
+      case 'identity.verification_session.unverified':
+        await handleIdentityVerificationSession(event.data.object, supabase);
+        break;
       
       default:
         console.log(`Unhandled event type: ${event.type}`);
@@ -143,16 +153,60 @@ async function handlePaymentFailure(paymentIntent: any, supabase: any) {
           status: 'failed',
           failure_reason: paymentIntent.last_payment_error?.message || 'Unknown error'
         },
-        notes: `Failed extra payment attempt of $${amount} for loan ${loanId}`
+        notes: `Failed extra payment attempt of ${amount} for loan ${loanId}`
       });
 
     if (auditError) {
       console.error('Error logging failed payment audit:', auditError);
     }
 
-    console.log(`Payment failure logged for loan ${loanId}: $${amount}`);
+    console.log(`Payment failure logged for loan ${loanId}: ${amount}`);
 
   } catch (error) {
     console.error('Error handling payment failure:', error);
+  }
+}
+
+async function handleIdentityVerificationSession(session: any, supabase: any) {
+  try {
+    const loanId = session.metadata?.loanId;
+    const newStatus = session.status; // e.g., 'verified', 'requires_input', 'unverified'
+
+    if (!loanId) {
+      console.warn('Identity verification session event received without loanId in metadata:', session);
+      return;
+    }
+
+    // Update the loan's stripeVerificationStatus
+    const { data: loan, error: loanUpdateError } = await supabase
+      .from('loans')
+      .update({ stripe_verification_status: newStatus })
+      .eq('id', loanId)
+      .select('borrower_id')
+      .single();
+
+    if (loanUpdateError) {
+      console.error(`Error updating loan ${loanId} verification status:`, loanUpdateError);
+      return;
+    }
+
+    console.log(`Loan ${loanId} Stripe verification status updated to: ${newStatus}`);
+
+    // Update the borrower's kycStatus if the verification is conclusive
+    if (loan && loan.borrower_id && (newStatus === 'verified' || newStatus === 'unverified')) {
+      const kycStatus = newStatus === 'verified' ? 'verified' : 'failed';
+      const { error: borrowerUpdateError } = await supabase
+        .from('borrowers')
+        .update({ kyc_status: kycStatus })
+        .eq('id', loan.borrower_id);
+
+      if (borrowerUpdateError) {
+        console.error(`Error updating borrower ${loan.borrower_id} KYC status:`, borrowerUpdateError);
+      }
+      console.log(`Borrower ${loan.borrower_id} KYC status updated to: ${kycStatus}`);
+    }
+
+  } catch (error) {
+    console.error('Error handling identity verification session:', error);
   }
 }

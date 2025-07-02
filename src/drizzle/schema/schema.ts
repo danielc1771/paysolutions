@@ -118,6 +118,8 @@ export const payments = pgTable("payments", {
 	pgPolicy("Enable all operations for service role", { as: "permissive", for: "all", to: ["public"], using: sql`true` }),
 ]);
 
+export const stripeVerificationStatusEnum = pgEnum('stripe_verification_status', ['pending', 'requires_action', 'verified', 'canceled', 'unverified', 'processing']);
+
 export const loans = pgTable("loans", { // Added vehicle fields
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	loanNumber: varchar("loan_number", { length: 50 }).notNull(),
@@ -143,6 +145,7 @@ export const loans = pgTable("loans", { // Added vehicle fields
 	organizationId: uuid('organization_id').references(() => organization.id),
 	applicationStep: integer("application_step").default(1),
 	stripeVerificationSessionId: varchar("stripe_verification_session_id", { length: 255 }),
+	stripeVerificationStatus: stripeVerificationStatusEnum('stripe_verification_status').default('pending'),
 }, (table) => [
 	index("idx_loans_borrower_id").using("btree", table.borrowerId.asc().nullsLast().op("uuid_ops")),
 	index("idx_loans_docusign_envelope_id").using("btree", table.docusignEnvelopeId.asc().nullsLast().op("text_ops")),
