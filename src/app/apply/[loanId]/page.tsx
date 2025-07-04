@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowRight, Check, DollarSign, User, Mail, Phone, Loader2, AlertCircle, Calendar, Lock } from 'lucide-react';
 import Image from 'next/image';
 import CustomSelect from '@/components/CustomSelect';
+import { createClient } from '@/utils/supabase/client';
 
 // Define the structure for loan data we expect to fetch
 interface LoanApplicationData {
@@ -35,13 +36,12 @@ export default function ApplyPage() {
   const [step, setStep] = useState(0); // 0: loading, 1: welcome, 2-4: form, 5: success, -1: error
   const [formData, setFormData] = useState<any>({
     dateOfBirth: '',
-    ssn: '',
     address: '',
     city: '',
     state: '',
     zipCode: '',
     employmentStatus: 'employed',
-    annualIncome: 0,
+    annualIncome: '',
     currentEmployerName: '',
     timeWithEmployment: '',
     reference1Name: '',
@@ -78,9 +78,19 @@ export default function ApplyPage() {
         }
         const data = await response.json();
         setInitialData({...data, loanId});
+        
+        // Helper function to convert null values to empty strings
+        const sanitizeData = (obj: any) => {
+          const sanitized: any = {};
+          for (const key in obj) {
+            sanitized[key] = obj[key] ?? '';
+          }
+          return sanitized;
+        };
+        
         setFormData({
           ...formData,
-          ...data.borrower,
+          ...sanitizeData(data.borrower),
           stripeVerificationSessionId: data.loan.stripeVerificationSessionId ?? '',
         });
         setStep(data.loan.applicationStep || 1); // Move to the saved step or first step
@@ -93,6 +103,69 @@ export default function ApplyPage() {
     };
 
     fetchApplicationData();
+  }, [loanId]);
+
+  // Set up Supabase Realtime subscription to listen for verification status changes
+  useEffect(() => {
+    if (!loanId) return;
+
+    const supabase = createClient();
+    
+    // Subscribe to changes in the loans table for this specific loan
+    const channel = supabase
+      .channel('loan-verification-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'loans',
+          filter: `id=eq.${loanId}`,
+        },
+        (payload) => {
+          console.log('🔄 Realtime update received for loan:', loanId, payload);
+          
+          // Update verification status when webhook updates the database
+          if (payload.new && payload.new.stripe_verification_status) {
+            const dbStatus = payload.new.stripe_verification_status;
+            console.log(`✅ Database verification status updated to: ${dbStatus}`);
+            
+            // Map database status to UI status
+            let uiStatus = dbStatus;
+            if (dbStatus === 'verified') {
+              uiStatus = 'completed';
+            }
+            
+            setFormData((prev) => ({
+              ...prev,
+              stripeVerificationStatus: uiStatus,
+            }));
+
+            console.log('🔄 Verification status updated in formData to:', uiStatus);
+            
+            // If verification is completed, user can proceed
+            if (uiStatus === 'completed') {
+              console.log('🎉 Verification completed! User can proceed.');
+            } else if (uiStatus === 'requires_action') {
+              setError('Verification failed. Please try again or contact support.');
+            }
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('🎯 Realtime subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Successfully subscribed to Realtime updates for loan:', loanId);
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('❌ Realtime subscription error for loan:', loanId);
+        }
+      });
+
+    // Cleanup subscription on unmount
+    return () => {
+      console.log('🧹 Cleaning up Realtime subscription for loan:', loanId);
+      supabase.removeChannel(channel);
+    };
   }, [loanId]);
 
   const saveProgress = async (currentStep: number, data: any) => {
@@ -227,7 +300,7 @@ function PersonalDetailsStep({ formData, setFormData, initialData, handleNext, h
   return (
     <div>
       <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Personal Information</h1>
-      <p className="text-gray-600 mb-8">Please provide your personal details to complete your application.</p>
+      <p className="text-gray-600 mb-8">Please provide your personal details. Identity verification (including SSN) will be handled securely through Stripe in a later step.</p>
       
       <div className="space-y-6">
         {/* Pre-filled, non-changeable fields */}
@@ -255,7 +328,6 @@ function PersonalDetailsStep({ formData, setFormData, initialData, handleNext, h
 
         {/* Form fields */}
         <InputField icon={<Calendar />} label="Date of Birth" name="dateOfBirth" type="date" value={formData.dateOfBirth} onChange={(e) => setFormData({...formData, dateOfBirth: e.target.value})} />
-        <InputField icon={<Lock />} label="Social Security Number" name="ssn" type="text" placeholder="XXX-XX-XXXX" value={formData.ssn} onChange={(e) => setFormData({...formData, ssn: e.target.value})} />
         <InputField label="Address" name="address" type="text" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} icon={undefined} />
         <div className="grid md:grid-cols-3 gap-4">
           <InputField label="City" name="city" type="text" value={formData.city} onChange={(e) => setFormData({ ...formData, city: e.target.value })} icon={undefined} />
@@ -296,7 +368,7 @@ function EmploymentDetailsStep({ formData, setFormData, handleNext, handlePrev }
             placeholder="Select Employment Status"
           />
         </div>
-        <InputField label="Annual Income" name="annualIncome" type="number" placeholder="50000" value={formData.annualIncome} onChange={(e) => setFormData({ ...formData, annualIncome: parseFloat(e.target.value) })} icon={undefined} />
+        <InputField label="Annual Income" name="annualIncome" type="number" placeholder="50000" value={formData.annualIncome} onChange={(e) => setFormData({ ...formData, annualIncome: e.target.value })} icon={undefined} />
         <InputField label="Current Employer Name" name="currentEmployerName" type="text" value={formData.currentEmployerName} onChange={(e) => setFormData({ ...formData, currentEmployerName: e.target.value })} icon={undefined} />
         <InputField label="Time with Current Employment (Years)" name="timeWithEmployment" type="text" placeholder="e.g., 5 years" value={formData.timeWithEmployment} onChange={(e) => setFormData({ ...formData, timeWithEmployment: e.target.value })} icon={undefined} />
       </div>
@@ -324,43 +396,136 @@ function ReviewStep({ formData, initialData, handlePrev, handleSubmit, loading }
       <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Review Your Application</h1>
       <p className="text-gray-600 mb-8">Please confirm that the following information is correct before submitting.</p>
       
-      <div className="space-y-4 bg-gray-50/50 p-4 md:p-6 rounded-2xl border">
-        <ReviewItem label="Full Name" value={`${reviewData.first_name} ${reviewData.last_name}`} />
-        <ReviewItem label="Contact" value={reviewData.email || reviewData.phone} />
-        <ReviewItem label="Loan Amount" value={`${reviewData.principal_amount?.toLocaleString()}`} />
-        <hr />
-        <ReviewItem label="Dealer" value={reviewData.dealerName} />
-        <ReviewItem label="Vehicle Year" value={reviewData.vehicleYear} />
-        <ReviewItem label="Vehicle Make" value={reviewData.vehicleMake} />
-        <ReviewItem label="Vehicle Model" value={reviewData.vehicleModel} />
-        <ReviewItem label="Vehicle VIN" value={reviewData.vehicleVin} />
-        <hr />
-        <ReviewItem label="Date of Birth" value={reviewData.dateOfBirth} />
-        <ReviewItem label="SSN" value={reviewData.ssn.replace(/\d(?=\d{4})/g, "*")} />
-        <ReviewItem label="Address" value={`${reviewData.address}, ${reviewData.city}, ${reviewData.state} ${reviewData.zipCode}`} />
-        <hr />
-        <ReviewItem label="Employment Status" value={reviewData.employmentStatus} />
-        <ReviewItem label="Annual Income" value={`${parseFloat(reviewData.annualIncome).toLocaleString()}`} />
-        <ReviewItem label="Current Employer" value={reviewData.currentEmployerName} />
-        <ReviewItem label="Time with Employment" value={reviewData.timeWithEmployment} />
-        <hr />
-        <h3 className="text-xl font-bold text-gray-900 mb-4">References</h3>
-        <ReviewItem label="Reference 1 Name" value={reviewData.reference1Name} />
-        <ReviewItem label="Reference 1 Phone" value={reviewData.reference1Phone} />
-        <ReviewItem label="Reference 1 Email" value={reviewData.reference1Email} />
-        <ReviewItem label="Reference 2 Name" value={reviewData.reference2Name} />
-        <ReviewItem label="Reference 2 Phone" value={reviewData.reference2Phone} />
-        <ReviewItem label="Reference 2 Email" value={reviewData.reference2Email} />
-        <ReviewItem label="Reference 3 Name" value={reviewData.reference3Name} />
-        <ReviewItem label="Reference 3 Phone" value={reviewData.reference3Phone} />
-        <ReviewItem label="Reference 3 Email" value={reviewData.reference3Email} />
-        <hr />
-        <h3 className="text-xl font-bold text-gray-900 mb-4">Verification & Consent</h3>
-        <ReviewItem label="Identity Verification" value={reviewData.stripeVerificationStatus === 'completed' ? 'Completed' : 'Pending'} />
-        <ReviewItem label="Communication Consent" value={reviewData.consentToContact ? 'Yes' : 'No'} />
-        <ReviewItem label="Text Message Consent" value={reviewData.consentToText ? 'Yes' : 'No'} />
-        <ReviewItem label="Phone Call Consent" value={reviewData.consentToCall ? 'Yes' : 'No'} />
-        <ReviewItem label="Preferred Contact Method" value={reviewData.communicationPreferences} />
+      <div className="space-y-6 bg-gray-50/50 p-4 md:p-6 rounded-2xl border">
+        {/* Basic Information */}
+        <div>
+          <h3 className="text-lg font-bold text-gray-900 mb-3">Basic Information</h3>
+          <div className="space-y-2">
+            <ReviewItem label="Full Name" value={`${reviewData.first_name || ''} ${reviewData.last_name || ''}`} />
+            <ReviewItem label="Email" value={reviewData.email || 'Not provided'} />
+            <ReviewItem label="Phone" value={reviewData.phone || 'Not provided'} />
+            <ReviewItem label="Date of Birth" value={reviewData.dateOfBirth || 'Not provided'} />
+          </div>
+        </div>
+
+        <hr className="border-gray-300" />
+
+        {/* Address Information */}
+        <div>
+          <h3 className="text-lg font-bold text-gray-900 mb-3">Address</h3>
+          <div className="space-y-2">
+            <ReviewItem label="Street Address" value={reviewData.address || 'Not provided'} />
+            <ReviewItem label="City" value={reviewData.city || 'Not provided'} />
+            <ReviewItem label="State" value={reviewData.state || 'Not provided'} />
+            <ReviewItem label="ZIP Code" value={reviewData.zipCode || 'Not provided'} />
+          </div>
+        </div>
+
+        <hr className="border-gray-300" />
+
+        {/* Loan Information */}
+        <div>
+          <h3 className="text-lg font-bold text-gray-900 mb-3">Loan Information</h3>
+          <div className="space-y-2">
+            <ReviewItem label="Loan Amount" value={`$${reviewData.principal_amount?.toLocaleString() || 'N/A'}`} />
+            <ReviewItem label="Dealer" value={initialData?.dealerName || 'Not provided'} />
+          </div>
+        </div>
+
+        <hr className="border-gray-300" />
+
+        {/* Vehicle Information */}
+        <div>
+          <h3 className="text-lg font-bold text-gray-900 mb-3">Vehicle Information</h3>
+          <div className="space-y-2">
+            <ReviewItem label="Year" value={reviewData.vehicleYear || initialData?.loan?.vehicleYear || 'Not provided'} />
+            <ReviewItem label="Make" value={reviewData.vehicleMake || initialData?.loan?.vehicleMake || 'Not provided'} />
+            <ReviewItem label="Model" value={reviewData.vehicleModel || initialData?.loan?.vehicleModel || 'Not provided'} />
+            <ReviewItem label="VIN" value={reviewData.vehicleVin || initialData?.loan?.vehicleVin || 'Not provided'} />
+          </div>
+        </div>
+
+        <hr className="border-gray-300" />
+
+        {/* Employment Information */}
+        <div>
+          <h3 className="text-lg font-bold text-gray-900 mb-3">Employment Information</h3>
+          <div className="space-y-2">
+            <ReviewItem label="Employment Status" value={reviewData.employmentStatus || 'Not provided'} />
+            <ReviewItem label="Annual Income" value={reviewData.annualIncome ? `$${parseFloat(reviewData.annualIncome).toLocaleString()}` : 'Not provided'} />
+            <ReviewItem label="Current Employer" value={reviewData.currentEmployerName || 'Not provided'} />
+            <ReviewItem label="Time with Employment" value={reviewData.timeWithEmployment || 'Not provided'} />
+          </div>
+        </div>
+
+        <hr className="border-gray-300" />
+
+        {/* References */}
+        <div>
+          <h3 className="text-lg font-bold text-gray-900 mb-3">References</h3>
+          <div className="space-y-4">
+            {/* Reference 1 */}
+            {(reviewData.reference1Name || reviewData.reference1Phone || reviewData.reference1Email) && (
+              <div>
+                <h4 className="font-semibold text-gray-800 mb-1">Reference 1</h4>
+                <div className="ml-4 space-y-1">
+                  {reviewData.reference1Name && <ReviewItem label="Name" value={reviewData.reference1Name} />}
+                  {reviewData.reference1Phone && <ReviewItem label="Phone" value={reviewData.reference1Phone} />}
+                  {reviewData.reference1Email && <ReviewItem label="Email" value={reviewData.reference1Email} />}
+                </div>
+              </div>
+            )}
+            
+            {/* Reference 2 */}
+            {(reviewData.reference2Name || reviewData.reference2Phone || reviewData.reference2Email) && (
+              <div>
+                <h4 className="font-semibold text-gray-800 mb-1">Reference 2</h4>
+                <div className="ml-4 space-y-1">
+                  {reviewData.reference2Name && <ReviewItem label="Name" value={reviewData.reference2Name} />}
+                  {reviewData.reference2Phone && <ReviewItem label="Phone" value={reviewData.reference2Phone} />}
+                  {reviewData.reference2Email && <ReviewItem label="Email" value={reviewData.reference2Email} />}
+                </div>
+              </div>
+            )}
+            
+            {/* Reference 3 */}
+            {(reviewData.reference3Name || reviewData.reference3Phone || reviewData.reference3Email) && (
+              <div>
+                <h4 className="font-semibold text-gray-800 mb-1">Reference 3</h4>
+                <div className="ml-4 space-y-1">
+                  {reviewData.reference3Name && <ReviewItem label="Name" value={reviewData.reference3Name} />}
+                  {reviewData.reference3Phone && <ReviewItem label="Phone" value={reviewData.reference3Phone} />}
+                  {reviewData.reference3Email && <ReviewItem label="Email" value={reviewData.reference3Email} />}
+                </div>
+              </div>
+            )}
+            
+            {!reviewData.reference1Name && !reviewData.reference1Phone && !reviewData.reference1Email &&
+             !reviewData.reference2Name && !reviewData.reference2Phone && !reviewData.reference2Email &&
+             !reviewData.reference3Name && !reviewData.reference3Phone && !reviewData.reference3Email && (
+              <p className="text-gray-500 italic">No references provided</p>
+            )}
+          </div>
+        </div>
+
+        <hr className="border-gray-300" />
+
+        {/* Verification & Consent */}
+        <div>
+          <h3 className="text-lg font-bold text-gray-900 mb-3">Verification & Consent</h3>
+          <div className="space-y-2">
+            <ReviewItem 
+              label="Identity Verification" 
+              value={reviewData.stripeVerificationStatus === 'completed' ? '✅ Verified via Stripe Identity' : '⏳ Pending verification'} 
+            />
+            <ReviewItem label="Communication Consent" value={reviewData.consentToContact ? '✅ Yes' : '❌ No'} />
+            {reviewData.consentToText && <ReviewItem label="Text Message Consent" value="✅ Yes" />}
+            {reviewData.consentToCall && <ReviewItem label="Phone Call Consent" value="✅ Yes" />}
+            {reviewData.communicationPreferences && (
+              <ReviewItem label="Preferred Contact Method" value={reviewData.communicationPreferences} />
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="mt-10 flex flex-col-reverse md:flex-row md:justify-between gap-4">
@@ -379,7 +544,12 @@ const InputField = ({ icon, label, ...props }) => (
     <label htmlFor={props.name} className="block text-sm font-semibold text-gray-700 mb-2">{label}</label>
     <div className="relative">
       {icon && <div className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400">{icon}</div>}
-      <input {...props} id={props.name} className={`w-full py-3 border border-gray-200 rounded-2xl bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition-all duration-300 ${icon ? 'pl-12 pr-4' : 'px-4'} ${props.type === 'date' ? 'appearance-none' : ''}`} />
+      <input 
+        {...props} 
+        id={props.name} 
+        value={props.value != null ? String(props.value) : ''} // Convert null/undefined/NaN to empty string
+        className={`w-full py-3 border border-gray-200 rounded-2xl bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition-all duration-300 ${icon ? 'pl-12 pr-4' : 'px-4'} ${props.type === 'date' ? 'appearance-none' : ''}`} 
+      />
     </div>
   </div>
 );
@@ -421,12 +591,55 @@ const ErrorMessage = ({ error }) => (
 );
 
 const SuccessMessage = () => (
-  <div className="text-center py-20">
-    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-      <Check className="w-8 h-8 text-green-500" />
+  <div className="text-center py-12">
+    <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+      <Check className="w-10 h-10 text-green-500" />
     </div>
-    <h2 className="text-2xl font-bold text-gray-900 mb-2">Application Submitted!</h2>
-    <p className="text-gray-600">Thank you. We have received your application and will be in touch soon.</p>
+    <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Congratulations!</h2>
+    <h3 className="text-xl md:text-2xl font-semibold text-green-600 mb-6">Your Application is Under Review</h3>
+    
+    <div className="max-w-2xl mx-auto space-y-6">
+      <div className="bg-green-50 border border-green-200 rounded-2xl p-6">
+        <h4 className="text-lg font-semibold text-green-800 mb-3">What Happens Next?</h4>
+        <div className="space-y-3 text-left">
+          <div className="flex items-start space-x-3">
+            <div className="w-6 h-6 bg-green-200 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+              <span className="text-green-700 text-sm font-bold">1</span>
+            </div>
+            <p className="text-green-700">Our team will review your application and verify all information provided</p>
+          </div>
+          <div className="flex items-start space-x-3">
+            <div className="w-6 h-6 bg-green-200 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+              <span className="text-green-700 text-sm font-bold">2</span>
+            </div>
+            <p className="text-green-700">We'll contact your references and employer to confirm employment details</p>
+          </div>
+          <div className="flex items-start space-x-3">
+            <div className="w-6 h-6 bg-green-200 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+              <span className="text-green-700 text-sm font-bold">3</span>
+            </div>
+            <p className="text-green-700">You'll receive loan terms and next steps within 2-3 business days</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6">
+        <h4 className="text-lg font-semibold text-blue-800 mb-3">Important Information</h4>
+        <div className="space-y-2 text-left text-blue-700">
+          <p>• Check your email and phone for updates from our team</p>
+          <p>• Your identity has been verified through Stripe Identity</p>
+          <p>• We'll contact you using your preferred communication method</p>
+          <p>• Keep your phone accessible in case we need additional information</p>
+        </div>
+      </div>
+
+      <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6">
+        <h4 className="text-lg font-semibold text-gray-800 mb-2">Questions?</h4>
+        <p className="text-gray-600">
+          If you have any questions about your application, please contact our customer service team.
+        </p>
+      </div>
+    </div>
   </div>
 );
 
@@ -470,14 +683,22 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
   useEffect(() => {
     // Load Stripe.js
     const loadStripe = async () => {
+      const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+      console.log('🔑 Stripe publishable key:', publishableKey ? 'Found' : 'Missing');
+      
+      if (!publishableKey) {
+        setError('Stripe publishable key not found. Please check your environment configuration.');
+        return;
+      }
+      
       if (window.Stripe) {
-        setStripe(window.Stripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY));
+        setStripe(window.Stripe(publishableKey));
       } else {
         // Add Stripe.js script if not already loaded
         const script = document.createElement('script');
         script.src = 'https://js.stripe.com/v3/';
         script.onload = () => {
-          setStripe(window.Stripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY));
+          setStripe(window.Stripe(publishableKey));
         };
         document.head.appendChild(script);
       }
@@ -487,7 +708,9 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
   }, []);
 
   useEffect(() => {
-    setVerificationStatus(formData.stripeVerificationStatus || 'not_started');
+    const newStatus = formData.stripeVerificationStatus || 'not_started';
+    console.log('🔄 StripeVerificationStep: Updating local status to:', newStatus);
+    setVerificationStatus(newStatus);
   }, [formData.stripeVerificationStatus]);
 
   const handleSkipVerification = async () => {
@@ -560,7 +783,18 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
         // Handle verification errors
         console.error('Verification error:', result.error);
         setVerificationStatus('failed');
-        setError(result.error.message);
+        
+        // Handle various error message formats
+        let errorMessage = 'Verification failed. Please try again.';
+        if (result.error.message) {
+          errorMessage = result.error.message;
+        } else if (result.error.type) {
+          errorMessage = `Verification failed: ${result.error.type}`;
+        } else if (typeof result.error === 'string') {
+          errorMessage = result.error;
+        }
+        
+        setError(errorMessage);
         setFormData({...formData, stripeVerificationStatus: 'failed'});
       } else {
         // Verification was submitted successfully
@@ -570,20 +804,23 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
           stripeVerificationStatus: 'processing',
         });
         
-        // Poll for verification results
-        pollVerificationStatus(session.verification_session_id);
+        // Webhook will handle status updates automatically
+        console.log('Verification submitted. Waiting for webhook updates...');
       }
     } catch (error) {
       console.error('Error starting verification:', error);
       setVerificationStatus('failed');
-      setError(error.message);
+      
+      // Handle error message safely
+      const errorMessage = error?.message || error?.toString() || 'An unexpected error occurred during verification';
+      setError(errorMessage);
       setFormData({...formData, stripeVerificationStatus: 'failed'});
     } finally {
       setIsVerifying(false);
     }
   };
 
-  const canProceed = verificationStatus === 'completed' || verificationStatus === 'processing';
+  const canProceed = verificationStatus === 'completed';
 
   return (
     <div>
@@ -684,7 +921,11 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
                 <h3 className="text-xl font-bold text-gray-900 mb-2">Verification Failed</h3>
                 <p className="text-red-600 mb-6">We were unable to verify your identity. Please try again or contact support.</p>
                 <button
-                  onClick={startVerification}
+                  onClick={() => {
+                    setError(null);
+                    setVerificationStatus('not_started');
+                    startVerification();
+                  }}
                   disabled={isVerifying}
                   className="px-8 py-4 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-2xl font-semibold hover:from-red-600 hover:to-red-700 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
                 >

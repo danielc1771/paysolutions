@@ -126,10 +126,21 @@ export default function CreateLoan() {
         }),
       });
 
-      const result = await response.json();
+      // Check if response is JSON before parsing
+      const contentType = response.headers.get('content-type');
+      let result;
+      
+      if (contentType && contentType.includes('application/json')) {
+        result = await response.json();
+      } else {
+        // If it's not JSON (likely HTML error page), get text content
+        const textResponse = await response.text();
+        console.error('Non-JSON response received:', textResponse);
+        throw new Error(`Server error: Received HTML instead of JSON. Status: ${response.status}`);
+      }
 
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to send application');
+        throw new Error(result.error || result.message || 'Failed to send application');
       }
 
       setSuccess(`Application sent successfully! Application URL: ${result.applicationUrl}`);

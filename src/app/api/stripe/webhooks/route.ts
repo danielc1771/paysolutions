@@ -17,6 +17,7 @@ export async function POST(request: Request) {
   try {
     // Verify the event came from Stripe
     event = stripe.webhooks.constructEvent(body, sig, endpointSecret);
+    console.log('🎯 Webhook received event:', event.type, 'ID:', event.id);
   } catch (err: any) {
     console.log(`❌ Error message: ${err.message}`);
     return NextResponse.json({ error: `Webhook Error: ${err.message}` }, { status: 400 });
@@ -31,20 +32,30 @@ export async function POST(request: Request) {
       const verificationSession = event.data.object as Stripe.Identity.VerificationSession;
       
       console.log('✅ Verification session verified:', verificationSession.id);
+      console.log('📋 Verification metadata:', verificationSession.metadata);
       
       // Update the loan and borrower records
       if (verificationSession.metadata?.loan_id) {
         try {
+          console.log('🔍 Looking up loan ID:', verificationSession.metadata.loan_id);
+          
           // Get the loan to find the borrower
-          const { data: loan } = await supabase
+          const { data: loan, error: loanError } = await supabase
             .from('loans')
             .select('borrower_id')
             .eq('id', verificationSession.metadata.loan_id)
             .single();
 
+          if (loanError) {
+            console.error('❌ Error fetching loan:', loanError);
+            throw loanError;
+          }
+
+          console.log('📄 Found loan with borrower_id:', loan?.borrower_id);
+
           if (loan?.borrower_id) {
             // Update borrower KYC status
-            await supabase
+            const { error: borrowerError } = await supabase
               .from('borrowers')
               .update({ 
                 kyc_status: 'completed',
@@ -52,23 +63,33 @@ export async function POST(request: Request) {
               })
               .eq('id', loan.borrower_id);
 
-            // Update loan metadata to include verification status
-            await supabase
+            if (borrowerError) {
+              console.error('❌ Error updating borrower:', borrowerError);
+            } else {
+              console.log('✅ Updated borrower KYC status to completed');
+            }
+
+            // Update loan verification status using existing fields
+            const { error: loanUpdateError } = await supabase
               .from('loans')
               .update({
-                metadata: {
-                  stripe_verification_status: 'verified',
-                  stripe_verification_session_id: verificationSession.id,
-                  verified_at: new Date().toISOString()
-                }
+                stripe_verification_status: 'verified',
+                stripe_verification_session_id: verificationSession.id,
+                updated_at: new Date().toISOString()
               })
               .eq('id', verificationSession.metadata.loan_id);
 
-            console.log('✅ Updated borrower KYC status to completed');
+            if (loanUpdateError) {
+              console.error('❌ Error updating loan verification status:', loanUpdateError);
+            } else {
+              console.log('✅ Updated loan verification status to verified for loan:', verificationSession.metadata.loan_id);
+            }
           }
         } catch (error) {
           console.error('❌ Error updating verification status:', error);
         }
+      } else {
+        console.error('❌ No loan_id found in verification session metadata');
       }
       break;
     }
@@ -99,17 +120,13 @@ export async function POST(request: Request) {
               })
               .eq('id', loan.borrower_id);
 
-            // Update loan metadata to include verification status
+            // Update loan verification status using existing fields
             await supabase
               .from('loans')
               .update({
-                metadata: {
-                  stripe_verification_status: 'requires_input',
-                  stripe_verification_session_id: verificationSession.id,
-                  verification_error: verificationSession.last_error?.reason,
-                  verification_error_code: verificationSession.last_error?.code,
-                  failed_at: new Date().toISOString()
-                }
+                stripe_verification_status: 'requires_action',
+                stripe_verification_session_id: verificationSession.id,
+                updated_at: new Date().toISOString()
               })
               .eq('id', verificationSession.metadata.loan_id);
 
@@ -171,11 +188,9 @@ export async function POST(request: Request) {
             await supabase
               .from('loans')
               .update({
-                metadata: {
-                  stripe_verification_status: 'processing',
-                  stripe_verification_session_id: verificationSession.id,
-                  processing_started_at: new Date().toISOString()
-                }
+                stripe_verification_status: 'processing',
+                stripe_verification_session_id: verificationSession.id,
+                updated_at: new Date().toISOString()
               })
               .eq('id', verificationSession.metadata.loan_id);
           }

@@ -20,9 +20,16 @@ const sendApplicationSchema = z.object({
 export async function POST(request: Request) {
   const supabase = await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return new NextResponse(JSON.stringify({ message: 'Unauthorized' }), { status: 401 });
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    console.error('Auth error:', authError);
+    return new NextResponse(JSON.stringify({ 
+      error: 'Unauthorized', 
+      message: 'Please log in to create loan applications' 
+    }), { 
+      status: 401,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   const { data: profile } = await supabase
@@ -32,14 +39,39 @@ export async function POST(request: Request) {
     .single();
 
   if (!profile || !profile.organization_id) {
-    return new NextResponse(JSON.stringify({ message: 'Forbidden: User has no organization' }), { status: 403 });
+    return new NextResponse(JSON.stringify({ 
+      error: 'Forbidden', 
+      message: 'User has no organization assigned' 
+    }), { 
+      status: 403,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
-  const body = await request.json();
+  let body;
+  try {
+    body = await request.json();
+  } catch (error) {
+    return new NextResponse(JSON.stringify({ 
+      error: 'Invalid JSON', 
+      message: 'Request body must be valid JSON' 
+    }), { 
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
   const validation = sendApplicationSchema.safeParse(body);
 
   if (!validation.success) {
-    return new NextResponse(JSON.stringify({ message: validation.error.message }), { status: 400 });
+    console.error('Validation error:', validation.error);
+    return new NextResponse(JSON.stringify({ 
+      error: 'Invalid form data', 
+      message: validation.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join(', ')
+    }), { 
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   const { customerName, customerEmail, loanAmount, vehicleYear, vehicleMake, vehicleModel, vehicleVin, dealerName } = validation.data;
@@ -47,14 +79,20 @@ export async function POST(request: Request) {
   try {
     let borrowerId: string;
 
-    const { data: existingBorrower } = await supabase
+    const { data: existingBorrower, error: borrowerLookupError } = await supabase
       .from('borrowers')
       .select('id')
       .eq('organization_id', profile.organization_id)
       .eq('email', customerEmail)
       .maybeSingle();
 
+    if (borrowerLookupError) {
+      console.error('Error looking up existing borrower:', borrowerLookupError);
+      throw new Error('Error checking for existing customer');
+    }
+
     if (existingBorrower) {
+      console.log(`Using existing borrower: ${existingBorrower.id} for email: ${customerEmail}`);
       borrowerId = existingBorrower.id;
     } else {
       const [firstName, ...lastNameParts] = customerName.split(' ');
@@ -74,6 +112,19 @@ export async function POST(request: Request) {
       if (insertError) throw insertError;
       if (!newBorrower) throw new Error('Failed to create new borrower.');
       borrowerId = newBorrower.id;
+    }
+
+    // Check for existing loans with the same VIN and borrower
+    const { data: existingLoan } = await supabase
+      .from('loans')
+      .select('id, loan_number')
+      .eq('borrower_id', borrowerId)
+      .eq('vehicle_vin', vehicleVin)
+      .eq('organization_id', profile.organization_id)
+      .maybeSingle();
+
+    if (existingLoan) {
+      throw new Error(`A loan application already exists for this customer and vehicle (VIN: ${vehicleVin}). Loan number: ${existingLoan.loan_number}`);
     }
 
     const { data: loan, error: loanError } = await supabase
@@ -130,6 +181,31 @@ export async function POST(request: Request) {
 
   } catch (error: any) {
     console.error('Error sending application:', error);
-    return new NextResponse(JSON.stringify({ message: error.message }), { status: 500 });
+    
+    // Handle specific database errors
+    let errorMessage = 'Failed to create loan application';
+    let statusCode = 500;
+    
+    if (error.message?.includes('duplicate') || error.code === '23505') {
+      errorMessage = 'A loan application already exists for this customer with these details';
+      statusCode = 409;
+    } else if (error.message?.includes('foreign key') || error.code === '23503') {
+      errorMessage = 'Invalid reference data provided';
+      statusCode = 400;
+    } else if (error.message?.includes('not null') || error.code === '23502') {
+      errorMessage = 'Required information is missing';
+      statusCode = 400;
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+    
+    return new NextResponse(JSON.stringify({ 
+      error: errorMessage,
+      message: errorMessage,
+      details: process.env.NODE_ENV === 'development' ? error.toString() : undefined
+    }), { 
+      status: statusCode,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 }

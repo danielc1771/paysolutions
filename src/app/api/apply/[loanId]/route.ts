@@ -4,14 +4,18 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 const loanApplicationSchema = z.object({
-  dateOfBirth: z.string().nonempty(),
-  ssn: z.string().nonempty(),
-  address: z.string().nonempty(),
-  city: z.string().nonempty(),
-  state: z.string().nonempty(),
-  zipCode: z.string().nonempty(),
-  employmentStatus: z.string().nonempty(),
-  annualIncome: z.string().nonempty(),
+  dateOfBirth: z.string().min(1, "Date of birth is required"),
+  address: z.string().min(1, "Address is required"),
+  city: z.string().min(1, "City is required"),
+  state: z.string().min(1, "State is required"),
+  zipCode: z.string().min(1, "ZIP code is required"),
+  employmentStatus: z.string().min(1, "Employment status is required"),
+  annualIncome: z.union([z.string(), z.number()]).refine((val) => {
+    const num = typeof val === 'string' ? parseFloat(val) : val;
+    return !isNaN(num) && num > 0;
+  }, {
+    message: "Annual income must be a valid positive number"
+  }),
   currentEmployerName: z.string().optional(),
   timeWithEmployment: z.string().optional(),
   reference1Name: z.string().optional(),
@@ -91,11 +95,16 @@ export async function POST(request: Request, { params }: { params: { loanId: str
 
   try {
     const body = await request.json();
+    console.log('📋 Final submission body:', JSON.stringify(body, null, 2));
+    
     const validation = loanApplicationSchema.safeParse(body);
 
     if (!validation.success) {
+      console.log('❌ Final submission validation errors:', validation.error.issues);
       return new NextResponse(JSON.stringify({ message: 'Invalid form data.', errors: validation.error.issues }), { status: 400 });
     }
+
+    console.log('✅ Final submission validation passed');
 
     const { data: loan } = await supabase
       .from('loans')
@@ -103,34 +112,46 @@ export async function POST(request: Request, { params }: { params: { loanId: str
       .eq('id', loanId)
       .single();
 
-    if (!loan || loan.status !== 'application_sent') {
-      throw new Error('This application cannot be updated.');
+    console.log('🔍 Loan data for submission:', loan);
+
+    if (!loan) {
+      throw new Error('Loan not found.');
     }
+
+    // Allow updates for applications that are in progress or sent
+    if (loan.status !== 'application_sent' && loan.status !== 'application_in_progress') {
+      console.log(`❌ Invalid loan status for submission: ${loan.status}`);
+      throw new Error(`This application has already been completed or is invalid. Current status: ${loan.status}`);
+    }
+
+    console.log('✅ Loan status is valid for submission:', loan.status);
+
+    // Safely parse annual income
+    const annualIncomeValue = typeof validation.data.annualIncome === 'string' 
+      ? parseFloat(validation.data.annualIncome) 
+      : validation.data.annualIncome;
 
     const { error: borrowerUpdateError } = await supabase
       .from('borrowers')
       .update({
         date_of_birth: validation.data.dateOfBirth,
-        // SSN should be handled with extreme care. In a real app, this would be encrypted.
-        // For this example, we are storing it as-is.
-        // ssn: validation.data.ssn, 
         address_line1: validation.data.address,
         city: validation.data.city,
         state: validation.data.state,
         zip_code: validation.data.zipCode,
         employment_status: validation.data.employmentStatus,
-        annual_income: parseFloat(validation.data.annualIncome),
-        current_employer_name: validation.data.currentEmployerName,
-        time_with_employment: validation.data.timeWithEmployment,
-        reference1_name: validation.data.reference1Name,
-        reference1_phone: validation.data.reference1Phone,
-        reference1_email: validation.data.reference1Email,
-        reference2_name: validation.data.reference2Name,
-        reference2_phone: validation.data.reference2Phone,
-        reference2_email: validation.data.reference2Email,
-        reference3_name: validation.data.reference3Name,
-        reference3_phone: validation.data.reference3Phone,
-        reference3_email: validation.data.reference3Email,
+        annual_income: annualIncomeValue,
+        current_employer_name: validation.data.currentEmployerName || null,
+        time_with_employment: validation.data.timeWithEmployment || null,
+        reference1_name: validation.data.reference1Name || null,
+        reference1_phone: validation.data.reference1Phone || null,
+        reference1_email: validation.data.reference1Email || null,
+        reference2_name: validation.data.reference2Name || null,
+        reference2_phone: validation.data.reference2Phone || null,
+        reference2_email: validation.data.reference2Email || null,
+        reference3_name: validation.data.reference3Name || null,
+        reference3_phone: validation.data.reference3Phone || null,
+        reference3_email: validation.data.reference3Email || null,
         // Update KYC status based on Stripe verification
         kyc_status: validation.data.stripeVerificationStatus === 'completed' ? 'completed' : 'pending',
       })
@@ -138,20 +159,12 @@ export async function POST(request: Request, { params }: { params: { loanId: str
 
     if (borrowerUpdateError) throw borrowerUpdateError;
 
-    // Store consent preferences in a separate table or add to loan metadata
-    const consentData = {
-      consent_to_contact: validation.data.consentToContact || false,
-      consent_to_text: validation.data.consentToText || false,
-      consent_to_call: validation.data.consentToCall || false,
-      communication_preferences: validation.data.communicationPreferences || 'email',
-      stripe_verification_status: validation.data.stripeVerificationStatus || 'pending'
-    };
-
+    // Update loan status to completed (we'll store consent preferences in borrower record for now)
     const { error: loanUpdateError } = await supabase
       .from('loans')
       .update({ 
         status: 'application_completed',
-        metadata: consentData 
+        updated_at: new Date().toISOString()
       })
       .eq('id', loanId);
 

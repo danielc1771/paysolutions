@@ -10,6 +10,8 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { email, firstName, lastName, loanId } = body;
 
+    console.log('🚀 Creating verification session for loan:', loanId);
+    
     // Create the verification session
     const verificationSession = await stripe.identity.verificationSessions.create({
       type: 'document',
@@ -22,6 +24,8 @@ export async function POST(request: Request) {
         last_name: lastName,
       },
     });
+
+    console.log('✅ Created verification session:', verificationSession.id, 'for loan:', loanId);
 
     // Return only the client secret to the frontend
     return NextResponse.json({
