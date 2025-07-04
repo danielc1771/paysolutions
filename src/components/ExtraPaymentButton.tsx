@@ -65,8 +65,8 @@ export default function ExtraPaymentButton({
         alert(`Payment Intent created! Client Secret: ${data.clientSecret.substring(0, 20)}...`);
       }
       
-    } catch (err: any) {
-      setError(err.message || 'Payment processing failed. Please try again.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Payment processing failed. Please try again.');
       console.error('Payment error:', err);
     } finally {
       setIsProcessing(false);

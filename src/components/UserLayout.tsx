@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { createClient } from '@/utils/supabase/client';
-import { LayoutDashboard, FileText, Plus, Users, Bell, Check, Clock, AlertCircle, UserPlus } from 'lucide-react';
+import { LayoutDashboard, FileText, Plus, Users, Bell, UserPlus } from 'lucide-react';
 import { useUserProfile } from '@/components/auth/RoleRedirect';
 
 interface UserLayoutProps {
@@ -17,9 +17,9 @@ export default function UserLayout({ children }: UserLayoutProps) {
   const router = useRouter();
   const [showAccountDropdown, setShowAccountDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [user, setUser] = useState<any>(null);
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [user, setUser] = useState<Record<string, unknown> | null>(null);
+  const [notifications] = useState<Record<string, unknown>[]>([]);
+  const [unreadCount] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
