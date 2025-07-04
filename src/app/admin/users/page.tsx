@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import AdminLayout from '@/components/AdminLayout';
 import { createClient } from '@/utils/supabase/client';
-import { UserPlus, Mail, User, Loader2, AlertCircle, CheckCircle, ChevronDown } from 'lucide-react';
+import { UserPlus, Mail, User, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 import CustomSelect from '@/components/CustomSelect';
 
 interface UserProfile {

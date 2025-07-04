@@ -38,10 +38,10 @@ export async function POST(
       loan
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ Loan approval error:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to approve loan' },
+      { error: error instanceof Error ? error.message : 'Failed to approve loan' },
       { status: 500 }
     );
   }

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminLayout from '@/components/AdminLayout';
-import { Send, Edit, User, Mail, Link as LinkIcon, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Send, Edit, User, Mail, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 
 import CustomSelect from '@/components/CustomSelect';
 
@@ -95,8 +95,9 @@ function SendApplicationForm() {
       setLoanAmount('');
       setEmail('');
 
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+      setError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }

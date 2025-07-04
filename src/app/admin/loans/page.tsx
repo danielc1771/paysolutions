@@ -74,7 +74,7 @@ export default function LoansPage() {
         setError(error.message);
       } else {
         // Transform the data to match our interface
-        const transformedData = data?.map((loan: any) => ({
+        const transformedData = data?.map((loan: Record<string, unknown>) => ({
           ...loan,
           borrower: Array.isArray(loan.borrower) ? loan.borrower[0] : loan.borrower
         })) || [];
@@ -101,7 +101,7 @@ export default function LoansPage() {
         // Refresh the loans list
         fetchLoans();
       }
-    } catch (err) {
+    } catch {
       alert('Failed to delete loan');
     } finally {
       setDeleteConfirm({ isOpen: false, loanId: '', loanNumber: '' });

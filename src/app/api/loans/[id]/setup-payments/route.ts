@@ -93,7 +93,7 @@ export async function POST(
       customerId
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ Payment setup error:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to setup payments' },

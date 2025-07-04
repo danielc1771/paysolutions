@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { createClient } from '@/utils/supabase/client';
 import { LayoutDashboard, FileText, Plus, Users, Bell, Check, Clock, AlertCircle, UserPlus } from 'lucide-react';
-import { RoleRedirect, useUserProfile } from '@/components/auth/RoleRedirect';
+import { useUserProfile } from '@/components/auth/RoleRedirect';
 import { getHomepageForRole, type Role } from '@/lib/auth/roles';
 
 interface AdminLayoutProps {
@@ -18,8 +18,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const router = useRouter();
   const [showAccountDropdown, setShowAccountDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [user, setUser] = useState<any>(null);
-  const [notifications, setNotifications] = useState<any[]>([]);
+  const [user, setUser] = useState<Record<string, unknown> | null>(null);
+  const [notifications, setNotifications] = useState<Record<string, unknown>[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
@@ -67,7 +67,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       if (response.ok) {
         const data = await response.json();
         setNotifications(data);
-        setUnreadCount(data.filter((n: any) => !n.read).length);
+        setUnreadCount(data.filter((n: Record<string, unknown>) => !n.read).length);
       } else {
         console.error('Failed to fetch notifications');
       }
