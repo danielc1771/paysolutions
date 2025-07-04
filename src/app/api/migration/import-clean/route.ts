@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 
 /**
  * Import cleaned data directly to new database
  */
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     console.log('📥 Starting cleaned data import...');
     

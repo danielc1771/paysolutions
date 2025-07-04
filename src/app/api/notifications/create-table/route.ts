@@ -23,6 +23,10 @@ export async function POST() {
     const { error } = await supabase.rpc('create_notifications_table', {}, {
       // We'll use SQL directly since RPC might not be available
     });
+    
+    if (error) {
+      console.warn('RPC method not available, falling back to SQL instructions:', error.message);
+    }
 
     // Fallback: Use direct SQL query
     const createTableSQL = `

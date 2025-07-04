@@ -21,7 +21,7 @@ export async function GET(
       verified_outputs: verificationSession.verified_outputs,
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error retrieving verification session:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to retrieve verification session' },

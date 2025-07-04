@@ -83,13 +83,15 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function handlePaymentSuccess(paymentIntent: any, supabase: any) {
+async function handlePaymentSuccess(paymentIntent: Record<string, unknown>, supabase: Record<string, unknown>) {
   try {
-    const { loanId, borrowerEmail, paymentType } = paymentIntent.metadata;
-    const amount = paymentIntent.amount / 100; // Convert from cents
+    const metadata = paymentIntent.metadata as Record<string, unknown>;
+    const { loanId, borrowerEmail, paymentType } = metadata;
+    const amount = (paymentIntent.amount as number) / 100; // Convert from cents
 
     // Record the payment in our database
-    const { error: paymentError } = await supabase
+    const supabaseClient = supabase as Record<string, unknown>;
+    const { error: paymentError } = await supabaseClient
       .from('payments')
       .insert({
         loan_id: loanId,
@@ -98,7 +100,7 @@ async function handlePaymentSuccess(paymentIntent: any, supabase: any) {
         actual_amount_paid: amount,
         status: 'paid',
         paid_date: new Date().toISOString(),
-        stripe_payment_intent_id: paymentIntent.id,
+        stripe_payment_intent_id: paymentIntent.id as string,
         notes: `Extra payment via Stripe - ${paymentType}`
       });
 
@@ -117,7 +119,7 @@ async function handlePaymentSuccess(paymentIntent: any, supabase: any) {
         changes: {
           payment_type: 'extra',
           amount: amount,
-          stripe_payment_intent_id: paymentIntent.id,
+          stripe_payment_intent_id: paymentIntent.id as string,
           status: 'paid'
         },
         notes: `Extra payment of $${amount} processed via Stripe`
@@ -134,13 +136,15 @@ async function handlePaymentSuccess(paymentIntent: any, supabase: any) {
   }
 }
 
-async function handlePaymentFailure(paymentIntent: any, supabase: any) {
+async function handlePaymentFailure(paymentIntent: Record<string, unknown>, supabase: Record<string, unknown>) {
   try {
-    const { loanId, borrowerEmail } = paymentIntent.metadata;
-    const amount = paymentIntent.amount / 100;
+    const metadata = paymentIntent.metadata as Record<string, unknown>;
+    const { loanId, borrowerEmail } = metadata;
+    const amount = (paymentIntent.amount as number) / 100;
 
     // Log the failed payment attempt
-    const { error: auditError } = await supabase
+    const supabaseClient = supabase as Record<string, unknown>;
+    const { error: auditError } = await supabaseClient
       .from('audit_log')
       .insert({
         table_name: 'payments',
@@ -149,7 +153,7 @@ async function handlePaymentFailure(paymentIntent: any, supabase: any) {
         changes: {
           payment_type: 'extra',
           amount: amount,
-          stripe_payment_intent_id: paymentIntent.id,
+          stripe_payment_intent_id: paymentIntent.id as string,
           status: 'failed',
           failure_reason: paymentIntent.last_payment_error?.message || 'Unknown error'
         },
@@ -167,7 +171,7 @@ async function handlePaymentFailure(paymentIntent: any, supabase: any) {
   }
 }
 
-async function handleIdentityVerificationSession(session: any, supabase: any) {
+async function handleIdentityVerificationSession(session: Record<string, unknown>, supabase: Record<string, unknown>) {
   try {
     const loanId = session.metadata?.loanId;
     const newStatus = session.status; // e.g., 'verified', 'requires_input', 'unverified'

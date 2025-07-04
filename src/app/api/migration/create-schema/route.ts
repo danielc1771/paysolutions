@@ -1,17 +1,17 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 
 /**
  * Create database schema in new Supabase project
  */
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     console.log('🏗️ Starting schema creation...');
     
     const supabase = await createClient();
     
     // Test connection first
-    const { data: testData, error: testError } = await supabase
+    const { error: testError } = await supabase
       .from('information_schema.tables')
       .select('table_name')
       .limit(1);

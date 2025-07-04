@@ -320,7 +320,7 @@ export default function UserBorrowers() {
               ) : (
                 <div className="p-6">
                   <div className="space-y-4">
-                    {filteredBorrowers.map((borrower: any) => (
+                    {filteredBorrowers.map((borrower: Record<string, unknown>) => (
                       <Link
                         key={borrower.id}
                         href={`/dashboard/borrowers/${borrower.id}`}

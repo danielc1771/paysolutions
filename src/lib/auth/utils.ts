@@ -2,7 +2,6 @@
 
 import { createClient } from '@/utils/supabase/client';
 import type { UserProfile, Role } from './roles';
-import { getHomepageForRole } from './roles';
 
 // Client-side profile fetching using Supabase client
 export async function getClientProfile(): Promise<UserProfile | null> {
@@ -38,26 +37,3 @@ export async function getClientProfile(): Promise<UserProfile | null> {
   }
 }
 
-// Role-based redirect helper
-export function getRedirectUrl(profile: UserProfile | null, requestedPath: string): string | null {
-  if (!profile) {
-    return '/login';
-  }
-
-  // If accessing a role-specific area, redirect to appropriate homepage
-  if (requestedPath.startsWith('/admin') && profile.role !== 'admin') {
-    if (profile.role === 'user') return '/dashboard';
-    if (profile.role === 'borrower') return '/borrower/dashboard';
-  }
-
-  if (requestedPath.startsWith('/dashboard') && profile.role === 'admin') {
-    return '/admin/dashboard';
-  }
-
-  if (requestedPath.startsWith('/borrower') && profile.role !== 'borrower') {
-    if (profile.role === 'admin') return '/admin/dashboard';
-    if (profile.role === 'user') return '/dashboard';
-  }
-
-  return null;
-}

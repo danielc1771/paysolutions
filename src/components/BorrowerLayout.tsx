@@ -18,7 +18,7 @@ export default function BorrowerLayout({ children }: BorrowerLayoutProps) {
   const [showAccountDropdown, setShowAccountDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [user, setUser] = useState<Record<string, unknown> | null>(null);
-  const [notifications] = useState<Record<string, unknown>[]>([]);
+  const [] = useState<Record<string, unknown>[]>([]);
   const [unreadCount] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);

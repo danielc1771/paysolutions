@@ -12,7 +12,7 @@ export default function CreateLoan() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [organizationInfo, setOrganizationInfo] = useState<any>(null);
+  const [organizationInfo, setOrganizationInfo] = useState<Record<string, unknown> | null>(null);
   const supabase = createClient();
 
   // Send Application Form State (no longer includes dealer info)
@@ -226,7 +226,7 @@ export default function CreateLoan() {
               <h1 className="text-4xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent mb-3">
                 Create New Loan
               </h1>
-              <p className="text-gray-600 text-lg">Choose how you'd like to create the loan application</p>
+              <p className="text-gray-600 text-lg">Choose how you&apos;d like to create the loan application</p>
             </div>
 
             {/* Tabs */}

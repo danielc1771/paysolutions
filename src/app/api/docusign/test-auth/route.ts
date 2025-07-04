@@ -15,12 +15,13 @@ export async function GET() {
       tokenPreview: `${accessToken.substring(0, 10)}...`
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('🚨 Authentication test failed:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     
     return NextResponse.json({
       success: false,
-      error: error.message,
+      error: errorMessage,
       details: 'Check server console for detailed logs'
     }, { status: 500 });
   }

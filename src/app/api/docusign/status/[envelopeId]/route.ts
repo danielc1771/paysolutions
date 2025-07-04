@@ -23,13 +23,13 @@ export async function GET(
 
     // Get recipient information to check signing status
     let hasSignedRecipients = false;
-    let recipientDetails: any[] = [];
+    let recipientDetails: Record<string, unknown>[] = [];
     
     try {
       // Use the correct method name from DocuSign SDK
-      const recipientsResponse = await (envelopesApi as any).listRecipients(accountId, envelopeId);
+      const recipientsResponse = await (envelopesApi as Record<string, unknown>).listRecipients(accountId, envelopeId) as Record<string, unknown>;
       
-      recipientDetails = recipientsResponse.signers?.map((s: any) => ({
+      recipientDetails = (recipientsResponse.signers as Record<string, unknown>[])?.map((s: Record<string, unknown>) => ({
         name: s.name,
         email: s.email,
         status: s.status,
@@ -37,7 +37,7 @@ export async function GET(
       })) || [];
 
       // Check if any signers have completed signing
-      hasSignedRecipients = recipientsResponse.signers?.some((s: any) => 
+      hasSignedRecipients = (recipientsResponse.signers as Record<string, unknown>[])?.some((s: Record<string, unknown>) => 
         s.status === 'completed' || s.signedDateTime
       ) || false;
     } catch (recipientError) {
@@ -137,7 +137,7 @@ export async function GET(
 
     // Only update if status has changed
     if (docusignStatus !== loan.docusign_status || newLoanStatus !== loan.status) {
-      const updateData: any = {
+      const updateData: Record<string, unknown> = {
         docusign_status: docusignStatus,
         docusign_status_updated: new Date().toISOString()
       };
@@ -178,8 +178,8 @@ export async function GET(
         status: envelopeData.status,
         completedDateTime: envelopeData.completedDateTime,
         statusChangedDateTime: envelopeData.statusChangedDateTime,
-        sentDateTime: (envelopeData as any).sentDateTime,
-        deliveredDateTime: (envelopeData as any).deliveredDateTime
+        sentDateTime: (envelopeData as Record<string, unknown>).sentDateTime,
+        deliveredDateTime: (envelopeData as Record<string, unknown>).deliveredDateTime
       }
     });
 

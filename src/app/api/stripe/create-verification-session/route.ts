@@ -33,7 +33,7 @@ export async function POST(request: Request) {
       verification_session_id: verificationSession.id,
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error creating verification session:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to create verification session' },

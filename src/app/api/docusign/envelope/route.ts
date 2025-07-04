@@ -102,10 +102,11 @@ export async function POST(request: NextRequest) {
       message: 'Loan agreement sent for signature successfully!'
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ DocuSign envelope creation error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to create DocuSign envelope';
     return NextResponse.json(
-      { error: error.message || 'Failed to create DocuSign envelope' },
+      { error: errorMessage },
       { status: 500 }
     );
   }
@@ -153,10 +154,11 @@ export async function GET(request: NextRequest) {
       });
     }
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ DocuSign envelope retrieval error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to retrieve envelope';
     return NextResponse.json(
-      { error: error.message || 'Failed to retrieve envelope' },
+      { error: errorMessage },
       { status: 500 }
     );
   }

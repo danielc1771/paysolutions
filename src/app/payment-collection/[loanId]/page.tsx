@@ -140,8 +140,8 @@ function PaymentForm({ loan, onPaymentSuccess }: { loan: LoanSummary; onPaymentS
           onPaymentSuccess();
         }
       }
-    } catch (err: any) {
-      setError(err.message || 'Setup failed. Please try again.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Setup failed. Please try again.');
     } finally {
       setProcessing(false);
     }
@@ -362,8 +362,8 @@ export default function PaymentCollectionPage() {
 
         setLoan(loanData);
         setPaymentSchedule(scheduleData);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
         setLoading(false);
       }

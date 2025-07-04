@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Update loan record
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       docusign_status: docusignStatus,
       docusign_status_updated: new Date().toISOString()
     };

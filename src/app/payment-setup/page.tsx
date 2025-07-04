@@ -34,7 +34,7 @@ if (!stripePublishableKey) {
 }
 
 // Initialize Stripe with error handling
-let stripePromise: Promise<any> | null = null;
+let stripePromise: Promise<import('@stripe/stripe-js').Stripe | null> | null = null;
 
 try {
   if (stripePublishableKey && stripePublishableKey.startsWith('pk_')) {

@@ -27,7 +27,7 @@ declare module 'docusign-esign' {
         status: string;
         statusChangedDateTime: string;
         completedDateTime?: string;
-        recipients: any;
+        recipients: Record<string, unknown>;
       }>;
     }
 

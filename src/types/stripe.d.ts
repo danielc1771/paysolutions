@@ -1,6 +1,6 @@
 declare global {
   interface Window {
-    Stripe: (publishableKey: string) => any;
+    Stripe: (publishableKey: string) => Record<string, unknown>;
   }
 }
 

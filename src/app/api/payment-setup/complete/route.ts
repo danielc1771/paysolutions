@@ -198,7 +198,7 @@ export async function POST(request: NextRequest) {
       hasPaymentSchedule: !!paymentSchedule
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ Payment setup completion error:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to complete payment setup' },

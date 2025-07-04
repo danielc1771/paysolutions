@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 
 /**
  * Export data from current database for migration
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     console.log('📤 Starting data export...');
     

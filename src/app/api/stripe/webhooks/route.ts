@@ -18,9 +18,10 @@ export async function POST(request: Request) {
     // Verify the event came from Stripe
     event = stripe.webhooks.constructEvent(body, sig, endpointSecret);
     console.log('🎯 Webhook received event:', event.type, 'ID:', event.id);
-  } catch (err: any) {
-    console.log(`❌ Error message: ${err.message}`);
-    return NextResponse.json({ error: `Webhook Error: ${err.message}` }, { status: 400 });
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    console.log(`❌ Error message: ${errorMessage}`);
+    return NextResponse.json({ error: `Webhook Error: ${errorMessage}` }, { status: 400 });
   }
 
   const supabase = await createClient();

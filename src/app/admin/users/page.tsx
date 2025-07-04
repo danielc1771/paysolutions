@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import AdminLayout from '@/components/AdminLayout';
 import { createClient } from '@/utils/supabase/client';
 import { UserPlus, Mail, User, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
@@ -24,7 +24,7 @@ export default function UsersPage() {
 
   const supabase = createClient();
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -69,11 +69,11 @@ export default function UsersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase]);
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [fetchUsers]);
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -24,11 +24,6 @@ export function LoanApplicationTemplate({
   };
   return (
     <html>
-      <head>
-        <meta charSet="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Complete Your Loan Application</title>
-      </head>
       <body style={{
         margin: 0,
         padding: 0,
@@ -107,7 +102,7 @@ export function LoanApplicationTemplate({
               fontSize: '16px',
               lineHeight: '1.6'
             }}>
-              Thank you for your interest in a loan with PaySolutions. We're excited to help you with your financing needs. 
+              Thank you for your interest in a loan with PaySolutions. We&apos;re excited to help you with your financing needs. 
               Your personalized application is ready and waiting for you to complete.
             </p>
 

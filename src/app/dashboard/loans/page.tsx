@@ -267,7 +267,7 @@ export default function UserLoans() {
               ) : (
                 <div className="p-6">
                   <div className="space-y-4">
-                    {filteredLoans.map((loan: any) => {
+                    {filteredLoans.map((loan: Record<string, unknown>) => {
                       const needsAction = loan.docusign_status === 'signed' && loan.status !== 'funded';
                       
                       return (

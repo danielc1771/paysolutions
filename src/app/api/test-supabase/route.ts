@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 export async function GET() {
@@ -53,6 +53,8 @@ export async function GET() {
     // Test if tables exist
     const { data: tables, error: tablesError } = await supabase
       .rpc('get_table_info');
+    
+    console.log('Available tables:', tables);
 
     return NextResponse.json({
       success: true,

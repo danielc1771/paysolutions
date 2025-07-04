@@ -52,15 +52,15 @@ export async function GET(request: NextRequest) {
         const envelope = await envelopesApi.getEnvelope(accountId, envelopeId);
         
         // Get recipients
-        let recipients = null;
+        let recipients: Record<string, unknown> | null = null;
         try {
-          recipients = await (envelopesApi as any).listRecipients(accountId, envelopeId);
+          recipients = await (envelopesApi as Record<string, unknown>).listRecipients(accountId, envelopeId) as Record<string, unknown>;
         } catch (recipientError) {
           console.warn('Could not fetch recipients:', recipientError);
         }
         
         // Check corresponding loan in database
-        const { data: loan, error: loanError } = await supabase
+        const { data: loan } = await supabase
           .from('loans')
           .select('id, docusign_status, status, docusign_status_updated')
           .eq('docusign_envelope_id', envelopeId)
@@ -72,11 +72,11 @@ export async function GET(request: NextRequest) {
             status: envelope.status,
             completedDateTime: envelope.completedDateTime,
             statusChangedDateTime: envelope.statusChangedDateTime,
-            sentDateTime: (envelope as any).sentDateTime,
-            deliveredDateTime: (envelope as any).deliveredDateTime
+            sentDateTime: (envelope as Record<string, unknown>).sentDateTime,
+            deliveredDateTime: (envelope as Record<string, unknown>).deliveredDateTime
           },
           recipients: recipients ? {
-            signers: recipients.signers?.map((s: any) => ({
+            signers: (recipients.signers as Record<string, unknown>[])?.map((s: Record<string, unknown>) => ({
               name: s.name,
               email: s.email,
               status: s.status,
@@ -138,7 +138,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const { envelopeId, forceRefresh } = await request.json();
+    const { envelopeId } = await request.json();
     
     if (!envelopeId) {
       return NextResponse.json({ error: 'envelopeId required' }, { status: 400 });

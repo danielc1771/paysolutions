@@ -62,7 +62,7 @@ export default function AcceptInvitePage() {
       setIsValidInvite(false);
     }
 
-  }, []);
+  }, [verifyInvite, supabase.auth]);
 
   const handleAcceptInvite = async (e: React.FormEvent) => {
     e.preventDefault();
