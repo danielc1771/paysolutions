@@ -83,8 +83,9 @@ export async function GET(request: Request, { params }: { params: { loanId: stri
       dealerName: loan.organizations?.name,
     });
 
-  } catch (error: any) {
-    return new NextResponse(JSON.stringify({ message: error.message }), { status: 404 });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    return new NextResponse(JSON.stringify({ message: errorMessage }), { status: 404 });
   }
 }
 
@@ -172,8 +173,9 @@ export async function POST(request: Request, { params }: { params: { loanId: str
 
     return NextResponse.json({ message: 'Application submitted successfully' });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error submitting application:', error);
-    return new NextResponse(JSON.stringify({ message: error.message }), { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    return new NextResponse(JSON.stringify({ message: errorMessage }), { status: 500 });
   }
 }

@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
-import { loans, borrowers } from '@/drizzle/schema/schema';
-import { eq } from 'drizzle-orm';
 
 export async function POST(request: NextRequest) {
   try {

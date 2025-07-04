@@ -60,7 +60,7 @@ export async function POST(request: Request, { params }: { params: { loanId: str
     }
 
     // Update borrower information
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
     
     // Only update fields that have valid values
     if (validation.data.dateOfBirth && validation.data.dateOfBirth.trim() !== '' && validation.data.dateOfBirth !== 'null' && validation.data.dateOfBirth !== 'undefined') {
@@ -159,8 +159,9 @@ export async function POST(request: Request, { params }: { params: { loanId: str
 
     return NextResponse.json({ message: 'Progress saved successfully' });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error saving progress:', error);
-    return new NextResponse(JSON.stringify({ message: error.message }), { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    return new NextResponse(JSON.stringify({ message: errorMessage }), { status: 500 });
   }
 }

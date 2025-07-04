@@ -34,7 +34,7 @@ export default function ApplyPage() {
   const loanId = params.loanId as string;
 
   const [step, setStep] = useState(0); // 0: loading, 1: welcome, 2-4: form, 5: success, -1: error
-  const [formData, setFormData] = useState<any>({
+  const [formData, setFormData] = useState<Record<string, unknown>>({
     dateOfBirth: '',
     address: '',
     city: '',
@@ -80,22 +80,23 @@ export default function ApplyPage() {
         setInitialData({...data, loanId});
         
         // Helper function to convert null values to empty strings
-        const sanitizeData = (obj: any) => {
-          const sanitized: any = {};
+        const sanitizeData = (obj: Record<string, unknown>) => {
+          const sanitized: Record<string, unknown> = {};
           for (const key in obj) {
             sanitized[key] = obj[key] ?? '';
           }
           return sanitized;
         };
         
-        setFormData({
-          ...formData,
+        setFormData(prev => ({
+          ...prev,
           ...sanitizeData(data.borrower),
           stripeVerificationSessionId: data.loan.stripeVerificationSessionId ?? '',
-        });
+        }));
         setStep(data.loan.applicationStep || 1); // Move to the saved step or first step
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+        setError(errorMessage);
         setStep(-1); // Move to an error step
       } finally {
         setLoading(false);
@@ -168,7 +169,7 @@ export default function ApplyPage() {
     };
   }, [loanId]);
 
-  const saveProgress = async (currentStep: number, data: any) => {
+  const saveProgress = async (currentStep: number, data: Record<string, unknown>) => {
     try {
       console.log({ data, currentStep });
       await fetch(`/api/apply/${loanId}/save-progress`, {
@@ -205,8 +206,9 @@ export default function ApplyPage() {
         throw new Error(err.message || 'Failed to submit application.');
       }
       setStep(8); // Move to success step
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -287,7 +289,7 @@ function WelcomeStep({ initialData, handleNext }) {
                 />
             </div>
             <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">Hello, {initialData?.borrower.first_name}!</h1>
-            <p className="text-gray-600 text-base md:text-lg max-w-md mx-auto mb-8">You're just a few steps away from completing your loan application. Let's get started.</p>
+            <p className="text-gray-600 text-base md:text-lg max-w-md mx-auto mb-8">You&apos;re just a few steps away from completing your loan application. Let&apos;s get started.</p>
             <button onClick={handleNext} className="w-full md:w-auto md:mx-auto px-10 py-5 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-2xl font-semibold hover:from-purple-600 hover:to-blue-600 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center text-lg">
                 Get Started <ArrowRight className="w-6 h-6 ml-3" />
             </button>
@@ -296,7 +298,7 @@ function WelcomeStep({ initialData, handleNext }) {
 }
 
 // Step 2: Personal Details
-function PersonalDetailsStep({ formData, setFormData, initialData, handleNext, handlePrev }) {
+function PersonalDetailsStep({ formData, setFormData, initialData, handleNext }) {
   return (
     <div>
       <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Personal Information</h1>
@@ -612,13 +614,13 @@ const SuccessMessage = () => (
             <div className="w-6 h-6 bg-green-200 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
               <span className="text-green-700 text-sm font-bold">2</span>
             </div>
-            <p className="text-green-700">We'll contact your references and employer to confirm employment details</p>
+            <p className="text-green-700">We&apos;ll contact your references and employer to confirm employment details</p>
           </div>
           <div className="flex items-start space-x-3">
             <div className="w-6 h-6 bg-green-200 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
               <span className="text-green-700 text-sm font-bold">3</span>
             </div>
-            <p className="text-green-700">You'll receive loan terms and next steps within 2-3 business days</p>
+            <p className="text-green-700">You&apos;ll receive loan terms and next steps within 2-3 business days</p>
           </div>
         </div>
       </div>
@@ -628,7 +630,7 @@ const SuccessMessage = () => (
         <div className="space-y-2 text-left text-blue-700">
           <p>• Check your email and phone for updates from our team</p>
           <p>• Your identity has been verified through Stripe Identity</p>
-          <p>• We'll contact you using your preferred communication method</p>
+          <p>• We&apos;ll contact you using your preferred communication method</p>
           <p>• Keep your phone accessible in case we need additional information</p>
         </div>
       </div>
@@ -733,9 +735,10 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
         ...formData,
         stripeVerificationStatus: 'completed',
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error skipping verification:', err);
-      setError(err.message);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+      setError(errorMessage);
     } finally {
       setIsVerifying(false);
     }
@@ -838,9 +841,9 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
               <h3 className="text-lg font-semibold text-blue-900 mb-2">Secure Identity Verification</h3>
               <ul className="text-blue-800 text-sm space-y-2">
                 <li>• Your personal information is encrypted and secure</li>
-                <li>• We use Stripe's industry-leading identity verification</li>
+                <li>• We use Stripe&apos;s industry-leading identity verification</li>
                 <li>• This process typically takes 2-3 minutes</li>
-                <li>• You'll need a government-issued photo ID</li>
+                <li>• You&apos;ll need a government-issued photo ID</li>
               </ul>
             </div>
           </div>

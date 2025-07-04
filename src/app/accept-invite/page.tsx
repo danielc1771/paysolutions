@@ -4,8 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
-import { AlertCircle, CheckCircle, Shield, Loader2, User, Lock } from 'lucide-react';
+import { AlertCircle, CheckCircle, Loader2, User, Lock } from 'lucide-react';
 
 export default function AcceptInvitePage() {
   const [password, setPassword] = useState('');
@@ -15,7 +14,6 @@ export default function AcceptInvitePage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isValidInvite, setIsValidInvite] = useState<boolean | null>(null);
-  const router = useRouter();
 
   const supabase = createClient();
 
@@ -103,7 +101,7 @@ export default function AcceptInvitePage() {
           await supabase.auth.signOut();
         }
       }
-    } catch (err) {
+    } catch {
       setError('An unexpected error occurred');
     } finally {
       setLoading(false);

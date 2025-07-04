@@ -19,9 +19,7 @@ const nextConfig: NextConfig = {
     
     return config;
   },
-  experimental: {
-    serverComponentsExternalPackages: ['docusign-esign'],
-  },
+  serverExternalPackages: ['docusign-esign'],
 };
 
 export default nextConfig;

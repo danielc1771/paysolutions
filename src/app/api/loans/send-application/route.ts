@@ -51,7 +51,7 @@ export async function POST(request: Request) {
   let body;
   try {
     body = await request.json();
-  } catch (error) {
+  } catch {
     return new NextResponse(JSON.stringify({ 
       error: 'Invalid JSON', 
       message: 'Request body must be valid JSON' 
@@ -179,23 +179,28 @@ export async function POST(request: Request) {
       applicationUrl // For admin reference
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error sending application:', error);
     
     // Handle specific database errors
     let errorMessage = 'Failed to create loan application';
     let statusCode = 500;
     
-    if (error.message?.includes('duplicate') || error.code === '23505') {
-      errorMessage = 'A loan application already exists for this customer with these details';
-      statusCode = 409;
-    } else if (error.message?.includes('foreign key') || error.code === '23503') {
-      errorMessage = 'Invalid reference data provided';
-      statusCode = 400;
-    } else if (error.message?.includes('not null') || error.code === '23502') {
-      errorMessage = 'Required information is missing';
-      statusCode = 400;
-    } else if (error.message) {
+    if (error && typeof error === 'object' && 'message' in error && 'code' in error) {
+      const dbError = error as { message?: string; code?: string };
+      if (dbError.message?.includes('duplicate') || dbError.code === '23505') {
+        errorMessage = 'A loan application already exists for this customer with these details';
+        statusCode = 409;
+      } else if (dbError.message?.includes('foreign key') || dbError.code === '23503') {
+        errorMessage = 'Invalid reference data provided';
+        statusCode = 400;
+      } else if (dbError.message?.includes('not null') || dbError.code === '23502') {
+        errorMessage = 'Required information is missing';
+        statusCode = 400;
+      } else if (dbError.message) {
+        errorMessage = dbError.message;
+      }
+    } else if (error instanceof Error) {
       errorMessage = error.message;
     }
     
