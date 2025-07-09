@@ -283,7 +283,7 @@ export default function UserDashboard() {
               ) : (
                 <div className="p-6">
                   <div className="space-y-4">
-                    {loans.slice(0, 5).map((loan: Record<string, unknown>) => {
+                    {loans.slice(0, 5).map((loan) => {
                       const needsAction = loan.docusign_status === 'signed' && loan.status !== 'funded';
                       
                       return (

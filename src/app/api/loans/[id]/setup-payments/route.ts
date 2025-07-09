@@ -96,7 +96,7 @@ export async function POST(
   } catch (error: unknown) {
     console.error('❌ Payment setup error:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to setup payments' },
+      { error: error instanceof Error ? error.message : 'Failed to setup payments' },
       { status: 500 }
     );
   }

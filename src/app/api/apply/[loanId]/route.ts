@@ -37,7 +37,7 @@ const loanApplicationSchema = z.object({
 });
 
 // GET handler to fetch initial loan data
-export async function GET(request: Request, { params }: { params: { loanId: string } }) {
+export async function GET(request: Request, { params }: { params: Promise<{ loanId: string }> }) {
   const { loanId } = await params;
   const supabase = await createClient();
 
@@ -82,7 +82,7 @@ export async function GET(request: Request, { params }: { params: { loanId: stri
         stripeVerificationStatus: loan.stripe_verification_status,
       },
       borrower: loan.borrowers,
-      dealerName: loan.organizations?.name,
+      dealerName: (loan.organizations as unknown as Record<string, unknown>)?.name,
     });
 
   } catch (error: unknown) {
@@ -92,7 +92,7 @@ export async function GET(request: Request, { params }: { params: { loanId: stri
 }
 
 // POST handler to submit the completed application
-export async function POST(request: Request, { params }: { params: { loanId: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ loanId: string }> }) {
   const { loanId } = await params;
   const supabase = await createClient();
 

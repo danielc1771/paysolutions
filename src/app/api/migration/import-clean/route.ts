@@ -91,8 +91,8 @@ export async function POST() {
     ];
     
     const results = {
-      borrowers: { success: false, count: 0, error: null },
-      loans: { success: false, count: 0, error: null }
+      borrowers: { success: false, count: 0, error: null as string | null },
+      loans: { success: false, count: 0, error: null as string | null }
     };
     
     // Import borrowers

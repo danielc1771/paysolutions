@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import UserLayout from '@/components/UserLayout';
 import { RoleRedirect } from '@/components/auth/RoleRedirect';
@@ -11,11 +11,11 @@ export default function CreateLoan() {
   const [activeTab, setActiveTab] = useState('send-application');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [createdLoanId, setCreatedLoanId] = useState<string | null>(null);
-  const [organizationInfo, setOrganizationInfo] = useState<Record<string, unknown> | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [organizationInfo, setOrganizationInfo] = useState<any>(null);
   const supabase = createClient();
 
   // Send Application Form State (no longer includes dealer info)
@@ -113,7 +113,6 @@ export default function CreateLoan() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    setSuccess(null);
 
     try {
       const response = await fetch('/api/loans/send-application', {
@@ -170,7 +169,6 @@ export default function CreateLoan() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    setSuccess(null);
 
     try {
       const response = await fetch('/api/loans/manual-entry', {
@@ -303,7 +301,7 @@ export default function CreateLoan() {
                           type="text"
                           required
                           value={sendFormData.customerName}
-                          onChange={(e) => setSendFormData(prev => ({ ...prev, customerName: e.target.value }))}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSendFormData(prev => ({ ...prev, customerName: e.target.value }))}
                           className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
                           placeholder="John Doe"
                         />
@@ -315,7 +313,7 @@ export default function CreateLoan() {
                           type="email"
                           required
                           value={sendFormData.customerEmail}
-                          onChange={(e) => setSendFormData(prev => ({ ...prev, customerEmail: e.target.value }))}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSendFormData(prev => ({ ...prev, customerEmail: e.target.value }))}
                           className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
                           placeholder="john@example.com"
                         />
@@ -326,7 +324,7 @@ export default function CreateLoan() {
                         <select
                           required
                           value={sendFormData.loanAmount}
-                          onChange={(e) => setSendFormData(prev => ({ ...prev, loanAmount: e.target.value }))}
+                          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSendFormData(prev => ({ ...prev, loanAmount: e.target.value }))}
                           className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
                         >
                           <option value="">Select loan amount</option>
@@ -347,7 +345,7 @@ export default function CreateLoan() {
                           type="text"
                           required
                           value={sendFormData.vehicleYear}
-                          onChange={(e) => setSendFormData(prev => ({ ...prev, vehicleYear: e.target.value }))}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSendFormData(prev => ({ ...prev, vehicleYear: e.target.value }))}
                           className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
                           placeholder="2020"
                         />
@@ -359,7 +357,7 @@ export default function CreateLoan() {
                           type="text"
                           required
                           value={sendFormData.vehicleMake}
-                          onChange={(e) => setSendFormData(prev => ({ ...prev, vehicleMake: e.target.value }))}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSendFormData(prev => ({ ...prev, vehicleMake: e.target.value }))}
                           className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
                           placeholder="Honda"
                         />
@@ -371,7 +369,7 @@ export default function CreateLoan() {
                           type="text"
                           required
                           value={sendFormData.vehicleModel}
-                          onChange={(e) => setSendFormData(prev => ({ ...prev, vehicleModel: e.target.value }))}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSendFormData(prev => ({ ...prev, vehicleModel: e.target.value }))}
                           className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
                           placeholder="Civic"
                         />
@@ -383,7 +381,7 @@ export default function CreateLoan() {
                           type="text"
                           required
                           value={sendFormData.vehicleVin}
-                          onChange={(e) => setSendFormData(prev => ({ ...prev, vehicleVin: e.target.value }))}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSendFormData(prev => ({ ...prev, vehicleVin: e.target.value }))}
                           className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
                           placeholder="1HGBH41JXMN109186"
                         />
@@ -481,7 +479,7 @@ export default function CreateLoan() {
                           type="text"
                           required
                           value={manualFormData.firstName}
-                          onChange={(e) => setManualFormData(prev => ({ ...prev, firstName: e.target.value }))}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setManualFormData(prev => ({ ...prev, firstName: e.target.value }))}
                           className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
                         />
                       </div>
@@ -492,7 +490,7 @@ export default function CreateLoan() {
                           type="text"
                           required
                           value={manualFormData.lastName}
-                          onChange={(e) => setManualFormData(prev => ({ ...prev, lastName: e.target.value }))}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setManualFormData(prev => ({ ...prev, lastName: e.target.value }))}
                           className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
                         />
                       </div>
@@ -503,7 +501,7 @@ export default function CreateLoan() {
                           type="email"
                           required
                           value={manualFormData.email}
-                          onChange={(e) => setManualFormData(prev => ({ ...prev, email: e.target.value }))}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setManualFormData(prev => ({ ...prev, email: e.target.value }))}
                           className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
                         />
                       </div>
@@ -513,7 +511,7 @@ export default function CreateLoan() {
                         <input
                           type="tel"
                           value={manualFormData.phone}
-                          onChange={(e) => setManualFormData(prev => ({ ...prev, phone: e.target.value }))}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setManualFormData(prev => ({ ...prev, phone: e.target.value }))}
                           className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
                         />
                       </div>
@@ -523,7 +521,7 @@ export default function CreateLoan() {
                         <input
                           type="date"
                           value={manualFormData.dateOfBirth}
-                          onChange={(e) => setManualFormData(prev => ({ ...prev, dateOfBirth: e.target.value }))}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setManualFormData(prev => ({ ...prev, dateOfBirth: e.target.value }))}
                           className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
                         />
                       </div>
@@ -533,7 +531,7 @@ export default function CreateLoan() {
                         <input
                           type="text"
                           value={manualFormData.addressLine1}
-                          onChange={(e) => setManualFormData(prev => ({ ...prev, addressLine1: e.target.value }))}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setManualFormData(prev => ({ ...prev, addressLine1: e.target.value }))}
                           className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
                           placeholder="123 Main Street"
                         />
@@ -544,7 +542,7 @@ export default function CreateLoan() {
                         <input
                           type="text"
                           value={manualFormData.city}
-                          onChange={(e) => setManualFormData(prev => ({ ...prev, city: e.target.value }))}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setManualFormData(prev => ({ ...prev, city: e.target.value }))}
                           className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
                         />
                       </div>
@@ -554,7 +552,7 @@ export default function CreateLoan() {
                         <input
                           type="text"
                           value={manualFormData.state}
-                          onChange={(e) => setManualFormData(prev => ({ ...prev, state: e.target.value }))}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setManualFormData(prev => ({ ...prev, state: e.target.value }))}
                           className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
                         />
                       </div>
@@ -564,7 +562,7 @@ export default function CreateLoan() {
                         <input
                           type="text"
                           value={manualFormData.zipCode}
-                          onChange={(e) => setManualFormData(prev => ({ ...prev, zipCode: e.target.value }))}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setManualFormData(prev => ({ ...prev, zipCode: e.target.value }))}
                           className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
                         />
                       </div>
@@ -573,7 +571,7 @@ export default function CreateLoan() {
                         <label className="block text-sm font-medium text-gray-700 mb-2">Employment Status</label>
                         <select
                           value={manualFormData.employmentStatus}
-                          onChange={(e) => setManualFormData(prev => ({ ...prev, employmentStatus: e.target.value }))}
+                          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setManualFormData(prev => ({ ...prev, employmentStatus: e.target.value }))}
                           className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
                         >
                           <option value="">Select status</option>
@@ -589,7 +587,7 @@ export default function CreateLoan() {
                         <input
                           type="number"
                           value={manualFormData.annualIncome}
-                          onChange={(e) => setManualFormData(prev => ({ ...prev, annualIncome: e.target.value }))}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setManualFormData(prev => ({ ...prev, annualIncome: e.target.value }))}
                           className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
                           placeholder="50000"
                         />
@@ -600,7 +598,7 @@ export default function CreateLoan() {
                         <input
                           type="text"
                           value={manualFormData.currentEmployerName}
-                          onChange={(e) => setManualFormData(prev => ({ ...prev, currentEmployerName: e.target.value }))}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setManualFormData(prev => ({ ...prev, currentEmployerName: e.target.value }))}
                           className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
                         />
                       </div>
@@ -618,7 +616,7 @@ export default function CreateLoan() {
                           type="number"
                           required
                           value={manualFormData.principalAmount}
-                          onChange={(e) => setManualFormData(prev => ({ ...prev, principalAmount: e.target.value }))}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setManualFormData(prev => ({ ...prev, principalAmount: e.target.value }))}
                           className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
                           placeholder="15000"
                         />
@@ -630,7 +628,7 @@ export default function CreateLoan() {
                           type="number"
                           step="0.01"
                           value={manualFormData.interestRate}
-                          onChange={(e) => setManualFormData(prev => ({ ...prev, interestRate: e.target.value }))}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setManualFormData(prev => ({ ...prev, interestRate: e.target.value }))}
                           className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
                         />
                       </div>
@@ -639,7 +637,7 @@ export default function CreateLoan() {
                         <label className="block text-sm font-medium text-gray-700 mb-2">Term (Months)</label>
                         <select
                           value={manualFormData.termMonths}
-                          onChange={(e) => setManualFormData(prev => ({ ...prev, termMonths: e.target.value }))}
+                          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setManualFormData(prev => ({ ...prev, termMonths: e.target.value }))}
                           className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
                         >
                           <option value="12">12 months</option>
@@ -663,7 +661,7 @@ export default function CreateLoan() {
                           type="text"
                           required
                           value={manualFormData.vehicleYear}
-                          onChange={(e) => setManualFormData(prev => ({ ...prev, vehicleYear: e.target.value }))}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setManualFormData(prev => ({ ...prev, vehicleYear: e.target.value }))}
                           className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
                         />
                       </div>
@@ -674,7 +672,7 @@ export default function CreateLoan() {
                           type="text"
                           required
                           value={manualFormData.vehicleMake}
-                          onChange={(e) => setManualFormData(prev => ({ ...prev, vehicleMake: e.target.value }))}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setManualFormData(prev => ({ ...prev, vehicleMake: e.target.value }))}
                           className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
                         />
                       </div>
@@ -685,7 +683,7 @@ export default function CreateLoan() {
                           type="text"
                           required
                           value={manualFormData.vehicleModel}
-                          onChange={(e) => setManualFormData(prev => ({ ...prev, vehicleModel: e.target.value }))}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setManualFormData(prev => ({ ...prev, vehicleModel: e.target.value }))}
                           className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
                         />
                       </div>
@@ -696,7 +694,7 @@ export default function CreateLoan() {
                           type="text"
                           required
                           value={manualFormData.vehicleVin}
-                          onChange={(e) => setManualFormData(prev => ({ ...prev, vehicleVin: e.target.value }))}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setManualFormData(prev => ({ ...prev, vehicleVin: e.target.value }))}
                           className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
                         />
                       </div>

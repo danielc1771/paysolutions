@@ -101,6 +101,7 @@ export const createEnvelopesApi = async () => {
   
   return {
     envelopesApi: new docusign.EnvelopesApi(apiClient),
+    apiClient: apiClient,
     accountId
   };
 };

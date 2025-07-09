@@ -17,10 +17,10 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
     
     const results = {
-      borrowers: { success: false, count: 0, error: null },
-      loans: { success: false, count: 0, error: null },
-      payment_schedules: { success: false, count: 0, error: null },
-      payments: { success: false, count: 0, error: null }
+      borrowers: { success: false, count: 0, error: null as string | null },
+      loans: { success: false, count: 0, error: null as string | null },
+      payment_schedules: { success: false, count: 0, error: null as string | null },
+      payments: { success: false, count: 0, error: null as string | null }
     };
     
     // Import borrowers first (since loans reference them)

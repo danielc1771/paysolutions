@@ -3,11 +3,46 @@ import { createClient } from '@/utils/supabase/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const webhookData = await request.json();
+    const contentType = request.headers.get('content-type') || '';
+    const userAgent = request.headers.get('user-agent') || '';
+    let webhookData: Record<string, unknown>;
     
-    console.log('🔔 DocuSign webhook received:', JSON.stringify(webhookData, null, 2));
-    console.log('📊 Webhook headers:', Object.fromEntries(request.headers.entries()));
-    console.log('⏰ Webhook timestamp:', new Date().toISOString());
+    console.log('🔔 DocuSign webhook received');
+    console.log('📊 Content-Type:', contentType);
+    console.log('👤 User-Agent:', userAgent);
+    console.log('⏰ Timestamp:', new Date().toISOString());
+    
+    // Handle both JSON and XML formats
+    if (contentType.includes('application/json')) {
+      webhookData = await request.json();
+      console.log('📋 JSON webhook data:', JSON.stringify(webhookData, null, 2));
+    } else if (contentType.includes('application/xml') || contentType.includes('text/xml')) {
+      // For XML format, we'll need to parse it - for now, log it
+      const xmlData = await request.text();
+      console.log('📋 XML webhook data:', xmlData);
+      
+      // For now, return success for XML until we implement XML parsing
+      return new Response('Success', { 
+        status: 200,
+        headers: { 'Content-Type': 'text/plain' }
+      });
+    } else {
+      // Try to parse as JSON by default
+      try {
+        webhookData = await request.json();
+        console.log('📋 Default JSON webhook data:', JSON.stringify(webhookData, null, 2));
+      } catch (parseError) {
+        const textData = await request.text();
+        console.log('📋 Raw webhook data:', textData);
+        console.log('❌ Failed to parse webhook data:', parseError);
+        
+        // Still return success to avoid webhook retries
+        return new Response('Received but could not parse', { 
+          status: 200,
+          headers: { 'Content-Type': 'text/plain' }
+        });
+      }
+    }
     
     // DocuSign webhook can have different structures, handle both formats
     let envelopeId: string;
@@ -18,27 +53,29 @@ export async function POST(request: NextRequest) {
     // Handle different webhook payload structures
     let customFields: Record<string, string> = {};
     
-    if (webhookData.data && webhookData.data.envelopeId) {
+    if (webhookData.data && typeof webhookData.data === 'object' && webhookData.data !== null && 'envelopeId' in webhookData.data) {
       // Format 1: { event, data: { envelopeId, envelopeSummary: { status } } }
-      envelopeId = webhookData.data.envelopeId;
-      status = webhookData.data.envelopeSummary?.status || webhookData.data.status;
-      completedDateTime = webhookData.data.envelopeSummary?.completedDateTime;
-      statusChangedDateTime = webhookData.data.envelopeSummary?.statusChangedDateTime;
+      const data = webhookData.data as Record<string, unknown>;
+      envelopeId = data.envelopeId as string;
+      const envelopeSummary = data.envelopeSummary as Record<string, unknown> | undefined;
+      status = (envelopeSummary?.status as string) || (data.status as string);
+      completedDateTime = envelopeSummary?.completedDateTime as string | undefined;
+      statusChangedDateTime = envelopeSummary?.statusChangedDateTime as string | undefined;
       
       // Extract custom fields if present
-      if (webhookData.data.customFields) {
-        customFields = webhookData.data.customFields;
+      if (data.customFields) {
+        customFields = data.customFields as Record<string, string>;
       }
-    } else if (webhookData.envelopeId) {
+    } else if ('envelopeId' in webhookData) {
       // Format 2: Direct envelope data
-      envelopeId = webhookData.envelopeId;
-      status = webhookData.status || webhookData.envelopeStatus;
-      completedDateTime = webhookData.completedDateTime;
-      statusChangedDateTime = webhookData.statusChangedDateTime;
+      envelopeId = webhookData.envelopeId as string;
+      status = (webhookData.status as string) || (webhookData.envelopeStatus as string);
+      completedDateTime = webhookData.completedDateTime as string | undefined;
+      statusChangedDateTime = webhookData.statusChangedDateTime as string | undefined;
       
       // Extract custom fields if present
       if (webhookData.customFields) {
-        customFields = webhookData.customFields;
+        customFields = webhookData.customFields as Record<string, string>;
       }
     } else {
       console.error('❌ Unknown webhook payload format:', webhookData);
@@ -161,21 +198,23 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString()
     });
 
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Webhook processed successfully',
-      loanId: loan.id,
-      docusignStatus,
-      loanStatus: newLoanStatus,
-      timestamp: new Date().toISOString()
+    // DocuSign expects a 200 response with simple text for acknowledgment
+    return new Response('Success', { 
+      status: 200,
+      headers: {
+        'Content-Type': 'text/plain'
+      }
     });
 
   } catch (error) {
     console.error('❌ DocuSign webhook error:', error);
-    return NextResponse.json(
-      { error: 'Failed to process webhook' },
-      { status: 500 }
-    );
+    // Still return success to avoid webhook retries for application errors
+    return new Response('Error processed', { 
+      status: 200,
+      headers: {
+        'Content-Type': 'text/plain'
+      }
+    });
   }
 }
 

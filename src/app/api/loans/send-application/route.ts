@@ -207,7 +207,7 @@ export async function POST(request: Request) {
     return new NextResponse(JSON.stringify({ 
       error: errorMessage,
       message: errorMessage,
-      details: process.env.NODE_ENV === 'development' ? error.toString() : undefined
+      details: process.env.NODE_ENV === 'development' ? String(error) : undefined
     }), { 
       status: statusCode,
       headers: { 'Content-Type': 'application/json' }

@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import Link from 'next/link';
-import { Building2, Users, DollarSign, Calendar, MoreVertical, Edit, Trash2, Eye } from 'lucide-react';
+import { Building2, Users, DollarSign, Calendar, Edit, Trash2, Eye } from 'lucide-react';
 
 interface Organization {
   id: string;
@@ -150,7 +149,7 @@ export default function OrganizationsTable() {
                 type="text"
                 placeholder="Search organizations by name, email, or contact person..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 rounded-2xl border-0 bg-white/60 backdrop-blur-sm shadow-sm focus:ring-2 focus:ring-green-500 focus:outline-none text-sm text-gray-900 placeholder-gray-500"
               />
               <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -161,7 +160,7 @@ export default function OrganizationsTable() {
           <div className="w-full sm:w-64">
             <select
               value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFilterStatus(e.target.value)}
               className="w-full px-4 py-3 rounded-2xl border-0 bg-white/60 backdrop-blur-sm shadow-sm focus:ring-2 focus:ring-green-500 focus:outline-none text-sm text-gray-900"
             >
               {statusOptions.map(option => (

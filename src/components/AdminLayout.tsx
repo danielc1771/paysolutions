@@ -18,7 +18,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const router = useRouter();
   const [showAccountDropdown, setShowAccountDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [user, setUser] = useState<Record<string, unknown> | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [user, setUser] = useState<any>(null);
   const [notifications, setNotifications] = useState<Record<string, unknown>[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -392,11 +393,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                         ) : (
                           notifications.map((notification) => (
                             <div
-                              key={notification.id}
+                              key={notification.id as string}
                               className={`p-4 border-b border-gray-100/50 hover:bg-gray-50/50 transition-colors cursor-pointer ${
                                 !notification.read ? 'bg-blue-50/30' : ''
                               }`}
-                              onClick={() => markNotificationAsRead(notification.id)}
+                              onClick={() => markNotificationAsRead(notification.id as number)}
                             >
                               <div className="flex items-start space-x-3">
                                 <div className={`p-2 rounded-lg ${
@@ -405,22 +406,22 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                                   notification.type === 'kyc_pending' ? 'bg-orange-100 text-orange-600' :
                                   'bg-gray-100 text-gray-600'
                                 }`}>
-                                  {getNotificationIcon(notification.icon)}
+                                  {getNotificationIcon(notification.icon as string)}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center justify-between">
                                     <p className="text-sm font-medium text-gray-900">
-                                      {notification.title}
+                                      {String(notification.title)}
                                     </p>
-                                    {!notification.read && (
+                                    {!Boolean(notification.read) && (
                                       <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
                                     )}
                                   </div>
                                   <p className="text-sm text-gray-600 mt-1">
-                                    {notification.message}
+                                    {String(notification.message)}
                                   </p>
                                   <p className="text-xs text-gray-500 mt-1">
-                                    {formatTimeAgo(notification.timestamp)}
+                                    {formatTimeAgo(notification.timestamp as string)}
                                   </p>
                                 </div>
                               </div>

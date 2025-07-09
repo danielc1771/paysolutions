@@ -1,9 +1,9 @@
 'use client';
 
+import React, { useEffect, useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import UserLayout from '@/components/UserLayout';
 import Link from 'next/link';
-import React, { useEffect, useState } from 'react';
 import { RoleRedirect } from '@/components/auth/RoleRedirect';
 
 interface Loan {
@@ -159,8 +159,10 @@ export default function UserLoans() {
 
   // Make the success function available globally for other components
   React.useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (window as any).showLoanSuccessMessage = showSuccessMessage;
     return () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       delete (window as any).showLoanSuccessMessage;
     };
   }, []);
@@ -268,7 +270,7 @@ export default function UserLoans() {
                       type="text"
                       placeholder="Search loans by number or borrower name..."
                       value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
                       className="w-full pl-10 pr-4 py-3 rounded-2xl border-0 bg-white/60 backdrop-blur-sm shadow-sm focus:ring-2 focus:ring-green-500 focus:outline-none text-sm text-gray-900 placeholder-gray-500"
                     />
                     <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -279,7 +281,7 @@ export default function UserLoans() {
                 <div className="w-full sm:w-64">
                   <select
                     value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFilterStatus(e.target.value)}
                     className="w-full px-4 py-3 rounded-2xl border-0 bg-white/60 backdrop-blur-sm shadow-sm focus:ring-2 focus:ring-green-500 focus:outline-none text-sm text-gray-900"
                   >
                     {statusOptions.map(option => (
@@ -363,7 +365,7 @@ export default function UserLoans() {
               ) : (
                 <div className="p-6">
                   <div className="space-y-4">
-                    {filteredLoans.map((loan: Record<string, unknown>) => {
+                    {filteredLoans.map((loan) => {
                       const needsAction = loan.docusign_status === 'signed' && loan.status !== 'funded';
                       
                       return (

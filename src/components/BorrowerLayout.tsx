@@ -17,7 +17,8 @@ export default function BorrowerLayout({ children }: BorrowerLayoutProps) {
   const router = useRouter();
   const [showAccountDropdown, setShowAccountDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [user, setUser] = useState<Record<string, unknown> | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [user, setUser] = useState<any>(null);
   const [] = useState<Record<string, unknown>[]>([]);
   const [unreadCount] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);

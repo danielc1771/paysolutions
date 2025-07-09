@@ -2,7 +2,7 @@
 
 import { createClient } from '@/utils/supabase/client';
 import AdminLayout from '@/components/AdminLayout';
-import { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { RoleRedirect } from '@/components/auth/RoleRedirect';
 
 interface Borrower {
@@ -205,7 +205,7 @@ export default function BorrowersPage() {
             <div className="w-72">
               <select
                 value={selectedOrganization}
-                onChange={(e) => setSelectedOrganization(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedOrganization(e.target.value)}
                 className="w-full px-4 py-3 rounded-2xl border-0 bg-white/80 backdrop-blur-sm shadow-sm focus:ring-2 focus:ring-purple-500 focus:outline-none text-sm text-gray-900"
               >
                 <option value="all">All Organizations</option>

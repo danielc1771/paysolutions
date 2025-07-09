@@ -11,10 +11,10 @@ export async function GET() {
     const supabase = await createClient();
     
     const exportData = {
-      borrowers: [],
-      loans: [],
-      payment_schedules: [],
-      payments: [],
+      borrowers: [] as Record<string, unknown>[],
+      loans: [] as Record<string, unknown>[],
+      payment_schedules: [] as Record<string, unknown>[],
+      payments: [] as Record<string, unknown>[],
       export_timestamp: new Date().toISOString()
     };
     

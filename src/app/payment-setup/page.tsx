@@ -337,7 +337,7 @@ function PaymentSetupForm() {
                 type="text"
                 id="cardholderName"
                 value={cardholderName}
-                onChange={(e) => setCardholderName(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCardholderName(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
                 placeholder="Enter full name as it appears on card"
                 required
@@ -386,7 +386,7 @@ function PaymentSetupForm() {
                   type="text"
                   id="address"
                   value={billingAddress.line1}
-                  onChange={(e) => setBillingAddress(prev => ({ ...prev, line1: e.target.value }))}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBillingAddress(prev => ({ ...prev, line1: e.target.value }))}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
                   placeholder="123 Main Street"
                 />
@@ -401,7 +401,7 @@ function PaymentSetupForm() {
                     type="text"
                     id="city"
                     value={billingAddress.city}
-                    onChange={(e) => setBillingAddress(prev => ({ ...prev, city: e.target.value }))}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBillingAddress(prev => ({ ...prev, city: e.target.value }))}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
                     placeholder="New York"
                   />
@@ -414,7 +414,7 @@ function PaymentSetupForm() {
                     type="text"
                     id="state"
                     value={billingAddress.state}
-                    onChange={(e) => setBillingAddress(prev => ({ ...prev, state: e.target.value }))}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBillingAddress(prev => ({ ...prev, state: e.target.value }))}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
                     placeholder="NY"
                     maxLength={2}
@@ -430,7 +430,7 @@ function PaymentSetupForm() {
                   type="text"
                   id="zip"
                   value={billingAddress.postal_code}
-                  onChange={(e) => setBillingAddress(prev => ({ ...prev, postal_code: e.target.value }))}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBillingAddress(prev => ({ ...prev, postal_code: e.target.value }))}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
                   placeholder="10001"
                   maxLength={10}

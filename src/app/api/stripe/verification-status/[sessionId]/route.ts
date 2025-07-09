@@ -2,12 +2,12 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-11-20.acacia',
+  apiVersion: '2025-05-28.basil',
 });
 
 export async function GET(
   request: Request, 
-  { params }: { params: { sessionId: string } }
+  { params }: { params: Promise<{ sessionId: string }> }
 ) {
   try {
     const { sessionId } = await params;
@@ -24,7 +24,7 @@ export async function GET(
   } catch (error: unknown) {
     console.error('Error retrieving verification session:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to retrieve verification session' },
+      { error: error instanceof Error ? error.message : 'Failed to retrieve verification session' },
       { status: 500 }
     );
   }

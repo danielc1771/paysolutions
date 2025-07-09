@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
@@ -230,7 +230,7 @@ function PaymentForm({ loan, onPaymentSuccess }: { loan: LoanSummary; onPaymentS
                 step="0.01"
                 min="0"
                 value={paymentAmount}
-                onChange={(e) => setPaymentAmount(parseFloat(e.target.value) || 0)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPaymentAmount(parseFloat(e.target.value) || 0)}
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg font-semibold"
                 placeholder="0.00"
               />
@@ -251,7 +251,7 @@ function PaymentForm({ loan, onPaymentSuccess }: { loan: LoanSummary; onPaymentS
             <input
               type="text"
               value={cardholderName}
-              onChange={(e) => setCardholderName(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCardholderName(e.target.value)}
               className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Full name on card"
               required

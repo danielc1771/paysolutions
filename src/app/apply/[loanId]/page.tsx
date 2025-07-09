@@ -26,6 +26,7 @@ interface LoanApplicationData {
     stripeVerificationSessionId?: string;
   };
   dealerName: string;
+  loanId: string;
 }
 
 // Main Page Component
@@ -166,7 +167,7 @@ export default function ApplyPage() {
             
             updateTimeout = setTimeout(() => {
               setFormData((prev) => {
-                const currentStatus = prev.stripeVerificationStatus || 'pending';
+                const currentStatus = String(prev.stripeVerificationStatus || 'pending');
                 
                 // Only update if transition is valid
                 if (canTransitionTo(currentStatus, uiStatus)) {
@@ -221,7 +222,7 @@ export default function ApplyPage() {
       }
       supabase.removeChannel(channel);
     };
-  }, [loanId]);
+  }, [loanId, showSuccessDialog]);
 
   const saveProgress = async (currentStep: number, data: Record<string, unknown>) => {
     try {
@@ -340,7 +341,7 @@ export default function ApplyPage() {
                     <h2 className="text-3xl font-bold text-gray-900 mb-4">Application Submitted!</h2>
                     <p className="text-gray-600 mb-8 text-lg">
                       Your loan application has been successfully submitted and is now under review. 
-                      We'll contact you within 2-3 business days with the next steps.
+                      We&apos;ll contact you within 2-3 business days with the next steps.
                     </p>
                     <div className="space-y-4">
                       <button
@@ -374,7 +375,7 @@ export default function ApplyPage() {
 }
 
 // Step 1: Welcome
-function WelcomeStep({ initialData, handleNext }) {
+function WelcomeStep({ initialData, handleNext }: { initialData: LoanApplicationData | null; handleNext: () => void }) {
     return (
         <div className="text-center py-8">
             <div className="text-center mb-8">
@@ -396,7 +397,12 @@ function WelcomeStep({ initialData, handleNext }) {
 }
 
 // Step 2: Personal Details
-function PersonalDetailsStep({ formData, setFormData, initialData, handleNext }) {
+function PersonalDetailsStep({ formData, setFormData, initialData, handleNext }: { 
+  formData: Record<string, unknown>; 
+  setFormData: React.Dispatch<React.SetStateAction<Record<string, unknown>>>; 
+  initialData: LoanApplicationData | null; 
+  handleNext: () => void; 
+}) {
   return (
     <div>
       <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Personal Information</h1>
@@ -407,7 +413,7 @@ function PersonalDetailsStep({ formData, setFormData, initialData, handleNext })
         <div className="grid md:grid-cols-2 gap-6">
           <InfoField icon={<User />} label="Full Name" value={`${initialData?.borrower.first_name} ${initialData?.borrower.last_name}`} />
           <InfoField icon={<DollarSign />} label="Loan Amount" value={`${initialData?.loan.principal_amount.toLocaleString()}`} />
-          <InfoField icon={initialData?.borrower.email ? <Mail /> : <Phone />} label="Contact" value={initialData?.borrower.email || initialData?.borrower.phone} />
+          <InfoField icon={initialData?.borrower.email ? <Mail /> : <Phone />} label="Contact" value={initialData?.borrower.email || initialData?.borrower.phone || ''} />
         </div>
 
         <hr className="border-gray-200" />
@@ -427,12 +433,12 @@ function PersonalDetailsStep({ formData, setFormData, initialData, handleNext })
         <hr className="border-gray-200" />
 
         {/* Form fields */}
-        <InputField icon={<Calendar />} label="Date of Birth" name="dateOfBirth" type="date" value={formData.dateOfBirth} onChange={(e) => setFormData({...formData, dateOfBirth: e.target.value})} />
-        <InputField label="Address" name="address" type="text" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} icon={undefined} />
+        <InputField icon={<Calendar />} label="Date of Birth" name="dateOfBirth" type="date" value={formData.dateOfBirth} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, dateOfBirth: e.target.value})} />
+        <InputField label="Address" name="address" type="text" value={formData.address} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, address: e.target.value })} icon={undefined} />
         <div className="grid md:grid-cols-3 gap-4">
-          <InputField label="City" name="city" type="text" value={formData.city} onChange={(e) => setFormData({ ...formData, city: e.target.value })} icon={undefined} />
-          <InputField label="State" name="state" type="text" value={formData.state} onChange={(e) => setFormData({ ...formData, state: e.target.value })} icon={undefined} />
-          <InputField label="ZIP Code" name="zipCode" type="text" value={formData.zipCode} onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })} icon={undefined} />
+          <InputField label="City" name="city" type="text" value={formData.city} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, city: e.target.value })} icon={undefined} />
+          <InputField label="State" name="state" type="text" value={formData.state} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, state: e.target.value })} icon={undefined} />
+          <InputField label="ZIP Code" name="zipCode" type="text" value={formData.zipCode} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, zipCode: e.target.value })} icon={undefined} />
         </div>
       </div>
 
@@ -446,7 +452,12 @@ function PersonalDetailsStep({ formData, setFormData, initialData, handleNext })
 }
 
 // Step 3: Employment Details (New)
-function EmploymentDetailsStep({ formData, setFormData, handleNext, handlePrev }) {
+function EmploymentDetailsStep({ formData, setFormData, handleNext, handlePrev }: { 
+  formData: Record<string, unknown>; 
+  setFormData: React.Dispatch<React.SetStateAction<Record<string, unknown>>>; 
+  handleNext: () => void; 
+  handlePrev: () => void; 
+}) {
   return (
     <div>
       <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Employment Details</h1>
@@ -463,14 +474,14 @@ function EmploymentDetailsStep({ formData, setFormData, handleNext, handlePrev }
               { value: 'retired', label: 'Retired' },
               { value: 'student', label: 'Student' },
             ]}
-            value={formData.employmentStatus}
+            value={formData.employmentStatus as string}
             onChange={(value) => setFormData({...formData, employmentStatus: value})}
             placeholder="Select Employment Status"
           />
         </div>
-        <InputField label="Annual Income" name="annualIncome" type="number" placeholder="50000" value={formData.annualIncome} onChange={(e) => setFormData({ ...formData, annualIncome: e.target.value })} icon={undefined} />
-        <InputField label="Current Employer Name" name="currentEmployerName" type="text" value={formData.currentEmployerName} onChange={(e) => setFormData({ ...formData, currentEmployerName: e.target.value })} icon={undefined} />
-        <InputField label="Time with Current Employment (Years)" name="timeWithEmployment" type="text" placeholder="e.g., 5 years" value={formData.timeWithEmployment} onChange={(e) => setFormData({ ...formData, timeWithEmployment: e.target.value })} icon={undefined} />
+        <InputField label="Annual Income" name="annualIncome" type="number" placeholder="50000" value={formData.annualIncome} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, annualIncome: e.target.value })} icon={undefined} />
+        <InputField label="Current Employer Name" name="currentEmployerName" type="text" value={formData.currentEmployerName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, currentEmployerName: e.target.value })} icon={undefined} />
+        <InputField label="Time with Current Employment (Years)" name="timeWithEmployment" type="text" placeholder="e.g., 5 years" value={formData.timeWithEmployment} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, timeWithEmployment: e.target.value })} icon={undefined} />
       </div>
 
       <div className="mt-10 flex flex-col-reverse md:flex-row md:justify-between gap-4">
@@ -484,7 +495,13 @@ function EmploymentDetailsStep({ formData, setFormData, handleNext, handlePrev }
 }
 
 // Step 5: Review (Modified - added new employment fields)
-function ReviewStep({ formData, initialData, handlePrev, handleSubmit, loading }) {
+function ReviewStep({ formData, initialData, handlePrev, handleSubmit, loading }: { 
+  formData: Record<string, unknown>; 
+  initialData: LoanApplicationData | null; 
+  handlePrev: () => void; 
+  handleSubmit: () => void; 
+  loading: boolean; 
+}) {
   const reviewData = {
     ...initialData?.borrower,
     ...initialData?.loan,
@@ -504,7 +521,7 @@ function ReviewStep({ formData, initialData, handlePrev, handleSubmit, loading }
             <ReviewItem label="Full Name" value={`${reviewData.first_name || ''} ${reviewData.last_name || ''}`} />
             <ReviewItem label="Email" value={reviewData.email || 'Not provided'} />
             <ReviewItem label="Phone" value={reviewData.phone || 'Not provided'} />
-            <ReviewItem label="Date of Birth" value={reviewData.dateOfBirth || 'Not provided'} />
+            <ReviewItem label="Date of Birth" value={(reviewData as Record<string, unknown>).dateOfBirth as string || 'Not provided'} />
           </div>
         </div>
 
@@ -514,10 +531,10 @@ function ReviewStep({ formData, initialData, handlePrev, handleSubmit, loading }
         <div>
           <h3 className="text-lg font-bold text-gray-900 mb-3">Address</h3>
           <div className="space-y-2">
-            <ReviewItem label="Street Address" value={reviewData.address || 'Not provided'} />
-            <ReviewItem label="City" value={reviewData.city || 'Not provided'} />
-            <ReviewItem label="State" value={reviewData.state || 'Not provided'} />
-            <ReviewItem label="ZIP Code" value={reviewData.zipCode || 'Not provided'} />
+            <ReviewItem label="Street Address" value={(reviewData as Record<string, unknown>).address as string || 'Not provided'} />
+            <ReviewItem label="City" value={(reviewData as Record<string, unknown>).city as string || 'Not provided'} />
+            <ReviewItem label="State" value={(reviewData as Record<string, unknown>).state as string || 'Not provided'} />
+            <ReviewItem label="ZIP Code" value={(reviewData as Record<string, unknown>).zipCode as string || 'Not provided'} />
           </div>
         </div>
 
@@ -551,10 +568,10 @@ function ReviewStep({ formData, initialData, handlePrev, handleSubmit, loading }
         <div>
           <h3 className="text-lg font-bold text-gray-900 mb-3">Employment Information</h3>
           <div className="space-y-2">
-            <ReviewItem label="Employment Status" value={reviewData.employmentStatus || 'Not provided'} />
-            <ReviewItem label="Annual Income" value={reviewData.annualIncome ? `$${parseFloat(reviewData.annualIncome).toLocaleString()}` : 'Not provided'} />
-            <ReviewItem label="Current Employer" value={reviewData.currentEmployerName || 'Not provided'} />
-            <ReviewItem label="Time with Employment" value={reviewData.timeWithEmployment || 'Not provided'} />
+            <ReviewItem label="Employment Status" value={(reviewData as Record<string, unknown>).employmentStatus as string || 'Not provided'} />
+            <ReviewItem label="Annual Income" value={(reviewData as Record<string, unknown>).annualIncome ? `$${parseFloat((reviewData as Record<string, unknown>).annualIncome as string).toLocaleString()}` : 'Not provided'} />
+            <ReviewItem label="Current Employer" value={(reviewData as Record<string, unknown>).currentEmployerName as string || 'Not provided'} />
+            <ReviewItem label="Time with Employment" value={(reviewData as Record<string, unknown>).timeWithEmployment as string || 'Not provided'} />
           </div>
         </div>
 
@@ -565,46 +582,46 @@ function ReviewStep({ formData, initialData, handlePrev, handleSubmit, loading }
           <h3 className="text-lg font-bold text-gray-900 mb-3">References</h3>
           <div className="space-y-4">
             {/* Reference 1 */}
-            {(reviewData.reference1Name || reviewData.reference1Phone || reviewData.reference1Email) && (
+            {((reviewData as Record<string, unknown>).reference1Name || (reviewData as Record<string, unknown>).reference1Phone || (reviewData as Record<string, unknown>).reference1Email) ? (
               <div>
                 <h4 className="font-semibold text-gray-800 mb-1">Reference 1</h4>
                 <div className="ml-4 space-y-1">
-                  {reviewData.reference1Name && <ReviewItem label="Name" value={reviewData.reference1Name} />}
-                  {reviewData.reference1Phone && <ReviewItem label="Phone" value={reviewData.reference1Phone} />}
-                  {reviewData.reference1Email && <ReviewItem label="Email" value={reviewData.reference1Email} />}
+                  {(reviewData as Record<string, unknown>).reference1Name ? <ReviewItem label="Name" value={(reviewData as Record<string, unknown>).reference1Name as string} /> : null}
+                  {(reviewData as Record<string, unknown>).reference1Phone ? <ReviewItem label="Phone" value={(reviewData as Record<string, unknown>).reference1Phone as string} /> : null}
+                  {(reviewData as Record<string, unknown>).reference1Email ? <ReviewItem label="Email" value={(reviewData as Record<string, unknown>).reference1Email as string} /> : null}
                 </div>
               </div>
-            )}
+            ) : null}
             
             {/* Reference 2 */}
-            {(reviewData.reference2Name || reviewData.reference2Phone || reviewData.reference2Email) && (
+            {((reviewData as Record<string, unknown>).reference2Name || (reviewData as Record<string, unknown>).reference2Phone || (reviewData as Record<string, unknown>).reference2Email) ? (
               <div>
                 <h4 className="font-semibold text-gray-800 mb-1">Reference 2</h4>
                 <div className="ml-4 space-y-1">
-                  {reviewData.reference2Name && <ReviewItem label="Name" value={reviewData.reference2Name} />}
-                  {reviewData.reference2Phone && <ReviewItem label="Phone" value={reviewData.reference2Phone} />}
-                  {reviewData.reference2Email && <ReviewItem label="Email" value={reviewData.reference2Email} />}
+                  {(reviewData as Record<string, unknown>).reference2Name ? <ReviewItem label="Name" value={(reviewData as Record<string, unknown>).reference2Name as string} /> : null}
+                  {(reviewData as Record<string, unknown>).reference2Phone ? <ReviewItem label="Phone" value={(reviewData as Record<string, unknown>).reference2Phone as string} /> : null}
+                  {(reviewData as Record<string, unknown>).reference2Email ? <ReviewItem label="Email" value={(reviewData as Record<string, unknown>).reference2Email as string} /> : null}
                 </div>
               </div>
-            )}
+            ) : null}
             
             {/* Reference 3 */}
-            {(reviewData.reference3Name || reviewData.reference3Phone || reviewData.reference3Email) && (
+            {((reviewData as Record<string, unknown>).reference3Name || (reviewData as Record<string, unknown>).reference3Phone || (reviewData as Record<string, unknown>).reference3Email) ? (
               <div>
                 <h4 className="font-semibold text-gray-800 mb-1">Reference 3</h4>
                 <div className="ml-4 space-y-1">
-                  {reviewData.reference3Name && <ReviewItem label="Name" value={reviewData.reference3Name} />}
-                  {reviewData.reference3Phone && <ReviewItem label="Phone" value={reviewData.reference3Phone} />}
-                  {reviewData.reference3Email && <ReviewItem label="Email" value={reviewData.reference3Email} />}
+                  {(reviewData as Record<string, unknown>).reference3Name ? <ReviewItem label="Name" value={(reviewData as Record<string, unknown>).reference3Name as string} /> : null}
+                  {(reviewData as Record<string, unknown>).reference3Phone ? <ReviewItem label="Phone" value={(reviewData as Record<string, unknown>).reference3Phone as string} /> : null}
+                  {(reviewData as Record<string, unknown>).reference3Email ? <ReviewItem label="Email" value={(reviewData as Record<string, unknown>).reference3Email as string} /> : null}
                 </div>
               </div>
-            )}
+            ) : null}
             
-            {!reviewData.reference1Name && !reviewData.reference1Phone && !reviewData.reference1Email &&
-             !reviewData.reference2Name && !reviewData.reference2Phone && !reviewData.reference2Email &&
-             !reviewData.reference3Name && !reviewData.reference3Phone && !reviewData.reference3Email && (
+            {!(reviewData as Record<string, unknown>).reference1Name && !(reviewData as Record<string, unknown>).reference1Phone && !(reviewData as Record<string, unknown>).reference1Email &&
+             !(reviewData as Record<string, unknown>).reference2Name && !(reviewData as Record<string, unknown>).reference2Phone && !(reviewData as Record<string, unknown>).reference2Email &&
+             !(reviewData as Record<string, unknown>).reference3Name && !(reviewData as Record<string, unknown>).reference3Phone && !(reviewData as Record<string, unknown>).reference3Email ? (
               <p className="text-gray-500 italic">No references provided</p>
-            )}
+            ) : null}
           </div>
         </div>
 
@@ -616,14 +633,14 @@ function ReviewStep({ formData, initialData, handlePrev, handleSubmit, loading }
           <div className="space-y-2">
             <ReviewItem 
               label="Identity Verification" 
-              value={reviewData.stripeVerificationStatus === 'completed' ? '✅ Verified via Stripe Identity' : '⏳ Pending verification'} 
+              value={(reviewData as Record<string, unknown>).stripeVerificationStatus === 'completed' ? '✅ Verified via Stripe Identity' : '⏳ Pending verification'} 
             />
-            <ReviewItem label="Communication Consent" value={reviewData.consentToContact ? '✅ Yes' : '❌ No'} />
-            {reviewData.consentToText && <ReviewItem label="Text Message Consent" value="✅ Yes" />}
-            {reviewData.consentToCall && <ReviewItem label="Phone Call Consent" value="✅ Yes" />}
-            {reviewData.communicationPreferences && (
-              <ReviewItem label="Preferred Contact Method" value={reviewData.communicationPreferences} />
-            )}
+            <ReviewItem label="Communication Consent" value={(reviewData as Record<string, unknown>).consentToContact ? '✅ Yes' : '❌ No'} />
+            {(reviewData as Record<string, unknown>).consentToText ? <ReviewItem label="Text Message Consent" value="✅ Yes" /> : null}
+            {(reviewData as Record<string, unknown>).consentToCall ? <ReviewItem label="Phone Call Consent" value="✅ Yes" /> : null}
+            {(reviewData as Record<string, unknown>).communicationPreferences ? (
+              <ReviewItem label="Preferred Contact Method" value={(reviewData as Record<string, unknown>).communicationPreferences as string} />
+            ) : null}
           </div>
         </div>
       </div>
@@ -639,14 +656,14 @@ function ReviewStep({ formData, initialData, handlePrev, handleSubmit, loading }
 }
 
 // --- UI Components ---
-const InputField = ({ icon, label, ...props }) => (
+const InputField = ({ icon, label, ...props }: { icon?: React.ReactNode; label: string; [key: string]: unknown }) => (
   <div>
-    <label htmlFor={props.name} className="block text-sm font-semibold text-gray-700 mb-2">{label}</label>
+    <label htmlFor={props.name as string} className="block text-sm font-semibold text-gray-700 mb-2">{label}</label>
     <div className="relative">
       {icon && <div className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400">{icon}</div>}
       <input 
         {...props} 
-        id={props.name} 
+        id={props.name as string} 
         value={props.value != null ? String(props.value) : ''} // Convert null/undefined/NaN to empty string
         className={`w-full py-3 border border-gray-200 rounded-2xl bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition-all duration-300 ${icon ? 'pl-12 pr-4' : 'px-4'} ${props.type === 'date' ? 'appearance-none' : ''}`} 
       />
@@ -654,7 +671,7 @@ const InputField = ({ icon, label, ...props }) => (
   </div>
 );
 
-const InfoField = ({ icon, label, value }) => (
+const InfoField = ({ icon, label, value }: { icon?: React.ReactNode; label: string; value: string | undefined }) => (
   <div>
     <label className="block text-sm font-semibold text-gray-700 mb-2">{label}</label>
     <div className="relative">
@@ -666,21 +683,21 @@ const InfoField = ({ icon, label, value }) => (
   </div>
 );
 
-const ReviewItem = ({ label, value }) => (
+const ReviewItem = ({ label, value }: { label: string; value: string | undefined }) => (
   <div className="flex justify-between items-center py-2 text-sm md:text-base">
     <p className="text-gray-600">{label}</p>
     <p className="font-semibold text-gray-900 text-right">{value}</p>
   </div>
 );
 
-const Loader = ({ text }) => (
+const Loader = ({ text }: { text: string }) => (
   <div className="flex flex-col items-center justify-center py-20">
     <Loader2 className="w-8 h-8 animate-spin text-purple-500 mb-4" />
     <p className="text-gray-600 font-medium">{text}</p>
   </div>
 );
 
-const ErrorMessage = ({ error }) => (
+const ErrorMessage = ({ error }: { error: string }) => (
   <div className="text-center py-20">
     <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
       <AlertCircle className="w-8 h-8 text-red-500" />
@@ -744,7 +761,12 @@ const SuccessMessage = () => (
 );
 
 // New Step: References
-function ReferencesStep({ formData, setFormData, handleNext, handlePrev }) {
+function ReferencesStep({ formData, setFormData, handleNext, handlePrev }: { 
+  formData: Record<string, unknown>; 
+  setFormData: React.Dispatch<React.SetStateAction<Record<string, unknown>>>; 
+  handleNext: () => void; 
+  handlePrev: () => void; 
+}) {
   return (
     <div>
       <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">References</h1>
@@ -755,9 +777,9 @@ function ReferencesStep({ formData, setFormData, handleNext, handlePrev }) {
           <div key={num} className="p-4 border border-gray-200 rounded-2xl bg-gray-50/50">
             <h3 className="text-xl font-bold text-gray-900 mb-4">Reference {num}</h3>
             <div className="space-y-4">
-              <InputField label="Name" name={`reference${num}Name`} type="text" value={formData[`reference${num}Name`]} onChange={(e) => setFormData({...formData, [`reference${num}Name`]: e.target.value})} />
-              <InputField label="Phone" name={`reference${num}Phone`} type="text" value={formData[`reference${num}Phone`]} onChange={(e) => setFormData({...formData, [`reference${num}Phone`]: e.target.value})} />
-              <InputField label="Email" name={`reference${num}Email`} type="email" value={formData[`reference${num}Email`]} onChange={(e) => setFormData({...formData, [`reference${num}Email`]: e.target.value})} />
+              <InputField label="Name" name={`reference${num}Name`} type="text" value={formData[`reference${num}Name`]} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, [`reference${num}Name`]: e.target.value})} />
+              <InputField label="Phone" name={`reference${num}Phone`} type="text" value={formData[`reference${num}Phone`]} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, [`reference${num}Phone`]: e.target.value})} />
+              <InputField label="Email" name={`reference${num}Email`} type="email" value={formData[`reference${num}Email`]} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, [`reference${num}Email`]: e.target.value})} />
             </div>
           </div>
         ))}
@@ -774,11 +796,18 @@ function ReferencesStep({ formData, setFormData, handleNext, handlePrev }) {
 }
 
 // Step 5: Stripe Identity Verification
-function StripeVerificationStep({ formData, setFormData, initialData, handleNext, handlePrev, saveProgress }) {
+function StripeVerificationStep({ formData, setFormData, initialData, handleNext, handlePrev, saveProgress }: { 
+  formData: Record<string, unknown>; 
+  setFormData: React.Dispatch<React.SetStateAction<Record<string, unknown>>>; 
+  initialData: LoanApplicationData | null; 
+  handleNext: () => void; 
+  handlePrev: () => void; 
+  saveProgress: (step: number, data: Record<string, unknown>) => void; 
+}) {
   const [verificationStatus, setVerificationStatus] = useState(formData.stripeVerificationStatus || 'not_started'); // not_started, in_progress, completed, failed
   const [isVerifying, setIsVerifying] = useState(false);
-  const [stripe, setStripe] = useState(null);
-  const [error, setError] = useState(null);
+  const [stripe, setStripe] = useState<Record<string, unknown> | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     // Load Stripe.js
@@ -878,7 +907,8 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
       setFormData({ ...formData, stripeVerificationSessionId: session.verification_session_id });
 
       // Show the verification modal using Stripe.js
-      const result = await stripe.verifyIdentity(session.client_secret);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result = await (stripe as any).verifyIdentity(session.client_secret);
 
       if (result.error) {
         // Handle verification errors
@@ -909,7 +939,8 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
       // Don't set verificationStatus here directly - update through formData
       
       // Handle error message safely
-      const errorMessage = error?.message || error?.toString() || 'An unexpected error occurred during verification';
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const errorMessage = (error as any)?.message || (error as any)?.toString() || 'An unexpected error occurred during verification';
       setError(errorMessage);
       setFormData({...formData, stripeVerificationStatus: 'failed'});
     } finally {
@@ -1050,7 +1081,12 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
 }
 
 // Step 6: Consent & Communication Preferences
-function ConsentStep({ formData, setFormData, handleNext, handlePrev }) {
+function ConsentStep({ formData, setFormData, handleNext, handlePrev }: { 
+  formData: Record<string, unknown>; 
+  setFormData: React.Dispatch<React.SetStateAction<Record<string, unknown>>>; 
+  handleNext: () => void; 
+  handlePrev: () => void; 
+}) {
   const canProceed = formData.consentToContact && (formData.consentToText || formData.consentToCall);
 
   return (
@@ -1084,8 +1120,8 @@ function ConsentStep({ formData, setFormData, handleNext, handlePrev }) {
             <label className="flex items-start space-x-3 cursor-pointer">
               <input
                 type="checkbox"
-                checked={formData.consentToContact}
-                onChange={(e) => setFormData({...formData, consentToContact: e.target.checked})}
+                checked={Boolean(formData.consentToContact)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, consentToContact: e.target.checked})}
                 className="mt-1 w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
               />
               <div>
@@ -1098,15 +1134,15 @@ function ConsentStep({ formData, setFormData, handleNext, handlePrev }) {
           </div>
 
           {/* Communication Methods */}
-          {formData.consentToContact && (
+          {Boolean(formData.consentToContact) && (
             <div className="pl-8 space-y-4 border-l-2 border-purple-200">
               <p className="text-sm font-semibold text-gray-700 mb-3">Select how we can contact you (choose at least one):</p>
               
               <label className="flex items-start space-x-3 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={formData.consentToText}
-                  onChange={(e) => setFormData({...formData, consentToText: e.target.checked})}
+                  checked={Boolean(formData.consentToText)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, consentToText: e.target.checked})}
                   className="mt-1 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
                 />
                 <div>
@@ -1118,8 +1154,8 @@ function ConsentStep({ formData, setFormData, handleNext, handlePrev }) {
               <label className="flex items-start space-x-3 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={formData.consentToCall}
-                  onChange={(e) => setFormData({...formData, consentToCall: e.target.checked})}
+                  checked={Boolean(formData.consentToCall)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, consentToCall: e.target.checked})}
                   className="mt-1 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
                 />
                 <div>

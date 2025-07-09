@@ -32,7 +32,7 @@ const loanProgressSchema = z.object({
   communicationPreferences: z.string().optional(),
 });
 
-export async function POST(request: Request, { params }: { params: { loanId: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ loanId: string }> }) {
   const { loanId } = await params;
   const supabase = await createClient();
 

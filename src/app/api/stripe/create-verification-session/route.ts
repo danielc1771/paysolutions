@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-11-20.acacia',
+  apiVersion: '2025-05-28.basil',
 });
 
 export async function POST(request: Request) {
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   } catch (error: unknown) {
     console.error('Error creating verification session:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to create verification session' },
+      { error: error instanceof Error ? error.message : 'Failed to create verification session' },
       { status: 500 }
     );
   }

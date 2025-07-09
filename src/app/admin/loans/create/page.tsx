@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminLayout from '@/components/AdminLayout';
 import { Send, Edit, User, Mail, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
@@ -113,7 +113,7 @@ function SendApplicationForm() {
           <label htmlFor="fullName" className="block text-sm font-semibold text-gray-700 mb-2">Full Name</label>
           <div className="relative">
             <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input id="fullName" type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="John Doe" className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-2xl bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition-all duration-300" required />
+            <input id="fullName" type="text" value={fullName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFullName(e.target.value)} placeholder="John Doe" className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-2xl bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition-all duration-300" required />
           </div>
         </div>
         <div>
@@ -135,7 +135,7 @@ function SendApplicationForm() {
           <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">Email Address</label>
           <div className="relative">
             <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="customer@example.com" className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-2xl bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition-all duration-300" required />
+            <input id="email" type="email" value={email} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)} placeholder="customer@example.com" className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-2xl bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition-all duration-300" required />
           </div>
         </div>
 
@@ -145,19 +145,19 @@ function SendApplicationForm() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label htmlFor="vehicleYear" className="block text-sm font-semibold text-gray-700 mb-2">Year</label>
-              <input id="vehicleYear" type="number" value={vehicleYear} onChange={(e) => setVehicleYear(e.target.value)} placeholder="2023" className="w-full px-4 py-3 border border-gray-200 rounded-2xl bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition-all duration-300" required />
+              <input id="vehicleYear" type="number" value={vehicleYear} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setVehicleYear(e.target.value)} placeholder="2023" className="w-full px-4 py-3 border border-gray-200 rounded-2xl bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition-all duration-300" required />
             </div>
             <div>
               <label htmlFor="vehicleMake" className="block text-sm font-semibold text-gray-700 mb-2">Make</label>
-              <input id="vehicleMake" type="text" value={vehicleMake} onChange={(e) => setVehicleMake(e.target.value)} placeholder="Toyota" className="w-full px-4 py-3 border border-gray-200 rounded-2xl bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition-all duration-300" required />
+              <input id="vehicleMake" type="text" value={vehicleMake} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setVehicleMake(e.target.value)} placeholder="Toyota" className="w-full px-4 py-3 border border-gray-200 rounded-2xl bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition-all duration-300" required />
             </div>
             <div>
               <label htmlFor="vehicleModel" className="block text-sm font-semibold text-gray-700 mb-2">Model</label>
-              <input id="vehicleModel" type="text" value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)} placeholder="Camry" className="w-full px-4 py-3 border border-gray-200 rounded-2xl bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition-all duration-300" required />
+              <input id="vehicleModel" type="text" value={vehicleModel} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setVehicleModel(e.target.value)} placeholder="Camry" className="w-full px-4 py-3 border border-gray-200 rounded-2xl bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition-all duration-300" required />
             </div>
             <div>
               <label htmlFor="vehicleVin" className="block text-sm font-semibold text-gray-700 mb-2">VIN</label>
-              <input id="vehicleVin" type="text" value={vehicleVin} onChange={(e) => setVehicleVin(e.target.value)} placeholder="17-character VIN" className="w-full px-4 py-3 border border-gray-200 rounded-2xl bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition-all duration-300" required />
+              <input id="vehicleVin" type="text" value={vehicleVin} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setVehicleVin(e.target.value)} placeholder="17-character VIN" className="w-full px-4 py-3 border border-gray-200 rounded-2xl bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition-all duration-300" required />
             </div>
           </div>
         </div>
