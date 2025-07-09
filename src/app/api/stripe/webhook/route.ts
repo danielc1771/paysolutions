@@ -10,16 +10,18 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
  * Handle Identity Verification Updates
  * Updates the database with verification status changes
  */
-async function handleIdentityVerification(verificationSession: Record<string, unknown>, status: string) {
+async function handleIdentityVerification(verificationSession: unknown, status: string) {
   try {
+    const session = verificationSession as Record<string, unknown>;
     console.log('🔄 Processing identity verification update:', {
-      sessionId: verificationSession.id,
+      sessionId: session.id,
       status,
-      metadata: verificationSession.metadata
+      metadata: session.metadata
     });
 
-    const supabase = createClient();
-    const loanId = verificationSession.metadata?.loan_id;
+    const supabase = await createClient();
+    const metadata = session.metadata as Record<string, string> | undefined;
+    const loanId = metadata?.loan_id;
 
     if (!loanId) {
       console.error('❌ No loan_id found in verification session metadata');
@@ -31,7 +33,7 @@ async function handleIdentityVerification(verificationSession: Record<string, un
       .from('loans')
       .update({
         stripe_verification_status: status,
-        stripe_verification_session_id: verificationSession.id,
+        stripe_verification_session_id: session.id,
         updated_at: new Date().toISOString()
       })
       .eq('id', loanId);
@@ -44,7 +46,7 @@ async function handleIdentityVerification(verificationSession: Record<string, un
     console.log('✅ Successfully updated loan verification status:', {
       loanId,
       status,
-      sessionId: verificationSession.id
+      sessionId: session.id
     });
 
   } catch (error) {

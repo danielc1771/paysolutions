@@ -154,7 +154,7 @@ export default function ApplyPage() {
           
           // Update stripe verification status
           if (newRecord.stripe_verification_status) {
-            const dbStatus = newRecord.stripe_verification_status;
+            const dbStatus = newRecord.stripe_verification_status as string;
             const uiStatus = mapVerificationStatus(dbStatus);
             
             setFormData((prev) => {
