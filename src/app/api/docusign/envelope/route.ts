@@ -77,9 +77,17 @@ export async function POST(request: NextRequest) {
       borrowerName: `${loanData.borrower.firstName} ${loanData.borrower.lastName}`
     });
 
-    // Create DocuSign envelope
+    // Create DocuSign envelope with webhook URL
     const { envelopesApi, accountId } = await createEnvelopesApi();
-    const envelopeDefinition = createLoanAgreementEnvelope(loanData);
+    
+    // Get webhook URL from request headers
+    const protocol = request.headers.get('x-forwarded-proto') || 'https';
+    const host = request.headers.get('host');
+    const webhookUrl = `${protocol}://${host}/api/docusign/webhook`;
+    
+    console.log('🔗 Using webhook URL:', webhookUrl);
+    
+    const envelopeDefinition = createLoanAgreementEnvelope(loanData, webhookUrl, loanId);
 
     console.log('📤 Sending envelope to DocuSign...');
     const result = await envelopesApi.createEnvelope(accountId, {

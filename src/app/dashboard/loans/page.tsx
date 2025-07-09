@@ -110,7 +110,7 @@ export default function UserLoans() {
       case 'application_sent': return 'bg-yellow-100 text-yellow-800';
       case 'application_completed': return 'bg-orange-100 text-orange-800';
       case 'review': return 'bg-orange-100 text-orange-800';
-      case 'signed': return 'bg-purple-100 text-purple-800';
+      case 'signed': return 'bg-emerald-100 text-emerald-800';
       case 'funded': return 'bg-green-100 text-green-800';
       case 'active': return 'bg-green-100 text-green-800';
       case 'closed': return 'bg-gray-100 text-gray-800';
@@ -132,7 +132,7 @@ export default function UserLoans() {
       case 'application_sent': return 'Application Sent';
       case 'application_completed': return 'Application Completed';
       case 'review': return 'Under Review';
-      case 'signed': return 'Signed';
+      case 'signed': return 'Signed - Ready for Funding';
       case 'funded': return 'Funded';
       case 'active': return 'Active';
       case 'closed': return 'Closed';

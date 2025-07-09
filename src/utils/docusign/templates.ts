@@ -179,7 +179,7 @@ export const generateLoanAgreementHTML = (loanData: LoanData): string => {
 };
 
 // Create DocuSign envelope with loan agreement
-export const createLoanAgreementEnvelope = (loanData: LoanData): docusign.EnvelopeDefinition => {
+export const createLoanAgreementEnvelope = (loanData: LoanData, webhookUrl?: string, loanId?: string): docusign.EnvelopeDefinition => {
   const documentHtml = generateLoanAgreementHTML(loanData);
   const documentBase64 = Buffer.from(documentHtml).toString('base64');
 
@@ -235,8 +235,79 @@ export const createLoanAgreementEnvelope = (loanData: LoanData): docusign.Envelo
     status: 'sent'
   };
 
-  // TODO: Add eventNotification configuration once we have a publicly accessible webhook URL
-  // For now, we'll rely on the frontend polling mechanism for status updates
+  // Add custom fields for loan tracking
+  if (loanId) {
+    envelopeDefinition.customFields = {
+      textCustomFields: [
+        {
+          fieldId: 'loan_id',
+          name: 'Loan ID',
+          value: loanId,
+          show: 'false',
+          required: 'false'
+        },
+        {
+          fieldId: 'loan_number',
+          name: 'Loan Number',
+          value: loanData.loanNumber,
+          show: 'false',
+          required: 'false'
+        }
+      ]
+    };
+  }
+
+  // Add per-envelope webhook configuration if URL is provided
+  if (webhookUrl) {
+    envelopeDefinition.eventNotification = {
+      url: webhookUrl,
+      loggingEnabled: 'true',
+      requireAcknowledgment: 'false',
+      useSoapInterface: 'false',
+      includeCertificateWithSoap: 'false',
+      signMessageWithX509Cert: 'false',
+      includeDocuments: 'false',
+      includeEnvelopeVoidReason: 'true',
+      includeTimeZone: 'true',
+      includeSenderAccountAsCustomField: 'false',
+      includeDocumentFields: 'false',
+      includeCertificateOfCompletion: 'false',
+      envelopeEvents: [
+        {
+          envelopeEventStatusCode: 'sent'
+        },
+        {
+          envelopeEventStatusCode: 'delivered'
+        },
+        {
+          envelopeEventStatusCode: 'completed'
+        },
+        {
+          envelopeEventStatusCode: 'declined'
+        },
+        {
+          envelopeEventStatusCode: 'voided'
+        }
+      ],
+      recipientEvents: [
+        {
+          recipientEventStatusCode: 'sent'
+        },
+        {
+          recipientEventStatusCode: 'delivered'
+        },
+        {
+          recipientEventStatusCode: 'completed'
+        },
+        {
+          recipientEventStatusCode: 'declined'
+        },
+        {
+          recipientEventStatusCode: 'autoresponded'
+        }
+      ]
+    };
+  }
 
   return envelopeDefinition;
 };

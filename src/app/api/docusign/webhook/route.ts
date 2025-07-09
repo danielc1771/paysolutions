@@ -16,18 +16,30 @@ export async function POST(request: NextRequest) {
     let statusChangedDateTime: string | undefined;
 
     // Handle different webhook payload structures
+    let customFields: Record<string, string> = {};
+    
     if (webhookData.data && webhookData.data.envelopeId) {
       // Format 1: { event, data: { envelopeId, envelopeSummary: { status } } }
       envelopeId = webhookData.data.envelopeId;
       status = webhookData.data.envelopeSummary?.status || webhookData.data.status;
       completedDateTime = webhookData.data.envelopeSummary?.completedDateTime;
       statusChangedDateTime = webhookData.data.envelopeSummary?.statusChangedDateTime;
+      
+      // Extract custom fields if present
+      if (webhookData.data.customFields) {
+        customFields = webhookData.data.customFields;
+      }
     } else if (webhookData.envelopeId) {
       // Format 2: Direct envelope data
       envelopeId = webhookData.envelopeId;
       status = webhookData.status || webhookData.envelopeStatus;
       completedDateTime = webhookData.completedDateTime;
       statusChangedDateTime = webhookData.statusChangedDateTime;
+      
+      // Extract custom fields if present
+      if (webhookData.customFields) {
+        customFields = webhookData.customFields;
+      }
     } else {
       console.error('❌ Unknown webhook payload format:', webhookData);
       return NextResponse.json({ error: 'Invalid webhook payload format' }, { status: 400 });
@@ -42,18 +54,35 @@ export async function POST(request: NextRequest) {
       envelopeId, 
       status, 
       completedDateTime, 
-      statusChangedDateTime 
+      statusChangedDateTime,
+      customFields
     });
 
     // Update loan record based on envelope status
     const supabase = await createClient();
     
-    // Find loan by envelope ID
-    const { data: loan, error: findError } = await supabase
+    // Find loan by envelope ID (primary method)
+    let { data: loan, error: findError } = await supabase
       .from('loans')
       .select('id, status, docusign_status')
       .eq('docusign_envelope_id', envelopeId)
       .single();
+
+    // If not found and we have custom fields, try to find by loan_id
+    if (findError && customFields.loan_id) {
+      console.log('🔍 Attempting to find loan by custom field loan_id:', customFields.loan_id);
+      const { data: loanByCustomField, error: customFieldError } = await supabase
+        .from('loans')
+        .select('id, status, docusign_status')
+        .eq('id', customFields.loan_id)
+        .single();
+      
+      if (!customFieldError && loanByCustomField) {
+        loan = loanByCustomField;
+        findError = null;
+        console.log('✅ Found loan using custom field');
+      }
+    }
 
     if (findError || !loan) {
       console.error('❌ Loan not found for envelope:', envelopeId, findError);
@@ -73,17 +102,22 @@ export async function POST(request: NextRequest) {
     switch (docusignStatus) {
       case 'completed':
       case 'signed':
-        newLoanStatus = 'signed'; // Document is signed, ready for admin approval
+        newLoanStatus = 'signed'; // Document is signed, ready for funding
         docusignStatus = 'signed'; // Normalize to 'signed' for our UI
+        console.log('✅ Document completed/signed - updating loan status to signed');
         break;
       case 'declined':
       case 'voided':
         newLoanStatus = 'review'; // Back to review if declined/voided
+        console.log('⚠️ Document declined/voided - updating loan status to review');
         break;
       case 'sent':
       case 'delivered':
         // Document sent/delivered, no loan status change needed
+        console.log('📤 Document sent/delivered - no loan status change');
         break;
+      default:
+        console.log('ℹ️ Unknown DocuSign status:', docusignStatus);
     }
 
     // Update loan record
