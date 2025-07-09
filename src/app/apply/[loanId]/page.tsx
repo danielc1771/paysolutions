@@ -150,7 +150,7 @@ export default function ApplyPage() {
         },
         (payload) => {
           console.log('Received loan update:', payload);
-          const newRecord = payload.new as any;
+          const newRecord = payload.new as Record<string, unknown>;
           
           // Update stripe verification status
           if (newRecord.stripe_verification_status) {
