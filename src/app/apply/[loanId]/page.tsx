@@ -34,6 +34,7 @@ export default function ApplyPage() {
   const loanId = params.loanId as string;
 
   const [step, setStep] = useState(0); // 0: loading, 1: welcome, 2-4: form, 5: success, -1: error
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [formData, setFormData] = useState<Record<string, unknown>>({
     dateOfBirth: '',
     address: '',
@@ -88,10 +89,17 @@ export default function ApplyPage() {
           return sanitized;
         };
         
+        // Map database verification status to UI status consistently
+        const mapVerificationStatus = (dbStatus: string) => {
+          if (dbStatus === 'verified') return 'completed';
+          return dbStatus;
+        };
+
         setFormData(prev => ({
           ...prev,
           ...sanitizeData(data.borrower),
           stripeVerificationSessionId: data.loan.stripeVerificationSessionId ?? '',
+          stripeVerificationStatus: mapVerificationStatus(data.loan.stripeVerificationStatus || 'pending'),
         }));
         setStep(data.loan.applicationStep || 1); // Move to the saved step or first step
       } catch (err: unknown) {
@@ -111,6 +119,23 @@ export default function ApplyPage() {
     if (!loanId) return;
 
     const supabase = createClient();
+    let updateTimeout: NodeJS.Timeout | null = null;
+    
+    // Map database verification status to UI status consistently
+    const mapVerificationStatus = (dbStatus: string) => {
+      if (dbStatus === 'verified') return 'completed';
+      return dbStatus;
+    };
+
+    // State machine to prevent backwards transitions
+    const canTransitionTo = (currentStatus: string, newStatus: string) => {
+      const statusOrder = ['pending', 'processing', 'verified', 'completed'];
+      const currentIndex = statusOrder.indexOf(currentStatus);
+      const newIndex = statusOrder.indexOf(newStatus);
+      
+      // Allow transitions to same status, forward transitions, or error states
+      return newIndex >= currentIndex || newStatus === 'requires_action' || newStatus === 'failed';
+    };
     
     // Subscribe to changes in the loans table for this specific loan
     const channel = supabase
@@ -132,23 +157,49 @@ export default function ApplyPage() {
             console.log(`✅ Database verification status updated to: ${dbStatus}`);
             
             // Map database status to UI status
-            let uiStatus = dbStatus;
-            if (dbStatus === 'verified') {
-              uiStatus = 'completed';
+            const uiStatus = mapVerificationStatus(dbStatus);
+            
+            // Debounce rapid updates to prevent UI flicker
+            if (updateTimeout) {
+              clearTimeout(updateTimeout);
             }
             
-            setFormData((prev) => ({
-              ...prev,
-              stripeVerificationStatus: uiStatus,
-            }));
-
-            console.log('🔄 Verification status updated in formData to:', uiStatus);
+            updateTimeout = setTimeout(() => {
+              setFormData((prev) => {
+                const currentStatus = prev.stripeVerificationStatus || 'pending';
+                
+                // Only update if transition is valid
+                if (canTransitionTo(currentStatus, uiStatus)) {
+                  console.log('🔄 Verification status updated in formData to:', uiStatus);
+                  
+                  // If verification is completed, user can proceed
+                  if (uiStatus === 'completed') {
+                    console.log('🎉 Verification completed! User can proceed.');
+                  } else if (uiStatus === 'requires_action') {
+                    setError('Verification failed. Please try again or contact support.');
+                  }
+                  
+                  return {
+                    ...prev,
+                    stripeVerificationStatus: uiStatus,
+                  };
+                } else {
+                  console.log('🚫 Prevented backwards transition from', currentStatus, 'to', uiStatus);
+                  return prev;
+                }
+              });
+            }, 300); // 300ms debounce
+          }
+          
+          // Handle loan status updates (e.g., application_completed)
+          if (payload.new && payload.new.status) {
+            const loanStatus = payload.new.status;
+            console.log(`📋 Loan status updated to: ${loanStatus}`);
             
-            // If verification is completed, user can proceed
-            if (uiStatus === 'completed') {
-              console.log('🎉 Verification completed! User can proceed.');
-            } else if (uiStatus === 'requires_action') {
-              setError('Verification failed. Please try again or contact support.');
+            // If application is completed, show success dialog
+            if (loanStatus === 'application_completed' && !showSuccessDialog) {
+              console.log('🎉 Application completed! Showing success dialog.');
+              setShowSuccessDialog(true);
             }
           }
         }
@@ -165,6 +216,9 @@ export default function ApplyPage() {
     // Cleanup subscription on unmount
     return () => {
       console.log('🧹 Cleaning up Realtime subscription for loan:', loanId);
+      if (updateTimeout) {
+        clearTimeout(updateTimeout);
+      }
       supabase.removeChannel(channel);
     };
   }, [loanId]);
@@ -205,7 +259,13 @@ export default function ApplyPage() {
         const err = await response.json();
         throw new Error(err.message || 'Failed to submit application.');
       }
-      setStep(8); // Move to success step
+      
+      // Show success dialog instead of moving to step 8
+      setShowSuccessDialog(true);
+      
+      // Update the loan status in realtime (will be handled by server response)
+      console.log('🎉 Application submitted successfully!');
+      
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
       setError(errorMessage);
@@ -268,6 +328,44 @@ export default function ApplyPage() {
             )}
 
             {step === 8 && <SuccessMessage />}
+            
+            {/* Success Dialog Modal */}
+            {showSuccessDialog && (
+              <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-8 w-full max-w-lg mx-auto border border-white/20">
+                  <div className="text-center">
+                    <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                      <Check className="w-10 h-10 text-green-500" />
+                    </div>
+                    <h2 className="text-3xl font-bold text-gray-900 mb-4">Application Submitted!</h2>
+                    <p className="text-gray-600 mb-8 text-lg">
+                      Your loan application has been successfully submitted and is now under review. 
+                      We'll contact you within 2-3 business days with the next steps.
+                    </p>
+                    <div className="space-y-4">
+                      <button
+                        className="w-full bg-gradient-to-r from-green-500 to-teal-500 text-white font-bold py-4 px-8 rounded-2xl hover:from-green-600 hover:to-teal-600 transition-all duration-300 shadow-lg hover:shadow-xl"
+                        onClick={() => {
+                          setShowSuccessDialog(false);
+                          setStep(8); // Show the detailed success page
+                        }}
+                      >
+                        View Details
+                      </button>
+                      <button
+                        className="w-full bg-gray-200 text-gray-900 font-semibold py-4 px-8 rounded-2xl hover:bg-gray-300 transition-all duration-300 shadow-sm hover:shadow-md"
+                        onClick={() => {
+                          setShowSuccessDialog(false);
+                          // Could redirect to a different page or close the application
+                        }}
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </motion.div>
         </AnimatePresence>
       </div>
@@ -730,7 +828,7 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
         throw new Error(err.message || 'Failed to skip verification.');
       }
 
-      setVerificationStatus('completed');
+      // Update through formData only, not local state
       setFormData({
         ...formData,
         stripeVerificationStatus: 'completed',
@@ -751,8 +849,8 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
     }
 
     setIsVerifying(true);
-    setVerificationStatus('in_progress');
     setError(null);
+    // Don't set verificationStatus here - let it be controlled by formData.stripeVerificationStatus
     
     try {
       // Create verification session on the server
@@ -785,7 +883,7 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
       if (result.error) {
         // Handle verification errors
         console.error('Verification error:', result.error);
-        setVerificationStatus('failed');
+        // Don't set verificationStatus here directly - update through formData
         
         // Handle various error message formats
         let errorMessage = 'Verification failed. Please try again.';
@@ -800,19 +898,15 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
         setError(errorMessage);
         setFormData({...formData, stripeVerificationStatus: 'failed'});
       } else {
-        // Verification was submitted successfully
-        setVerificationStatus('processing');
-        setFormData({
-          ...formData, 
-          stripeVerificationStatus: 'processing',
-        });
-        
-        // Webhook will handle status updates automatically
+        // Verification was submitted successfully to Stripe
+        // Don't set status here - let webhook handle the actual verification result
+        // The realtime subscription will update the status based on webhook events
         console.log('Verification submitted. Waiting for webhook updates...');
+        console.log('🎯 Stripe verification modal completed successfully');
       }
     } catch (error) {
       console.error('Error starting verification:', error);
-      setVerificationStatus('failed');
+      // Don't set verificationStatus here directly - update through formData
       
       // Handle error message safely
       const errorMessage = error?.message || error?.toString() || 'An unexpected error occurred during verification';
@@ -926,7 +1020,8 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
                 <button
                   onClick={() => {
                     setError(null);
-                    setVerificationStatus('not_started');
+                    // Reset verification status through formData instead of local state
+                    setFormData({...formData, stripeVerificationStatus: 'not_started'});
                     startVerification();
                   }}
                   disabled={isVerifying}

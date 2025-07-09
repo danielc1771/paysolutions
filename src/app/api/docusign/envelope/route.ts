@@ -56,7 +56,18 @@ export async function POST(request: NextRequest) {
         ssn: loan.borrower.ssn || '',
         dateOfBirth: loan.borrower.date_of_birth || '',
         employmentStatus: loan.borrower.employment_status || '',
-        annualIncome: parseFloat(loan.borrower.annual_income || '0')
+        annualIncome: parseFloat(loan.borrower.annual_income || '0'),
+        currentEmployerName: loan.borrower.current_employer_name || '',
+        timeWithEmployment: loan.borrower.time_with_employment || '',
+        reference1Name: loan.borrower.reference1_name || '',
+        reference1Phone: loan.borrower.reference1_phone || '',
+        reference1Email: loan.borrower.reference1_email || '',
+        reference2Name: loan.borrower.reference2_name || '',
+        reference2Phone: loan.borrower.reference2_phone || '',
+        reference2Email: loan.borrower.reference2_email || '',
+        reference3Name: loan.borrower.reference3_name || '',
+        reference3Phone: loan.borrower.reference3_phone || '',
+        reference3Email: loan.borrower.reference3_email || ''
       }
     };
 

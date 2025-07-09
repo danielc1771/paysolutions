@@ -53,6 +53,7 @@ export async function GET(request: Request, { params }: { params: { loanId: stri
         vehicle_vin,
         application_step,
         stripe_verification_session_id,
+        stripe_verification_status,
         borrowers(*),
         organizations(*)
       `)
@@ -78,6 +79,7 @@ export async function GET(request: Request, { params }: { params: { loanId: stri
         vehicleVin: loan.vehicle_vin,
         applicationStep: loan.application_step,
         stripeVerificationSessionId: loan.stripe_verification_session_id,
+        stripeVerificationStatus: loan.stripe_verification_status,
       },
       borrower: loan.borrowers,
       dealerName: loan.organizations?.name,

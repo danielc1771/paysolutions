@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/client';
 import AdminLayout from '@/components/AdminLayout';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { RoleRedirect } from '@/components/auth/RoleRedirect';
 
 interface Loan {
   id: string;
@@ -22,12 +23,23 @@ interface Loan {
     email: string;
     kyc_status: string;
   } | null;
+  organization?: {
+    id: string;
+    name: string;
+  };
+}
+
+interface Organization {
+  id: string;
+  name: string;
 }
 
 export default function LoansPage() {
   const [loans, setLoans] = useState<Loan[]>([]);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedOrganization, setSelectedOrganization] = useState<string>('all');
   const [deleteConfirm, setDeleteConfirm] = useState<{
     isOpen: boolean;
     loanId: string;
@@ -48,6 +60,20 @@ export default function LoansPage() {
   const fetchLoans = async () => {
     try {
       setLoading(true);
+      
+      // Fetch organizations for the filter dropdown
+      const { data: orgsData, error: orgsError } = await supabase
+        .from('organizations')
+        .select('id, name')
+        .order('name', { ascending: true });
+
+      if (orgsError) {
+        console.error('Error fetching organizations:', orgsError);
+      } else {
+        setOrganizations(orgsData || []);
+      }
+
+      // Fetch loans with organization data
       const { data, error } = await supabase
         .from('loans')
         .select(`
@@ -66,6 +92,10 @@ export default function LoansPage() {
             last_name,
             email,
             kyc_status
+          ),
+          organization:organizations(
+            id,
+            name
           )
         `)
         .order('created_at', { ascending: false });
@@ -76,7 +106,8 @@ export default function LoansPage() {
         // Transform the data to match our interface
         const transformedData = data?.map((loan: Record<string, unknown>) => ({
           ...loan,
-          borrower: Array.isArray(loan.borrower) ? loan.borrower[0] : loan.borrower
+          borrower: Array.isArray(loan.borrower) ? loan.borrower[0] : loan.borrower,
+          organization: Array.isArray(loan.organization) ? loan.organization[0] : loan.organization
         })) || [];
         setLoans(transformedData);
       }
@@ -140,27 +171,44 @@ export default function LoansPage() {
     });
   };
 
+  // Filter loans based on selected organization
+  const filteredLoans = selectedOrganization === 'all' 
+    ? loans 
+    : loans.filter(l => l.organization?.id === selectedOrganization);
+
   return (
-    <AdminLayout>
+    <RoleRedirect allowedRoles={['admin']}>
+      <AdminLayout>
       <div className="p-8">
         {/* Page Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent mb-3">
-              Loan Management
-            </h1>
-            <p className="text-gray-600 text-lg">Complete loan lifecycle management and tracking</p>
-          </div>
-          <div>
-            <Link
-              href="/admin/loans/create"
-              className="bg-gradient-to-r from-purple-500 to-blue-500 text-white px-6 py-3 rounded-2xl font-semibold hover:from-purple-600 hover:to-blue-600 transition-all duration-300 flex items-center space-x-2 shadow-lg hover:shadow-xl"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-              <span>Create New Loan</span>
-            </Link>
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent mb-3">
+            Loan Management
+          </h1>
+          <p className="text-gray-600 text-lg">Complete loan lifecycle management and tracking</p>
+        </div>
+
+        {/* Organization Filter */}
+        <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-white/20 mb-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Filter by Organization</h3>
+              <p className="text-gray-600 text-sm">View loans from specific organizations</p>
+            </div>
+            <div className="w-72">
+              <select
+                value={selectedOrganization}
+                onChange={(e) => setSelectedOrganization(e.target.value)}
+                className="w-full px-4 py-3 rounded-2xl border-0 bg-white/80 backdrop-blur-sm shadow-sm focus:ring-2 focus:ring-purple-500 focus:outline-none text-sm text-gray-900"
+              >
+                <option value="all">All Organizations</option>
+                {organizations.map(org => (
+                  <option key={org.id} value={org.id}>
+                    {org.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
@@ -173,7 +221,14 @@ export default function LoansPage() {
                 <p className="text-gray-600">Complete loan portfolio with application tracking</p>
               </div>
               <div className="flex items-center gap-4">
-                <span className="text-sm text-gray-600 font-medium bg-white/60 px-4 py-2 rounded-2xl">{loans.length} total loans</span>
+                <span className="text-sm text-gray-600 font-medium bg-white/60 px-4 py-2 rounded-2xl">
+                  {filteredLoans.length} loans
+                  {selectedOrganization !== 'all' && (
+                    <span className="ml-2 px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">
+                      {organizations.find(org => org.id === selectedOrganization)?.name}
+                    </span>
+                  )}
+                </span>
               </div>
             </div>
           </div>
@@ -204,7 +259,7 @@ export default function LoansPage() {
                 Try Again
               </button>
             </div>
-          ) : !loans || loans.length === 0 ? (
+          ) : !filteredLoans || filteredLoans.length === 0 ? (
             <div className="p-12 text-center">
               <div className="w-20 h-20 bg-gradient-to-br from-purple-100 to-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
                 <svg className="w-10 h-10 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -212,21 +267,12 @@ export default function LoansPage() {
                 </svg>
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-3">No loans yet</h3>
-              <p className="text-gray-600 mb-6 max-w-md mx-auto">Get started by creating your first loan application. Our streamlined process makes it easy!</p>
-              <Link
-                href="/admin/loans/create"
-                className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-2xl font-bold hover:from-purple-600 hover:to-blue-600 transition-all duration-300 shadow-lg hover:shadow-xl space-x-2"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                <span>Create Your First Loan</span>
-              </Link>
+              <p className="text-gray-600 mb-6 max-w-md mx-auto">Loans will appear here as organizations create loan applications through the system.</p>
             </div>
           ) : (
             <div className="p-6">
               <div className="space-y-4">
-                {loans.map((loan: Loan) => (
+                {filteredLoans.map((loan: Loan) => (
                   <div 
                     key={loan.id} 
                     className="group relative bg-white/60 backdrop-blur-sm rounded-2xl p-6 shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer hover:-translate-y-1 border border-white/30"
@@ -275,6 +321,12 @@ export default function LoansPage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3a4 4 0 118 0v4M5 7h14l1 12H4L5 7z" />
                               </svg>
                               {loan.term_months} months
+                            </span>
+                            <span className="flex items-center">
+                              <svg className="w-4 h-4 mr-1 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                              </svg>
+                              {loan.organization?.name || 'No Organization'}
                             </span>
                           </div>
                         </div>
@@ -366,5 +418,6 @@ export default function LoansPage() {
         </div>
       )}
     </AdminLayout>
+    </RoleRedirect>
   );
 }

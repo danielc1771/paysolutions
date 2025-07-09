@@ -3,7 +3,7 @@
 import { createClient } from '@/utils/supabase/client';
 import UserLayout from '@/components/UserLayout';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { RoleRedirect } from '@/components/auth/RoleRedirect';
 
 interface Loan {
@@ -33,6 +33,19 @@ export default function UserLoans() {
   const [error, setError] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    isOpen: boolean;
+    loanId: string;
+    loanNumber: string;
+    borrowerName: string;
+  }>({
+    isOpen: false,
+    loanId: '',
+    loanNumber: '',
+    borrowerName: ''
+  });
 
   const supabase = createClient();
 
@@ -113,17 +126,100 @@ export default function UserLoans() {
     });
   };
 
+  const formatStatus = (status: string) => {
+    switch (status) {
+      case 'new': return 'New';
+      case 'application_sent': return 'Application Sent';
+      case 'application_completed': return 'Application Completed';
+      case 'review': return 'Under Review';
+      case 'signed': return 'Signed';
+      case 'funded': return 'Funded';
+      case 'active': return 'Active';
+      case 'closed': return 'Closed';
+      default: return status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ');
+    }
+  };
+
   // Filter loans based on status and search term
   const filteredLoans = loans.filter(loan => {
     const matchesStatus = filterStatus === 'all' || loan.status === filterStatus;
     const matchesSearch = searchTerm === '' || 
       loan.loan_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
       loan.borrower?.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      loan.borrower?.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      loan.borrower?.email?.toLowerCase().includes(searchTerm.toLowerCase());
+      loan.borrower?.last_name?.toLowerCase().includes(searchTerm.toLowerCase());
     
     return matchesStatus && matchesSearch;
   });
+
+  // Add success modal trigger function
+  const showSuccessMessage = (message: string) => {
+    setSuccessMessage(message);
+    setShowSuccessModal(true);
+  };
+
+  // Make the success function available globally for other components
+  React.useEffect(() => {
+    (window as any).showLoanSuccessMessage = showSuccessMessage;
+    return () => {
+      delete (window as any).showLoanSuccessMessage;
+    };
+  }, []);
+
+  const handleDeleteLoan = async (loanId: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        alert('User not authenticated');
+        return;
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError || !profile?.organization_id) {
+        alert('Could not retrieve organization ID for user.');
+        return;
+      }
+
+      // Delete loan only if it belongs to the user's organization
+      const { error } = await supabase
+        .from('loans')
+        .delete()
+        .eq('id', loanId)
+        .eq('organization_id', profile.organization_id);
+
+      if (error) {
+        alert('Error deleting loan: ' + error.message);
+      } else {
+        setSuccessMessage('Loan deleted successfully');
+        setShowSuccessModal(true);
+        // Refresh the loans list
+        const updatedLoans = loans.filter(loan => loan.id !== loanId);
+        setLoans(updatedLoans);
+      }
+    } catch {
+      alert('Failed to delete loan');
+    } finally {
+      setDeleteConfirm({ isOpen: false, loanId: '', loanNumber: '', borrowerName: '' });
+    }
+  };
+
+  const openDeleteConfirm = (loanId: string, loanNumber: string, borrowerName: string) => {
+    setDeleteConfirm({
+      isOpen: true,
+      loanId,
+      loanNumber,
+      borrowerName
+    });
+  };
+
+  const closeDeleteConfirm = () => {
+    setDeleteConfirm({ isOpen: false, loanId: '', loanNumber: '', borrowerName: '' });
+  };
 
   const statusOptions = [
     { value: 'all', label: 'All Loans' },
@@ -170,7 +266,7 @@ export default function UserLoans() {
                   <div className="relative">
                     <input
                       type="text"
-                      placeholder="Search loans by number, borrower name, or email..."
+                      placeholder="Search loans by number or borrower name..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="w-full pl-10 pr-4 py-3 rounded-2xl border-0 bg-white/60 backdrop-blur-sm shadow-sm focus:ring-2 focus:ring-green-500 focus:outline-none text-sm text-gray-900 placeholder-gray-500"
@@ -298,7 +394,7 @@ export default function UserLoans() {
                                     {loan.borrower?.first_name} {loan.borrower?.last_name}
                                   </h3>
                                   <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${getStatusColor(loan.status)}`}>
-                                    {loan.status.replace('_', ' ')}
+                                    {formatStatus(loan.status)}
                                   </span>
                                   {needsAction && (
                                     <span className="inline-flex items-center px-3 py-1 text-xs font-bold rounded-full bg-orange-100 text-orange-800 border border-orange-300">
@@ -312,12 +408,6 @@ export default function UserLoans() {
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                     </svg>
                                     {loan.loan_number}
-                                  </span>
-                                  <span className="flex items-center">
-                                    <svg className="w-4 h-4 mr-1 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                    </svg>
-                                    {loan.borrower?.email}
                                   </span>
                                   <span className="flex items-center">
                                     <svg className="w-4 h-4 mr-1 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -345,10 +435,35 @@ export default function UserLoans() {
                                 <p className="text-sm text-gray-500 font-medium">Principal Amount</p>
                               </div>
                               
-                              <div className={`p-3 rounded-2xl transition-all duration-300 group-hover:scale-110 ${needsAction ? 'bg-orange-100 text-orange-600' : 'bg-green-100 text-green-600'}`}>
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                </svg>
+                              <div className="flex items-center space-x-2">
+                                <button 
+                                  className="p-3 bg-blue-100 text-blue-600 rounded-2xl transition-all duration-300 group-hover:scale-110 hover:bg-blue-200"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    window.location.href = `/dashboard/loans/${loan.id}`;
+                                  }}
+                                  title="View Details"
+                                >
+                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                  </svg>
+                                </button>
+                                
+                                <button 
+                                  className="p-3 bg-red-100 text-red-600 rounded-2xl transition-all duration-300 group-hover:scale-110 hover:bg-red-200"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    openDeleteConfirm(loan.id, loan.loan_number, `${loan.borrower?.first_name} ${loan.borrower?.last_name}`);
+                                  }}
+                                  title="Delete Loan"
+                                >
+                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </button>
                               </div>
                             </div>
                           </div>
@@ -361,7 +476,64 @@ export default function UserLoans() {
             </div>
           </div>
         </div>
+
+        {/* Success Modal */}
+        {showSuccessModal && (
+          <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-8 w-96 border border-white/20">
+              <div className="text-center">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <h2 className="text-xl font-bold text-gray-900 mb-2">Success!</h2>
+                <p className="text-gray-600 mb-6">{successMessage}</p>
+                <button
+                  className="w-full bg-gradient-to-r from-green-500 to-teal-500 text-white font-semibold py-3 px-6 rounded-2xl hover:from-green-600 hover:to-teal-600 transition-all duration-300"
+                  onClick={() => setShowSuccessModal(false)}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </UserLayout>
+
+      {/* Delete Confirmation Dialog */}
+      {deleteConfirm.isOpen && (
+        <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-8 w-96 border border-white/20">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">Delete Loan Confirmation</h2>
+              <p className="text-gray-600">
+                Are you sure you want to delete loan <span className="font-semibold text-gray-900">{deleteConfirm.loanNumber}</span> for <span className="font-semibold text-gray-900">{deleteConfirm.borrowerName}</span>?
+              </p>
+              <p className="text-sm text-red-600 mt-2">This action cannot be undone and will permanently remove the loan from the system.</p>
+            </div>
+            <div className="flex space-x-3">
+              <button
+                className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-6 rounded-2xl transition-colors"
+                onClick={() => handleDeleteLoan(deleteConfirm.loanId)}
+              >
+                Delete Loan
+              </button>
+              <button
+                className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-900 font-semibold py-3 px-6 rounded-2xl transition-colors"
+                onClick={closeDeleteConfirm}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </RoleRedirect>
   );
 }

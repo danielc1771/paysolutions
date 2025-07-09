@@ -28,6 +28,21 @@ export default function UserBorrowers() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterKyc, setFilterKyc] = useState<string>('all');
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    isOpen: boolean;
+    borrowerId: string;
+    borrowerName: string;
+    loanCount: number;
+    activeLoans: number;
+  }>({
+    isOpen: false,
+    borrowerId: '',
+    borrowerName: '',
+    loanCount: 0,
+    activeLoans: 0
+  });
 
   const supabase = createClient();
 
@@ -101,6 +116,65 @@ export default function UserBorrowers() {
       year: 'numeric',
       month: 'short',
       day: 'numeric'
+    });
+  };
+
+  const handleDeleteBorrower = async (borrowerId: string) => {
+    try {
+      const response = await fetch(`/api/borrowers/${borrowerId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        alert('Error deleting borrower: ' + result.error);
+        return;
+      }
+
+      setSuccessMessage(`Borrower deleted successfully`);
+      setShowSuccessModal(true);
+      
+      // Refresh the borrowers list
+      const updatedBorrowers = borrowers.filter(borrower => borrower.id !== borrowerId);
+      setBorrowers(updatedBorrowers);
+    } catch (error) {
+      console.error('Error deleting borrower:', error);
+      alert('Failed to delete borrower');
+    } finally {
+      setDeleteConfirm({
+        isOpen: false,
+        borrowerId: '',
+        borrowerName: '',
+        loanCount: 0,
+        activeLoans: 0
+      });
+    }
+  };
+
+  const openDeleteConfirm = (borrowerId: string, borrowerName: string, loans: Array<{status: string}>) => {
+    const loanCount = loans.length;
+    const activeLoans = loans.filter(loan => loan.status === 'active' || loan.status === 'funded').length;
+    
+    setDeleteConfirm({
+      isOpen: true,
+      borrowerId,
+      borrowerName,
+      loanCount,
+      activeLoans
+    });
+  };
+
+  const closeDeleteConfirm = () => {
+    setDeleteConfirm({
+      isOpen: false,
+      borrowerId: '',
+      borrowerName: '',
+      loanCount: 0,
+      activeLoans: 0
     });
   };
 
@@ -382,10 +456,35 @@ export default function UserBorrowers() {
                               </p>
                             </div>
                             
-                            <div className="p-3 rounded-2xl transition-all duration-300 group-hover:scale-110 bg-green-100 text-green-600">
-                              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                              </svg>
+                            <div className="flex items-center space-x-2">
+                              <button 
+                                className="p-3 bg-blue-100 text-blue-600 rounded-2xl transition-all duration-300 group-hover:scale-110 hover:bg-blue-200"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  window.location.href = `/dashboard/borrowers/${borrower.id}`;
+                                }}
+                                title="View Details"
+                              >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                              </button>
+                              
+                              <button 
+                                className="p-3 bg-red-100 text-red-600 rounded-2xl transition-all duration-300 group-hover:scale-110 hover:bg-red-200"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  openDeleteConfirm(borrower.id, `${borrower.first_name} ${borrower.last_name}`, borrower.loans || []);
+                                }}
+                                title="Delete Borrower"
+                              >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
                             </div>
                           </div>
                         </div>
@@ -397,6 +496,95 @@ export default function UserBorrowers() {
             </div>
           </div>
         </div>
+
+        {/* Success Modal */}
+        {showSuccessModal && (
+          <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-8 w-96 border border-white/20">
+              <div className="text-center">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <h2 className="text-xl font-bold text-gray-900 mb-2">Success!</h2>
+                <p className="text-gray-600 mb-6">{successMessage}</p>
+                <button
+                  className="w-full bg-gradient-to-r from-green-500 to-teal-500 text-white font-semibold py-3 px-6 rounded-2xl hover:from-green-600 hover:to-teal-600 transition-all duration-300"
+                  onClick={() => setShowSuccessModal(false)}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Confirmation Dialog */}
+        {deleteConfirm.isOpen && (
+          <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-8 w-96 border border-white/20">
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </div>
+                <h2 className="text-xl font-bold text-gray-900 mb-2">Delete Borrower Confirmation</h2>
+                <p className="text-gray-600 mb-4">
+                  Are you sure you want to delete <span className="font-semibold text-gray-900">{deleteConfirm.borrowerName}</span>?
+                </p>
+                
+                {deleteConfirm.loanCount > 0 && (
+                  <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 mb-4">
+                    <div className="flex items-center">
+                      <svg className="w-5 h-5 text-orange-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                      </svg>
+                      <div className="text-left">
+                        <p className="text-orange-800 font-semibold text-sm">
+                          Warning: This borrower has {deleteConfirm.loanCount} loan{deleteConfirm.loanCount !== 1 ? 's' : ''}
+                        </p>
+                        <p className="text-orange-700 text-sm">
+                          {deleteConfirm.activeLoans > 0 
+                            ? `${deleteConfirm.activeLoans} active loan${deleteConfirm.activeLoans !== 1 ? 's' : ''} will be deleted. This action cannot be undone.`
+                            : 'All associated loans will be permanently deleted.'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                <p className="text-sm text-red-600 mt-2">This action cannot be undone and will permanently remove the borrower and all associated loans from the system.</p>
+              </div>
+              
+              <div className="flex space-x-3">
+                {deleteConfirm.activeLoans > 0 ? (
+                  <button
+                    className="flex-1 bg-gray-200 text-gray-900 font-semibold py-3 px-6 rounded-2xl transition-colors cursor-not-allowed opacity-50"
+                    disabled
+                    title="Cannot delete borrower with active loans"
+                  >
+                    Cannot Delete
+                  </button>
+                ) : (
+                  <button
+                    className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-6 rounded-2xl transition-colors"
+                    onClick={() => handleDeleteBorrower(deleteConfirm.borrowerId)}
+                  >
+                    Delete Borrower
+                  </button>
+                )}
+                <button
+                  className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-900 font-semibold py-3 px-6 rounded-2xl transition-colors"
+                  onClick={closeDeleteConfirm}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </UserLayout>
     </RoleRedirect>
   );

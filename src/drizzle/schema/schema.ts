@@ -1,6 +1,12 @@
-import { pgTable, index, unique, pgPolicy, uuid, varchar, date, numeric, timestamp, foreignKey, integer, text, check, pgEnum } from "drizzle-orm/pg-core"
+import { pgTable, index, unique, pgPolicy, uuid, varchar, date, numeric, timestamp, foreignKey, integer, text, check, pgEnum, boolean } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 // import { organization } from "./auth";
+
+// Enum declarations first
+export const roleEnum = pgEnum('role', ['admin', 'organization_owner', 'team_member', 'borrower']);
+export const profileStatusEnum = pgEnum('profile_status', ['INVITED', 'ACTIVE']);
+export const subscriptionStatusEnum = pgEnum('subscription_status', ['trial', 'active', 'suspended', 'cancelled']);
+export const stripeVerificationStatusEnum = pgEnum('stripe_verification_status', ['pending', 'requires_action', 'verified', 'canceled', 'unverified', 'processing']);
 
 export const organization = pgTable("organizations", {
 	id: uuid("id").defaultRandom().primaryKey(),
@@ -17,17 +23,20 @@ export const organization = pgTable("organizations", {
 	description: text("description"),
 	contactPerson: varchar("contact_person", { length: 255 }),
 	taxId: varchar("tax_id", { length: 255 }),
+	subscriptionStatus: subscriptionStatusEnum('subscription_status').default('trial'),
+	subscriptionStartDate: timestamp("subscription_start_date"),
+	subscriptionEndDate: timestamp("subscription_end_date"),
+	monthlyLoanLimit: integer("monthly_loan_limit").default(100),
+	totalUsersLimit: integer("total_users_limit").default(10),
+	isActive: boolean("is_active").default(true),
 });
-
-export const roleEnum = pgEnum('role', ['admin', 'user', 'borrower']);
-export const profileStatusEnum = pgEnum('profile_status', ['INVITED', 'ACTIVE']);
 
 // This table stores user-specific data, linking them to an organization and a role.
 // The `id` column is the primary key and is intended to match the `id` from Supabase's `auth.users` table.
 export const profiles = pgTable("profiles", {
 	id: uuid('id').primaryKey(), // This ID must correspond to the user's ID in auth.users
 	organizationId: uuid('organization_id').references(() => organization.id),
-	role: roleEnum('role').default('user'),
+	role: roleEnum('role').default('team_member'),
 	fullName: varchar("full_name", { length: 255 }),
 	email: varchar("email", { length: 255 }),
 	status: profileStatusEnum('status').default('INVITED'),
@@ -118,8 +127,6 @@ export const payments = pgTable("payments", {
 	pgPolicy("Enable all operations for service role", { as: "permissive", for: "all", to: ["public"], using: sql`true` }),
 ]);
 
-export const stripeVerificationStatusEnum = pgEnum('stripe_verification_status', ['pending', 'requires_action', 'verified', 'canceled', 'unverified', 'processing']);
-
 export const loans = pgTable("loans", { // Added vehicle fields
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	loanNumber: varchar("loan_number", { length: 50 }).notNull(),
@@ -159,4 +166,27 @@ export const loans = pgTable("loans", { // Added vehicle fields
 	unique("loans_loan_number_key").on(table.loanNumber),
 	pgPolicy("Enable all operations for service role", { as: "permissive", for: "all", to: ["public"], using: sql`true` }),
 	check("check_positive_amounts", sql`(principal_amount > (0)::numeric) AND (interest_rate >= (0)::numeric) AND (term_months > 0) AND (monthly_payment > (0)::numeric)`),
+]);
+
+export const organizationSettings = pgTable("organization_settings", {
+	id: uuid("id").defaultRandom().primaryKey().notNull(),
+	organizationId: uuid("organization_id").references(() => organization.id).notNull(),
+	allowTeamMemberInvites: boolean("allow_team_member_invites").default(true),
+	allowBorrowerSelfRegistration: boolean("allow_borrower_self_registration").default(false),
+	maxLoanAmount: numeric("max_loan_amount", { precision: 12, scale: 2 }).default('25000.00'),
+	minLoanAmount: numeric("min_loan_amount", { precision: 12, scale: 2 }).default('1000.00'),
+	defaultInterestRate: numeric("default_interest_rate", { precision: 5, scale: 4 }).default('8.9900'),
+	requireDocuSignForAllLoans: boolean("require_docusign_for_all_loans").default(true),
+	allowExtraPayments: boolean("allow_extra_payments").default(true),
+	notificationsEnabled: boolean("notifications_enabled").default(true),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+}, (table) => [
+	unique("organization_settings_organization_id_key").on(table.organizationId),
+	foreignKey({
+		columns: [table.organizationId],
+		foreignColumns: [organization.id],
+		name: "organization_settings_organization_id_fkey"
+	}).onDelete("cascade"),
+	pgPolicy("Enable all operations for service role", { as: "permissive", for: "all", to: ["public"], using: sql`true` }),
 ]);

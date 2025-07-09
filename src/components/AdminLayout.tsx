@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { createClient } from '@/utils/supabase/client';
-import { LayoutDashboard, FileText, Plus, Users, Bell, Check, Clock, AlertCircle, UserPlus } from 'lucide-react';
+import { LayoutDashboard, FileText, Plus, Users, Bell, Check, Clock, AlertCircle, UserPlus, Building2 } from 'lucide-react';
 import { useUserProfile } from '@/components/auth/RoleRedirect';
 import { getHomepageForRole, type Role } from '@/lib/auth/roles';
 
@@ -213,6 +213,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   const adminNavigation = [
     {
+      name: 'Organizations',
+      href: '/admin/organizations',
+      icon: <Building2 className="w-5 h-5" />,
+    },
+    {
       name: 'Users',
       href: '/admin/users',
       icon: <UserPlus className="w-5 h-5" />,
@@ -327,6 +332,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                   {pathname === '/admin' ? 'Dashboard' : 
                    pathname === '/admin/loans' ? 'Loans' :
                    pathname === '/admin/borrowers' ? 'Borrowers' :
+                   pathname === '/admin/organizations' ? 'Organizations' :
+                   pathname === '/admin/users' ? 'Users' :
                    pathname.includes('/admin/loans/') ? 'Loan Details' :
                    pathname.includes('/admin/borrowers/') ? 'Borrower Details' :
                    'Admin Panel'}

@@ -21,6 +21,17 @@ export interface LoanData {
     dateOfBirth: string;
     employmentStatus: string;
     annualIncome: number;
+    currentEmployerName?: string;
+    timeWithEmployment?: string;
+    reference1Name?: string;
+    reference1Phone?: string;
+    reference1Email?: string;
+    reference2Name?: string;
+    reference2Phone?: string;
+    reference2Email?: string;
+    reference3Name?: string;
+    reference3Phone?: string;
+    reference3Email?: string;
   };
 }
 
@@ -94,7 +105,39 @@ export const generateLoanAgreementHTML = (loanData: LoanData): string => {
         <p><strong>Annual Income:</strong> $${loanData.borrower.annualIncome?.toLocaleString() || 'Not specified'}</p>
         <p><strong>Date of Birth:</strong> ${loanData.borrower.dateOfBirth || 'Not specified'}</p>
         <p><strong>SSN:</strong> ***-**-${loanData.borrower.ssn ? loanData.borrower.ssn.slice(-4) : '****'}</p>
+        ${loanData.borrower.currentEmployerName ? `<p><strong>Current Employer:</strong> ${loanData.borrower.currentEmployerName}</p>` : ''}
+        ${loanData.borrower.timeWithEmployment ? `<p><strong>Time with Employment:</strong> ${loanData.borrower.timeWithEmployment}</p>` : ''}
     </div>
+
+    ${(loanData.borrower.reference1Name || loanData.borrower.reference2Name || loanData.borrower.reference3Name) ? `
+    <div class="section">
+        <h3>REFERENCES</h3>
+        ${loanData.borrower.reference1Name ? `
+        <div style="margin-bottom: 15px; padding: 10px; border: 1px solid #eee;">
+            <h4>Reference 1</h4>
+            <p><strong>Name:</strong> ${loanData.borrower.reference1Name}</p>
+            ${loanData.borrower.reference1Phone ? `<p><strong>Phone:</strong> ${loanData.borrower.reference1Phone}</p>` : ''}
+            ${loanData.borrower.reference1Email ? `<p><strong>Email:</strong> ${loanData.borrower.reference1Email}</p>` : ''}
+        </div>
+        ` : ''}
+        ${loanData.borrower.reference2Name ? `
+        <div style="margin-bottom: 15px; padding: 10px; border: 1px solid #eee;">
+            <h4>Reference 2</h4>
+            <p><strong>Name:</strong> ${loanData.borrower.reference2Name}</p>
+            ${loanData.borrower.reference2Phone ? `<p><strong>Phone:</strong> ${loanData.borrower.reference2Phone}</p>` : ''}
+            ${loanData.borrower.reference2Email ? `<p><strong>Email:</strong> ${loanData.borrower.reference2Email}</p>` : ''}
+        </div>
+        ` : ''}
+        ${loanData.borrower.reference3Name ? `
+        <div style="margin-bottom: 15px; padding: 10px; border: 1px solid #eee;">
+            <h4>Reference 3</h4>
+            <p><strong>Name:</strong> ${loanData.borrower.reference3Name}</p>
+            ${loanData.borrower.reference3Phone ? `<p><strong>Phone:</strong> ${loanData.borrower.reference3Phone}</p>` : ''}
+            ${loanData.borrower.reference3Email ? `<p><strong>Email:</strong> ${loanData.borrower.reference3Email}</p>` : ''}
+        </div>
+        ` : ''}
+    </div>
+    ` : ''}
 
     <div class="section">
         <h3>TERMS AND CONDITIONS</h3>

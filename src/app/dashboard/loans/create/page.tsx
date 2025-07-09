@@ -12,6 +12,9 @@ export default function CreateLoan() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [createdLoanId, setCreatedLoanId] = useState<string | null>(null);
   const [organizationInfo, setOrganizationInfo] = useState<Record<string, unknown> | null>(null);
   const supabase = createClient();
 
@@ -143,7 +146,9 @@ export default function CreateLoan() {
         throw new Error(result.error || result.message || 'Failed to send application');
       }
 
-      setSuccess(`Application sent successfully! Application URL: ${result.applicationUrl}`);
+      setSuccessMessage(`Application sent successfully! Application URL: ${result.applicationUrl}`);
+      setCreatedLoanId(result.loanId || null);
+      setShowSuccessModal(true);
       setSendFormData({
         customerName: '',
         customerEmail: '',
@@ -153,11 +158,6 @@ export default function CreateLoan() {
         vehicleModel: '',
         vehicleVin: ''
       });
-
-      // Redirect to loans page after 3 seconds
-      setTimeout(() => {
-        router.push('/dashboard/loans');
-      }, 3000);
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -187,7 +187,9 @@ export default function CreateLoan() {
         throw new Error(result.error || 'Failed to create loan');
       }
 
-      setSuccess('Loan created successfully!');
+      setSuccessMessage('Loan created successfully!');
+      setCreatedLoanId(result.loanId || null);
+      setShowSuccessModal(true);
       
       // Reset form
       setManualFormData({
@@ -201,11 +203,6 @@ export default function CreateLoan() {
         reference2Name: '', reference2Phone: '', reference2Email: '',
         reference3Name: '', reference3Phone: '', reference3Email: ''
       });
-
-      // Redirect to loans page after 3 seconds
-      setTimeout(() => {
-        router.push('/dashboard/loans');
-      }, 3000);
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -280,16 +277,6 @@ export default function CreateLoan() {
                 </div>
               )}
 
-              {success && (
-                <div className="p-6 bg-green-50 border-b border-green-200">
-                  <div className="flex items-center">
-                    <svg className="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span className="text-green-700">{success}</span>
-                  </div>
-                </div>
-              )}
 
               {/* Send Application Form */}
               {activeTab === 'send-application' && (
@@ -749,6 +736,53 @@ export default function CreateLoan() {
             </div>
           </div>
         </div>
+
+        {/* Success Modal */}
+        {showSuccessModal && (
+          <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-8 w-96 border border-white/20">
+              <div className="text-center">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <h2 className="text-xl font-bold text-gray-900 mb-2">Success!</h2>
+                <p className="text-gray-600 mb-6">{successMessage}</p>
+                <div className="flex flex-col space-y-3">
+                  <button
+                    className="w-full bg-gradient-to-r from-green-500 to-teal-500 text-white font-semibold py-3 px-6 rounded-2xl hover:from-green-600 hover:to-teal-600 transition-all duration-300"
+                    onClick={() => {
+                      setShowSuccessModal(false);
+                      router.push('/dashboard/loans');
+                    }}
+                  >
+                    View All Loans
+                  </button>
+                  {createdLoanId && (
+                    <button
+                      className="w-full bg-white text-green-600 border border-green-600 font-semibold py-3 px-6 rounded-2xl hover:bg-green-50 transition-all duration-300"
+                      onClick={() => {
+                        setShowSuccessModal(false);
+                        router.push(`/dashboard/loans/${createdLoanId}`);
+                      }}
+                    >
+                      View Loan Details
+                    </button>
+                  )}
+                  <button
+                    className="w-full bg-gray-200 text-gray-900 font-semibold py-3 px-6 rounded-2xl hover:bg-gray-300 transition-all duration-300"
+                    onClick={() => {
+                      setShowSuccessModal(false);
+                    }}
+                  >
+                    Create Another Loan
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </UserLayout>
     </RoleRedirect>
   );

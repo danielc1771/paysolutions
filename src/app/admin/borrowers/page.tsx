@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/client';
 import AdminLayout from '@/components/AdminLayout';
 import { useEffect, useState, useCallback } from 'react';
+import { RoleRedirect } from '@/components/auth/RoleRedirect';
 
 interface Borrower {
   id: string;
@@ -24,6 +25,10 @@ interface Borrower {
   kyc_verified_at: string;
   created_at: string;
   updated_at: string;
+  organization?: {
+    id: string;
+    name: string;
+  };
   loans?: Array<{
     id: string;
     loan_number: string;
@@ -33,10 +38,17 @@ interface Borrower {
   }>;
 }
 
+interface Organization {
+  id: string;
+  name: string;
+}
+
 export default function BorrowersPage() {
   const [borrowers, setBorrowers] = useState<Borrower[]>([]);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedOrganization, setSelectedOrganization] = useState<string>('all');
   const [deleteConfirm, setDeleteConfirm] = useState<{
     isOpen: boolean;
     borrowerId: string;
@@ -52,10 +64,28 @@ export default function BorrowersPage() {
   const fetchBorrowers = useCallback(async () => {
     try {
       setLoading(true);
+      
+      // Fetch organizations for the filter dropdown
+      const { data: orgsData, error: orgsError } = await supabase
+        .from('organizations')
+        .select('id, name')
+        .order('name', { ascending: true });
+
+      if (orgsError) {
+        console.error('Error fetching organizations:', orgsError);
+      } else {
+        setOrganizations(orgsData || []);
+      }
+
+      // Fetch borrowers with organization data
       const { data, error } = await supabase
         .from('borrowers')
         .select(`
           *,
+          organization:organizations(
+            id,
+            name
+          ),
           loans(
             id,
             loan_number,
@@ -130,14 +160,20 @@ export default function BorrowersPage() {
     setDeleteConfirm({ isOpen: false, borrowerId: '', borrowerName: '' });
   };
 
-  // Calculate stats
-  const totalBorrowers = borrowers?.length || 0;
-  const verifiedBorrowers = borrowers?.filter(b => b.kyc_status === 'verified').length || 0;
-  const pendingBorrowers = borrowers?.filter(b => b.kyc_status === 'pending').length || 0;
-  const borrowersWithLoans = borrowers?.filter(b => b.loans && b.loans.length > 0).length || 0;
+  // Filter borrowers based on selected organization
+  const filteredBorrowers = selectedOrganization === 'all' 
+    ? borrowers 
+    : borrowers.filter(b => b.organization?.id === selectedOrganization);
+
+  // Calculate stats based on filtered data
+  const totalBorrowers = filteredBorrowers?.length || 0;
+  const verifiedBorrowers = filteredBorrowers?.filter(b => b.kyc_status === 'verified').length || 0;
+  const pendingBorrowers = filteredBorrowers?.filter(b => b.kyc_status === 'pending').length || 0;
+  const borrowersWithLoans = filteredBorrowers?.filter(b => b.loans && b.loans.length > 0).length || 0;
 
   return (
-    <AdminLayout>
+    <RoleRedirect allowedRoles={['admin']}>
+      <AdminLayout>
       <div className="p-8">
         {/* Page Header */}
         <div className="mb-8">
@@ -155,6 +191,30 @@ export default function BorrowersPage() {
                 </svg>
                 <span>Export CSV</span>
               </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Organization Filter */}
+        <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-white/20 mb-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Filter by Organization</h3>
+              <p className="text-gray-600 text-sm">View borrowers from specific organizations</p>
+            </div>
+            <div className="w-72">
+              <select
+                value={selectedOrganization}
+                onChange={(e) => setSelectedOrganization(e.target.value)}
+                className="w-full px-4 py-3 rounded-2xl border-0 bg-white/80 backdrop-blur-sm shadow-sm focus:ring-2 focus:ring-purple-500 focus:outline-none text-sm text-gray-900"
+              >
+                <option value="all">All Organizations</option>
+                {organizations.map(org => (
+                  <option key={org.id} value={org.id}>
+                    {org.name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
@@ -231,7 +291,14 @@ export default function BorrowersPage() {
                 <p className="text-gray-600">Complete borrower database with KYC status and loan history</p>
               </div>
               <div className="flex items-center gap-4">
-                <span className="text-sm text-gray-600 font-medium bg-white/60 px-4 py-2 rounded-2xl">{totalBorrowers} total borrowers</span>
+                <span className="text-sm text-gray-600 font-medium bg-white/60 px-4 py-2 rounded-2xl">
+                  {totalBorrowers} borrowers
+                  {selectedOrganization !== 'all' && (
+                    <span className="ml-2 px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">
+                      {organizations.find(org => org.id === selectedOrganization)?.name}
+                    </span>
+                  )}
+                </span>
               </div>
             </div>
           </div>
@@ -262,7 +329,7 @@ export default function BorrowersPage() {
                 Try Again
               </button>
             </div>
-          ) : !borrowers || borrowers.length === 0 ? (
+          ) : !filteredBorrowers || filteredBorrowers.length === 0 ? (
             <div className="p-12 text-center">
               <div className="w-20 h-20 bg-gradient-to-br from-purple-100 to-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
                 <svg className="w-10 h-10 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -275,7 +342,7 @@ export default function BorrowersPage() {
           ) : (
             <div className="p-6">
               <div className="space-y-4">
-                {borrowers.map((borrower: Borrower) => {
+                {filteredBorrowers.map((borrower: Borrower) => {
                   const loanCount = borrower.loans?.length || 0;
                   
                   return (
@@ -321,6 +388,12 @@ export default function BorrowersPage() {
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2v2m8 0V6a2 2 0 002 2h2a2 2 0 002-2V4a2 2 0 00-2-2h-2a2 2 0 00-2 2z" />
                                 </svg>
                                 {borrower.employment_status?.replace('_', ' ') || 'N/A'}
+                              </span>
+                              <span className="flex items-center">
+                                <svg className="w-4 h-4 mr-1 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                </svg>
+                                {borrower.organization?.name || 'No Organization'}
                               </span>
                             </div>
                           </div>
@@ -406,5 +479,6 @@ export default function BorrowersPage() {
         </div>
       )}
     </AdminLayout>
+    </RoleRedirect>
   );
 }
