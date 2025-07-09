@@ -10,6 +10,8 @@ export async function POST(request: NextRequest) {
     console.log('🔔 DocuSign webhook received');
     console.log('📊 Content-Type:', contentType);
     console.log('👤 User-Agent:', userAgent);
+    console.log('🌐 Domain:', request.headers.get('host'));
+    console.log('🔗 Origin:', request.headers.get('origin'));
     console.log('⏰ Timestamp:', new Date().toISOString());
     
     // Handle both JSON and XML formats

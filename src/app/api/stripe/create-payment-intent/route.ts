@@ -63,7 +63,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Initialize Stripe with real keys
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+      apiVersion: '2025-06-30.basil',
+    });
 
     // Create real payment intent
     const paymentIntent = await stripe.paymentIntents.create({

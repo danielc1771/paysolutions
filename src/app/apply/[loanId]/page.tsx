@@ -115,12 +115,11 @@ export default function ApplyPage() {
     fetchApplicationData();
   }, [loanId]);
 
-  // Set up Supabase Realtime subscription to listen for verification status changes
+  // Real-time status updates using Supabase Realtime
   useEffect(() => {
     if (!loanId) return;
 
     const supabase = createClient();
-    let updateTimeout: NodeJS.Timeout | null = null;
     
     // Map database verification status to UI status consistently
     const mapVerificationStatus = (dbStatus: string) => {
@@ -137,89 +136,56 @@ export default function ApplyPage() {
       // Allow transitions to same status, forward transitions, or error states
       return newIndex >= currentIndex || newStatus === 'requires_action' || newStatus === 'failed';
     };
-    
-    // Subscribe to changes in the loans table for this specific loan
+
+    // Set up real-time subscription for loan updates
     const channel = supabase
-      .channel('loan-verification-updates')
+      .channel(`loan-updates-${loanId}`)
       .on(
         'postgres_changes',
         {
           event: 'UPDATE',
           schema: 'public',
           table: 'loans',
-          filter: `id=eq.${loanId}`,
+          filter: `id=eq.${loanId}`
         },
         (payload) => {
-          console.log('🔄 Realtime update received for loan:', loanId, payload);
+          console.log('Received loan update:', payload);
+          const newRecord = payload.new as any;
           
-          // Update verification status when webhook updates the database
-          if (payload.new && payload.new.stripe_verification_status) {
-            const dbStatus = payload.new.stripe_verification_status;
-            console.log(`✅ Database verification status updated to: ${dbStatus}`);
-            
-            // Map database status to UI status
+          // Update stripe verification status
+          if (newRecord.stripe_verification_status) {
+            const dbStatus = newRecord.stripe_verification_status;
             const uiStatus = mapVerificationStatus(dbStatus);
             
-            // Debounce rapid updates to prevent UI flicker
-            if (updateTimeout) {
-              clearTimeout(updateTimeout);
-            }
-            
-            updateTimeout = setTimeout(() => {
-              setFormData((prev) => {
-                const currentStatus = String(prev.stripeVerificationStatus || 'pending');
-                
-                // Only update if transition is valid
-                if (canTransitionTo(currentStatus, uiStatus)) {
-                  console.log('🔄 Verification status updated in formData to:', uiStatus);
-                  
-                  // If verification is completed, user can proceed
-                  if (uiStatus === 'completed') {
-                    console.log('🎉 Verification completed! User can proceed.');
-                  } else if (uiStatus === 'requires_action') {
-                    setError('Verification failed. Please try again or contact support.');
-                  }
-                  
-                  return {
-                    ...prev,
-                    stripeVerificationStatus: uiStatus,
-                  };
-                } else {
-                  console.log('🚫 Prevented backwards transition from', currentStatus, 'to', uiStatus);
-                  return prev;
-                }
-              });
-            }, 300); // 300ms debounce
+            setFormData((prev) => {
+              const currentStatus = String(prev.stripeVerificationStatus || 'pending');
+              if (canTransitionTo(currentStatus, uiStatus) && currentStatus !== uiStatus) {
+                return { ...prev, stripeVerificationStatus: uiStatus };
+              }
+              return prev;
+            });
           }
-          
-          // Handle loan status updates (e.g., application_completed)
-          if (payload.new && payload.new.status) {
-            const loanStatus = payload.new.status;
-            console.log(`📋 Loan status updated to: ${loanStatus}`);
-            
-            // If application is completed, show success dialog
-            if (loanStatus === 'application_completed' && !showSuccessDialog) {
-              console.log('🎉 Application completed! Showing success dialog.');
-              setShowSuccessDialog(true);
-            }
+
+          // Check for application completion
+          if (newRecord.status === 'application_completed' && !showSuccessDialog) {
+            setShowSuccessDialog(true);
           }
         }
       )
       .subscribe((status) => {
-        console.log('🎯 Realtime subscription status:', status);
+        console.log('Realtime subscription status:', status);
         if (status === 'SUBSCRIBED') {
-          console.log('✅ Successfully subscribed to Realtime updates for loan:', loanId);
+          console.log('✅ Successfully subscribed to loan updates');
         } else if (status === 'CHANNEL_ERROR') {
-          console.error('❌ Realtime subscription error for loan:', loanId);
+          console.error('❌ Realtime subscription error');
+        } else if (status === 'TIMED_OUT') {
+          console.error('⏰ Realtime subscription timed out');
         }
       });
 
     // Cleanup subscription on unmount
     return () => {
-      console.log('🧹 Cleaning up Realtime subscription for loan:', loanId);
-      if (updateTimeout) {
-        clearTimeout(updateTimeout);
-      }
+      console.log('Cleaning up realtime subscription');
       supabase.removeChannel(channel);
     };
   }, [loanId, showSuccessDialog]);
