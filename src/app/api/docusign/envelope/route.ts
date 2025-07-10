@@ -7,8 +7,6 @@ import { LoanForDocuSign } from '@/types/loan';
 export async function POST(request: NextRequest) {
   try {
     const { loanId } = await request.json();
-
-    console.log('Loan ID:', loanId);
     
     if (!loanId) {
       return NextResponse.json(
@@ -123,7 +121,8 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: unknown) {
-    console.error('❌ DocuSign envelope creation error:', error);
+    console.error('❌ DocuSign envelope creation error:', JSON.stringify(error));
+  
     const errorMessage = error instanceof Error ? error.message : 'Failed to create DocuSign envelope';
     return NextResponse.json(
       { error: errorMessage },
