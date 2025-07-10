@@ -10,18 +10,16 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
  * Handle Identity Verification Updates
  * Updates the database with verification status changes
  */
-async function handleIdentityVerification(verificationSession: unknown, status: string) {
+async function handleIdentityVerification(verificationSession: Stripe.Identity.VerificationSession, status: string) {
   try {
-    const session = verificationSession as Record<string, unknown>;
     console.log('🔄 Processing identity verification update:', {
-      sessionId: session.id,
+      sessionId: verificationSession.id,
       status,
-      metadata: session.metadata
+      metadata: verificationSession.metadata
     });
 
     const supabase = await createClient();
-    const metadata = session.metadata as Record<string, string> | undefined;
-    const loanId = metadata?.loan_id;
+    const loanId = verificationSession.metadata?.loan_id;
 
     if (!loanId) {
       console.error('❌ No loan_id found in verification session metadata');
@@ -33,7 +31,7 @@ async function handleIdentityVerification(verificationSession: unknown, status: 
       .from('loans')
       .update({
         stripe_verification_status: status,
-        stripe_verification_session_id: session.id,
+        stripe_verification_session_id: verificationSession.id,
         updated_at: new Date().toISOString()
       })
       .eq('id', loanId);
@@ -46,7 +44,7 @@ async function handleIdentityVerification(verificationSession: unknown, status: 
     console.log('✅ Successfully updated loan verification status:', {
       loanId,
       status,
-      sessionId: session.id
+      sessionId: verificationSession.id
     });
 
   } catch (error) {
@@ -64,12 +62,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.text();
     const signature = request.headers.get('stripe-signature')!;
-    
-    console.log('🔄 Stripe webhook received at:', new Date().toISOString());
-    console.log('📝 Domain:', request.headers.get('host'));
-    console.log('📝 URL:', request.url);
-    console.log('📝 Signature present:', !!signature);
-    console.log('📝 Body length:', body.length);
+
     
     // Verify webhook signature
     let event: Stripe.Event;
@@ -108,7 +101,7 @@ export async function POST(request: NextRequest) {
 
       case 'identity.verification_session.verified':
         console.log('✅ Identity verification succeeded:', event.data.object.id);
-        await handleIdentityVerification(event.data.object, 'completed');
+        await handleIdentityVerification(event.data.object, 'verified');
         break;
 
       case 'identity.verification_session.requires_input':

@@ -54,8 +54,37 @@ export async function GET(request: Request, { params }: { params: Promise<{ loan
         application_step,
         stripe_verification_session_id,
         stripe_verification_status,
-        borrowers(*),
-        organizations(*)
+        phone_verification_session_id,
+        phone_verification_status,
+        verified_phone_number,
+        borrowers(
+          id,
+          first_name,
+          last_name,
+          email,
+          phone,
+          date_of_birth,
+          address_line1,
+          city,
+          state,
+          zip_code,
+          employment_status,
+          annual_income,
+          current_employer_name,
+          time_with_employment,
+          reference1_name,
+          reference1_phone,
+          reference1_email,
+          reference2_name,
+          reference2_phone,
+          reference2_email,
+          reference3_name,
+          reference3_phone,
+          reference3_email,
+          kyc_status,
+          communication_consent
+        ),
+        organizations(name)
       `)
       .eq('id', loanId)
       .single();
@@ -80,6 +109,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ loan
         applicationStep: loan.application_step,
         stripeVerificationSessionId: loan.stripe_verification_session_id,
         stripeVerificationStatus: loan.stripe_verification_status,
+        phoneVerificationSessionId: loan.phone_verification_session_id,
+        phoneVerificationStatus: loan.phone_verification_status,
+        verifiedPhoneNumber: loan.verified_phone_number,
       },
       borrower: loan.borrowers,
       dealerName: (loan.organizations as unknown as Record<string, unknown>)?.name,
@@ -134,6 +166,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ loa
       ? parseFloat(validation.data.annualIncome) 
       : validation.data.annualIncome;
 
+    // Prepare communication consent data
+    const consentData = {
+      consentToContact: validation.data.consentToContact,
+      consentToText: validation.data.consentToText,
+      consentToCall: validation.data.consentToCall,
+      communicationPreferences: validation.data.communicationPreferences
+    };
+
     const { error: borrowerUpdateError } = await supabase
       .from('borrowers')
       .update({
@@ -155,6 +195,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ loa
         reference3_name: validation.data.reference3Name || null,
         reference3_phone: validation.data.reference3Phone || null,
         reference3_email: validation.data.reference3Email || null,
+        // Communication consent
+        communication_consent: JSON.stringify(consentData),
         // Update KYC status based on Stripe verification
         kyc_status: validation.data.stripeVerificationStatus === 'completed' ? 'completed' : 'pending',
       })

@@ -41,8 +41,8 @@ interface Loan {
   };
   principal_amount: string;
   interest_rate: string;
-  term_months: string;
-  monthly_payment: string;
+  term_weeks: string;
+  weekly_payment: string;
   purpose: string;
   created_at: string;
   funding_date: string;
@@ -326,11 +326,11 @@ export default function LoanDetail({ params }: LoanDetailProps) {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Term</label>
-                      <p className="text-lg font-semibold text-gray-900">{loan.term_months} months</p>
+                      <p className="text-lg font-semibold text-gray-900">{loan.term_weeks} weeks</p>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Monthly Payment</label>
-                      <p className="text-lg font-semibold text-gray-900">${parseFloat(loan.monthly_payment).toLocaleString()}</p>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Weekly Payment</label>
+                      <p className="text-lg font-semibold text-gray-900">${parseFloat(loan.weekly_payment).toLocaleString()}</p>
                     </div>
                   </div>
                 </div>

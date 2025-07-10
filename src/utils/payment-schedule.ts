@@ -14,8 +14,8 @@ export interface LoanForSchedule {
   id: string;
   principal_amount: string;
   interest_rate: string;
-  term_months: string;
-  monthly_payment: string;
+  term_weeks: string;
+  weekly_payment: string;
   funding_date?: string;
   created_at: string;
 }
@@ -23,21 +23,21 @@ export interface LoanForSchedule {
 // Generate payment schedule for a loan
 export function generatePaymentSchedule(loan: LoanForSchedule): PaymentScheduleItem[] {
   const schedule: PaymentScheduleItem[] = [];
-  const monthlyPayment = parseFloat(loan.monthly_payment);
+  const weeklyPayment = parseFloat(loan.weekly_payment);
   const principalAmount = parseFloat(loan.principal_amount);
   const annualRate = parseFloat(loan.interest_rate) / 100; // Convert percentage to decimal
-  const monthlyRate = annualRate / 12;
-  const termMonths = parseInt(loan.term_months);
+  const weeklyRate = annualRate / 52; // Weekly interest rate
+  const termWeeks = parseInt(loan.term_weeks);
   
   let remainingBalance = principalAmount;
   const startDate = new Date(loan.funding_date || loan.created_at);
   
-  for (let i = 1; i <= termMonths; i++) {
+  for (let i = 1; i <= termWeeks; i++) {
     const paymentDate = new Date(startDate);
-    paymentDate.setMonth(paymentDate.getMonth() + i);
+    paymentDate.setDate(paymentDate.getDate() + (i * 7)); // Add weeks instead of months
     
-    const interestPayment = remainingBalance * monthlyRate;
-    const principalPayment = monthlyPayment - interestPayment;
+    const interestPayment = remainingBalance * weeklyRate;
+    const principalPayment = weeklyPayment - interestPayment;
     remainingBalance = Math.max(0, remainingBalance - principalPayment);
     
     schedule.push({
@@ -45,7 +45,7 @@ export function generatePaymentSchedule(loan: LoanForSchedule): PaymentScheduleI
       dueDate: paymentDate.toISOString().split('T')[0],
       principalPayment: Math.round(principalPayment * 100) / 100,
       interestPayment: Math.round(interestPayment * 100) / 100,
-      totalPayment: Math.round(monthlyPayment * 100) / 100,
+      totalPayment: Math.round(weeklyPayment * 100) / 100,
       remainingBalance: Math.round(remainingBalance * 100) / 100,
       status: 'pending'
     });
@@ -142,8 +142,8 @@ async function generateAndStorePaymentSchedule(loanId: string): Promise<PaymentS
         id,
         principal_amount,
         interest_rate,
-        term_months,
-        monthly_payment,
+        term_weeks,
+        weekly_payment,
         funding_date,
         created_at
       `)
@@ -160,8 +160,8 @@ async function generateAndStorePaymentSchedule(loanId: string): Promise<PaymentS
       id: loan.id,
       principal_amount: loan.principal_amount,
       interest_rate: loan.interest_rate,
-      term_months: loan.term_months,
-      monthly_payment: loan.monthly_payment,
+      term_weeks: loan.term_weeks,
+      weekly_payment: loan.weekly_payment,
       funding_date: loan.funding_date,
       created_at: loan.created_at
     });

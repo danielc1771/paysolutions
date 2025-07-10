@@ -76,8 +76,8 @@ export async function POST(request: NextRequest) {
         id: loan.id,
         principal_amount: loan.principal_amount,
         interest_rate: loan.interest_rate,
-        term_months: loan.term_months,
-        monthly_payment: loan.monthly_payment,
+        term_weeks: loan.term_weeks,
+        weekly_payment: loan.weekly_payment,
         funding_date: loan.funding_date,
         created_at: loan.created_at
       };
@@ -102,8 +102,8 @@ export async function POST(request: NextRequest) {
         // Create a price for the product
         const price = await stripe.prices.create({
           currency: 'usd',
-          unit_amount: Math.round(parseFloat(loan.monthly_payment) * 100),
-          recurring: { interval: 'month' },
+          unit_amount: Math.round(parseFloat(loan.weekly_payment) * 100),
+          recurring: { interval: 'week' },
           product: product.id,
         });
 
