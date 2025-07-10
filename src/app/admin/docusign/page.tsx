@@ -195,13 +195,21 @@ export default function DocuSignAdminPage() {
                   <h2 className="text-2xl font-bold text-gray-900 mb-2">Current Configurations</h2>
                   <p className="text-gray-600">Manage existing DocuSign Connect configurations</p>
                 </div>
-                <button
-                  onClick={fetchConfigurations}
-                  disabled={loading}
-                  className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50"
-                >
-                  {loading ? 'Loading...' : 'Refresh'}
-                </button>
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => window.open('/api/docusign/preview', '_blank')}
+                    className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors"
+                  >
+                    Preview Template
+                  </button>
+                  <button
+                    onClick={fetchConfigurations}
+                    disabled={loading}
+                    className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50"
+                  >
+                    {loading ? 'Loading...' : 'Refresh'}
+                  </button>
+                </div>
               </div>
             </div>
 

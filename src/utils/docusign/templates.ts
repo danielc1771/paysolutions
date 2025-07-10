@@ -82,11 +82,11 @@ export interface WeeklyPaymentScheduleItem {
   remainingBalance: number;
 }
 
-// Calculate weekly payment schedule for 14 weeks
+// Calculate weekly payment schedule for variable term weeks
 export function calculateWeeklyPaymentSchedule(
   principalAmount: number,
   annualInterestRate: number,
-  termWeeks: number = 14
+  termWeeks: number
 ): WeeklyPaymentScheduleItem[] {
   const schedule: WeeklyPaymentScheduleItem[] = [];
   const weeklyRate = annualInterestRate / 52; // Convert annual to weekly rate
@@ -124,7 +124,7 @@ export function calculateWeeklyPaymentSchedule(
   return schedule;
 }
 
-// Generate comprehensive loan agreement document content
+// Generate comprehensive loan agreement document content with inline styles for DocuSign compatibility
 export const generateLoanAgreementHTML = (loanData: LoanData): string => {
   const currentDate = new Date().toLocaleDateString('en-US', {
     month: '2-digit',
@@ -135,11 +135,11 @@ export const generateLoanAgreementHTML = (loanData: LoanData): string => {
   const firstPaymentDate = new Date();
   firstPaymentDate.setDate(firstPaymentDate.getDate() + 7); // First payment due in 7 days
   
-  // Calculate weekly payment schedule
+  // Calculate weekly payment schedule using actual term weeks
   const paymentSchedule = calculateWeeklyPaymentSchedule(
     loanData.principalAmount,
     loanData.interestRate,
-    14
+    loanData.termWeeks
   );
   
   const totalFinanceCharge = paymentSchedule.reduce((sum, payment) => sum + payment.interestAmount, 0);
@@ -150,86 +150,224 @@ export const generateLoanAgreementHTML = (loanData: LoanData): string => {
 <html>
 <head>
     <title>Vehicle Loan Agreement - ${loanData.loanNumber}</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { 
-            font-family: Arial, sans-serif; 
-            margin: 20px; 
-            line-height: 1.4; 
-            font-size: 12px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            margin: 0;
+            padding: 30px;
+            line-height: 1.6;
+            font-size: 14px;
+            color: #1f2937;
+            background-color: #ffffff;
         }
         .page-break { page-break-before: always; }
-        .header { text-align: center; margin-bottom: 20px; }
-        .section { margin-bottom: 20px; }
-        .contact-info { display: flex; justify-content: space-between; margin-bottom: 20px; }
+        .document-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+            margin: -30px -30px 40px -30px;
+            border-radius: 0 0 20px 20px;
+        }
+        .document-header h1 {
+            font-size: 32px;
+            font-weight: 700;
+            margin: 0 0 10px 0;
+            letter-spacing: -0.5px;
+        }
+        .document-header p {
+            font-size: 16px;
+            margin: 0;
+            opacity: 0.9;
+        }
+        .header { text-align: center; margin-bottom: 30px; }
+        .section { 
+            margin-bottom: 30px;
+            background: #f8fafc;
+            padding: 25px;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+        }
+        .section h3 {
+            color: #1e40af;
+            font-size: 20px;
+            font-weight: 600;
+            margin: 0 0 20px 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #3b82f6;
+        }
+        .contact-info { 
+            display: flex; 
+            justify-content: space-between; 
+            margin-bottom: 30px;
+            gap: 20px;
+        }
         .contact-box { 
-            border: 1px solid #000; 
-            padding: 10px; 
-            width: 48%; 
-            min-height: 100px;
+            border: 2px solid #3b82f6;
+            border-radius: 12px;
+            padding: 20px;
+            width: 48%;
+            min-height: 120px;
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+        }
+        .contact-box h4 {
+            color: #1e40af;
+            font-size: 16px;
+            font-weight: 600;
+            margin: 0 0 15px 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         .loan-info-table { 
             width: 100%; 
             border-collapse: collapse; 
-            margin: 15px 0; 
+            margin: 20px 0;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            overflow: hidden;
         }
         .loan-info-table th, .loan-info-table td { 
-            border: 1px solid #000; 
-            padding: 6px; 
-            text-align: left; 
+            border: 1px solid #d1d5db;
+            padding: 12px 15px;
+            text-align: left;
         }
         .loan-info-table th { 
-            background-color: #f0f0f0; 
-            font-weight: bold;
+            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+            color: white;
+            font-weight: 600;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .loan-info-table td {
+            background-color: #ffffff;
+            font-weight: 500;
         }
         .schedule-table { 
             width: 100%; 
             border-collapse: collapse; 
-            margin: 15px 0; 
-            font-size: 10px;
+            margin: 20px 0;
+            font-size: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            overflow: hidden;
         }
         .schedule-table th, .schedule-table td { 
-            border: 1px solid #000; 
-            padding: 4px; 
-            text-align: center; 
+            border: 1px solid #d1d5db;
+            padding: 10px 8px;
+            text-align: center;
         }
         .schedule-table th { 
-            background-color: #f0f0f0; 
-            font-weight: bold;
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            color: white;
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .schedule-table td {
+            background-color: #ffffff;
+            font-weight: 500;
+        }
+        .schedule-table tr:nth-child(even) td {
+            background-color: #f8fafc;
         }
         .legal-text { 
             text-align: justify; 
-            margin-bottom: 15px; 
-            line-height: 1.3;
+            margin-bottom: 20px; 
+            line-height: 1.6;
+            font-size: 14px;
         }
         .signature-section { 
-            margin-top: 30px; 
+            margin-top: 40px;
             page-break-inside: avoid;
+            background: #f8fafc;
+            padding: 30px;
+            border-radius: 12px;
+            border: 2px solid #e2e8f0;
+        }
+        .signature-section h3 {
+            color: #1e40af;
+            font-size: 22px;
+            font-weight: 600;
+            margin: 0 0 20px 0;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         .initial-box {
             display: inline-block;
-            border: 1px solid #000;
-            width: 30px;
-            height: 20px;
-            margin: 0 5px;
+            border: 2px solid #3b82f6;
+            width: 35px;
+            height: 25px;
+            margin: 0 8px;
             vertical-align: middle;
+            border-radius: 4px;
+            background-color: #f0f9ff;
         }
-        ol { counter-reset: item; padding-left: 0; }
-        ol > li { display: block; margin-bottom: 10px; }
+        ol { 
+            counter-reset: item; 
+            padding-left: 0;
+            margin: 20px 0;
+        }
+        ol > li { 
+            display: block; 
+            margin-bottom: 15px;
+            padding-left: 25px;
+            position: relative;
+        }
         ol > li:before { 
             content: counter(item, lower-alpha) ". "; 
             counter-increment: item; 
-            font-weight: bold; 
+            font-weight: 700;
+            color: #1e40af;
+            position: absolute;
+            left: 0;
+        }
+        .financial-summary {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border: 2px solid #3b82f6;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .financial-summary h4 {
+            color: #1e40af;
+            font-size: 18px;
+            font-weight: 600;
+            margin: 0 0 15px 0;
+            text-align: center;
+        }
+        .highlight-box {
+            background: linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%);
+            border: 2px solid #f59e0b;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            text-align: center;
+        }
+        .highlight-box p {
+            margin: 0;
+            font-weight: 600;
+            color: #92400e;
+        }
+        @media print {
+            body { margin: 0; padding: 20px; font-size: 12px; }
+            .document-header { margin: -20px -20px 30px -20px; }
         }
     </style>
 </head>
 <body>
-    <!-- Page 1: Application & Agreement Information -->
-    <div class="header">
-        <h2>Vehicle Loan Application</h2>
+    <!-- Enhanced Document Header -->
+    <div class="document-header">
+        <h1>Vehicle Loan Agreement</h1>
+        <p>PaySolutions LLC - Professional Financing Services</p>
     </div>
 
     <div class="section">
-        <h3>LOAN INFORMATION</h3>
+        <h3>📋 Loan Information</h3>
         <table class="loan-info-table">
             <tr>
                 <th>Application Date:</th>
@@ -263,23 +401,26 @@ export const generateLoanAgreementHTML = (loanData: LoanData): string => {
 
     <div class="contact-info">
         <div class="contact-box">
-            <h4>LENDER INFORMATION</h4>
-            <strong>Pay Solutions LLC</strong><br>
+            <h4>🏢 Lender Information</h4>
+            <strong style="color: #1e40af; font-size: 16px;">Pay Solutions LLC</strong><br>
             575 NW 50th St<br>
             Miami, FL 33166<br>
+            <br>
+            <strong>Professional Lending Services</strong><br>
+            <em>Your trusted financial partner</em>
         </div>
         <div class="contact-box">
-            <h4>BORROWER INFORMATION</h4>
-            <strong>${loanData.borrower.firstName} ${loanData.borrower.lastName}</strong><br>
-            ${loanData.borrower.email}<br>
-            ${loanData.borrower.phone || ''}<br>
-            Date of Birth: ${loanData.borrower.dateOfBirth}<br>
+            <h4>👤 Borrower Information</h4>
+            <strong style="color: #1e40af; font-size: 16px;">${loanData.borrower.firstName} ${loanData.borrower.lastName}</strong><br>
+            📧 ${loanData.borrower.email}<br>
+            ${loanData.borrower.phone ? `📱 ${loanData.borrower.phone}<br>` : ''}
+            🎂 Date of Birth: ${loanData.borrower.dateOfBirth}<br>
             <br>
-            <strong>ADDRESS:</strong><br>
+            <strong>📍 Address:</strong><br>
             ${loanData.borrower.addressLine1}<br>
             ${loanData.borrower.city}, ${loanData.borrower.state} ${loanData.borrower.zipCode}<br>
             <br>
-            <strong>EMPLOYMENT:</strong><br>
+            <strong>💼 Employment:</strong><br>
             Status: ${loanData.borrower.employmentStatus}<br>
             Annual Salary: $${loanData.borrower.annualIncome?.toLocaleString()}<br>
             ${loanData.borrower.currentEmployerName ? `Employer: ${loanData.borrower.currentEmployerName}<br>` : ''}
@@ -289,7 +430,7 @@ export const generateLoanAgreementHTML = (loanData: LoanData): string => {
 
     ${(loanData.borrower.reference1Name || loanData.borrower.reference2Name) ? `
     <div class="section">
-        <h3>REFERENCES</h3>
+        <h3>📞 References</h3>
         <table class="loan-info-table">
             ${loanData.borrower.reference1Name ? `
             <tr>
@@ -312,7 +453,7 @@ export const generateLoanAgreementHTML = (loanData: LoanData): string => {
     ` : ''}
 
     <div class="section">
-        <h3>PERSONAL FINANCING AGREEMENT ("PFA") - EXHIBIT "A"</h3>
+        <h3>📄 Personal Financing Agreement ("PFA") - Exhibit "A"</h3>
         <table class="loan-info-table">
             <tr>
                 <th>Borrower Name:</th>
@@ -328,7 +469,7 @@ export const generateLoanAgreementHTML = (loanData: LoanData): string => {
             </tr>
             <tr>
                 <th>Term (Weeks):</th>
-                <td>14</td>
+                <td>${loanData.termWeeks}</td>
                 <th>First Payment Date:</th>
                 <td>${firstPaymentDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}</td>
             </tr>
@@ -337,7 +478,10 @@ export const generateLoanAgreementHTML = (loanData: LoanData): string => {
 
     <!-- Amortization Schedule -->
     <div class="section">
-        <h3>AMORTIZATION SCHEDULE</h3>
+        <h3>📊 Weekly Payment Schedule</h3>
+        <div class="highlight-box">
+            <p>Total of ${loanData.termWeeks} Weekly Payments</p>
+        </div>
         <table class="schedule-table">
             <thead>
                 <tr>
@@ -363,25 +507,28 @@ export const generateLoanAgreementHTML = (loanData: LoanData): string => {
             </tbody>
         </table>
         
-        <table class="loan-info-table" style="margin-top: 10px;">
-            <tr>
-                <th>Principal Amount:</th>
-                <td>$${loanData.principalAmount.toLocaleString()}</td>
-                <th>Finance Charge:</th>
-                <td>$${totalFinanceCharge.toFixed(2)}</td>
-                <th>Total of Payments:</th>
-                <td>$${totalOfPayments.toFixed(2)}</td>
-            </tr>
-        </table>
+        <div class="financial-summary">
+            <h4>💰 Financial Summary</h4>
+            <table class="loan-info-table" style="margin: 0;">
+                <tr>
+                    <th>Principal Amount:</th>
+                    <td style="font-weight: 700; color: #1e40af;">$${loanData.principalAmount.toLocaleString()}</td>
+                    <th>Finance Charge:</th>
+                    <td style="font-weight: 700; color: #dc2626;">$${totalFinanceCharge.toFixed(2)}</td>
+                    <th>Total of Payments:</th>
+                    <td style="font-weight: 700; color: #059669;">$${totalOfPayments.toFixed(2)}</td>
+                </tr>
+            </table>
+        </div>
     </div>
 
     <!-- Page Break for Legal Content -->
     <div class="page-break"></div>
 
     <!-- Legal Agreement Content -->
-    <div class="header">
-        <h2>PERSONAL FINANCING AGREEMENT</h2>
-        <p><strong>Pay Solutions LLC</strong><br>The Simple, Smart Way to Grow</p>
+    <div class="document-header">
+        <h1>Personal Financing Agreement</h1>
+        <p>Pay Solutions LLC - The Simple, Smart Way to Grow</p>
     </div>
 
     <div class="legal-text">
@@ -389,7 +536,7 @@ export const generateLoanAgreementHTML = (loanData: LoanData): string => {
     </div>
 
     <div class="section">
-        <h3>Contract Parties are the following:</h3>
+        <h3>⚖️ Contract Parties</h3>
         <ol>
             <li><strong>BORROWER</strong> shall mean, an individual ("Borrower"), ${loanData.borrower.firstName} ${loanData.borrower.lastName} with mailing address at ${loanData.borrower.addressLine1}, ${loanData.borrower.city}, ${loanData.borrower.state} ${loanData.borrower.zipCode}.</li>
             <li><strong>LENDER</strong> shall mean PAY SOLUTIONS LLC ("PS"), a Florida Limited Liability Company at its office at 575 NW 50th St, Miami, FL 33166, its successors, assigns, and any other holder of this PFA.</li>
@@ -398,7 +545,7 @@ export const generateLoanAgreementHTML = (loanData: LoanData): string => {
     </div>
 
     <div class="section">
-        <h3>Borrower's Representations</h3>
+        <h3>✅ Borrower's Representations</h3>
         <p>You represent and acknowledge that: <span style="color: white;">\\i1\\</span> (Initial)</p>
         <ol>
             <li><strong>Legal Age.</strong> You are of legal age and have legal capacity to enter into this Contract.</li>
@@ -409,7 +556,7 @@ export const generateLoanAgreementHTML = (loanData: LoanData): string => {
     </div>
 
     <div class="section">
-        <h3>Payment Terms</h3>
+        <h3>💳 Payment Terms</h3>
         <p>Initial to acknowledge: <span style="color: white;">\\i2\\</span></p>
         <ol>
             <li>For all provisions in this contract, time is of the essence.</li>
@@ -425,7 +572,7 @@ export const generateLoanAgreementHTML = (loanData: LoanData): string => {
     </div>
 
     <div class="section">
-        <h3>Default</h3>
+        <h3>⚠️ Default Conditions</h3>
         <p>Initial to acknowledge: <span style="color: white;">\\i3\\</span></p>
         <p>You will be deemed in default if any of the following occurs:</p>
         <ol>
@@ -439,7 +586,7 @@ export const generateLoanAgreementHTML = (loanData: LoanData): string => {
     </div>
 
     <div class="section">
-        <h3>Additional Agreements</h3>
+        <h3>📋 Additional Agreements</h3>
         <p>Initial to acknowledge: <span style="color: white;">\\i4\\</span></p>
         <ol>
             <li><strong>GPS/Tracking Device Installation.</strong> Your vehicle could potentially feature a GPS/TRACKING DEVICE and by signing this document you acknowledge and give consent to the device's installation.</li>

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
-import { createLoanAgreementEnvelope, LoanData } from '@/utils/docusign/templates';
+import { createLoanAgreementEnvelopeInline, LoanData } from '@/utils/docusign/templates-inline';
 import { createEnvelopesApi } from '@/utils/docusign/client';
 
 export async function POST(request: NextRequest) {
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
 
     // Create DocuSign envelope
     const { envelopesApi, accountId } = await createEnvelopesApi();
-    const envelopeDefinition = createLoanAgreementEnvelope(loanData);
+    const envelopeDefinition = createLoanAgreementEnvelopeInline(loanData);
 
     console.log('📤 Sending envelope to DocuSign...');
     const result = await envelopesApi.createEnvelope(accountId, {
