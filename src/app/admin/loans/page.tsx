@@ -10,8 +10,8 @@ interface Loan {
   loan_number: string;
   principal_amount: string;
   interest_rate: string;
-  term_months: number;
-  monthly_payment: string;
+  term_weeks: number;
+  weekly_payment: string;
   remaining_balance: string;
   status: string;
   purpose: string;
@@ -321,7 +321,7 @@ export default function LoansPage() {
                               <svg className="w-4 h-4 mr-1 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3a4 4 0 118 0v4M5 7h14l1 12H4L5 7z" />
                               </svg>
-                              {loan.term_months} months
+                              {loan.term_weeks} weeks
                             </span>
                             <span className="flex items-center">
                               <svg className="w-4 h-4 mr-1 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">

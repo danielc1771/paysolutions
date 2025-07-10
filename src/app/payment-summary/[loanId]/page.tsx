@@ -10,8 +10,8 @@ interface LoanSummary {
   borrower_name: string;
   principal_amount: string;
   interest_rate: string;
-  term_months: string;
-  monthly_payment: string;
+  term_weeks: string;
+  weekly_payment: string;
   funding_date: string;
   status: string;
 }

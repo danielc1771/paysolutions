@@ -35,9 +35,9 @@ interface Borrower {
     principal_amount: string;
     status: string;
     created_at: string;
-    monthly_payment: string;
+    weekly_payment: string;
     interest_rate: string;
-    term_months: number;
+    term_weeks: number;
   }>;
 }
 
@@ -351,7 +351,7 @@ export default function BorrowerDetail({ params }: BorrowerDetailProps) {
                       Amount
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Monthly Payment
+                      Weekly Payment
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Term
@@ -380,10 +380,10 @@ export default function BorrowerDetail({ params }: BorrowerDetailProps) {
                         ${parseFloat(loan.principal_amount).toLocaleString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        ${parseFloat(loan.monthly_payment).toLocaleString()}
+                        ${parseFloat(loan.weekly_payment).toLocaleString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {loan.term_months} months
+                        {loan.term_weeks} weeks
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {(parseFloat(loan.interest_rate) * 100).toFixed(2)}%

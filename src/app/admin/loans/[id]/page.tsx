@@ -28,8 +28,8 @@ interface Loan {
   };
   principal_amount: string;
   interest_rate: string;
-  term_months: string;
-  monthly_payment: string;
+  term_weeks: string;
+  weekly_payment: string;
   purpose: string;
   created_at: string;
   funding_date: string;
@@ -42,21 +42,21 @@ interface Loan {
 // Generate payment schedule
 function generatePaymentSchedule(loan: Loan) {
   const schedule = [];
-  const monthlyPayment = parseFloat(loan.monthly_payment);
+  const weeklyPayment = parseFloat(loan.weekly_payment);
   const principalAmount = parseFloat(loan.principal_amount);
   const annualRate = parseFloat(loan.interest_rate);
-  const monthlyRate = annualRate / 12;
-  const termMonths = parseInt(loan.term_months);
+  const weeklyRate = annualRate / 52;
+  const termWeeks = parseInt(loan.term_weeks);
   
   let remainingBalance = principalAmount;
   const startDate = new Date(loan.funding_date || loan.created_at);
   
-  for (let i = 1; i <= termMonths; i++) {
+  for (let i = 1; i <= termWeeks; i++) {
     const paymentDate = new Date(startDate);
-    paymentDate.setMonth(paymentDate.getMonth() + i);
+    paymentDate.setDate(paymentDate.getDate() + (i * 7));
     
-    const interestPayment = remainingBalance * monthlyRate;
-    const principalPayment = monthlyPayment - interestPayment;
+    const interestPayment = remainingBalance * weeklyRate;
+    const principalPayment = weeklyPayment - interestPayment;
     remainingBalance = Math.max(0, remainingBalance - principalPayment);
     
     schedule.push({
@@ -64,7 +64,7 @@ function generatePaymentSchedule(loan: Loan) {
       dueDate: paymentDate.toISOString().split('T')[0],
       principalPayment: principalPayment.toFixed(2),
       interestPayment: interestPayment.toFixed(2),
-      totalPayment: monthlyPayment.toFixed(2),
+      totalPayment: weeklyPayment.toFixed(2),
       remainingBalance: remainingBalance.toFixed(2),
       status: 'pending' // Will be updated based on actual payments
     });
@@ -594,11 +594,11 @@ export default function LoanDetail({ params }: LoanDetailProps) {
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-50">
                   <span className="text-gray-600 font-medium">Term:</span>
-                  <span className="font-semibold text-gray-900">{loan.term_months} months</span>
+                  <span className="font-semibold text-gray-900">{loan.term_weeks} weeks</span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-50">
-                  <span className="text-gray-600 font-medium">Monthly Payment:</span>
-                  <span className="font-semibold text-gray-900">${parseFloat(loan.monthly_payment).toLocaleString()}</span>
+                  <span className="text-gray-600 font-medium">Weekly Payment:</span>
+                  <span className="font-semibold text-gray-900">${parseFloat(loan.weekly_payment).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-50">
                   <span className="text-gray-600 font-medium">Purpose:</span>

@@ -11,8 +11,8 @@ interface Loan {
   loan_number: string;
   principal_amount: string;
   interest_rate: string;
-  term_months: number;
-  monthly_payment: string;
+  term_weeks: number;
+  weekly_payment: string;
   status: string;
   docusign_status: string;
   remaining_balance: string;
