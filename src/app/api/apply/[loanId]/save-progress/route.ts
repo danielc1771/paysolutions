@@ -125,6 +125,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ loa
       updateData.kyc_status = validation.data.stripeVerificationStatus;
     }
 
+    // Communication Consent (store as JSON in notes field for now)
+    if (validation.data.consentToContact !== undefined || 
+        validation.data.consentToText !== undefined || 
+        validation.data.consentToCall !== undefined || 
+        validation.data.communicationPreferences !== undefined) {
+      
+      const consentData = {
+        consentToContact: validation.data.consentToContact,
+        consentToText: validation.data.consentToText,
+        consentToCall: validation.data.consentToCall,
+        communicationPreferences: validation.data.communicationPreferences
+      };
+      
+      // Store as JSON string in a text field (we'll need to add this field to schema)
+      updateData.communication_consent = JSON.stringify(consentData);
+    }
+
     // Only update if there's data to update
     let borrowerUpdateError = null;
     if (Object.keys(updateData).length > 0) {

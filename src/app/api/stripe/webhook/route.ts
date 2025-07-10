@@ -18,7 +18,7 @@ async function handleIdentityVerification(verificationSession: any, status: stri
       metadata: verificationSession.metadata
     });
 
-    const supabase = createClient();
+    const supabase = await createClient();
     const loanId = verificationSession.metadata?.loan_id;
 
     if (!loanId) {
@@ -62,10 +62,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.text();
     const signature = request.headers.get('stripe-signature')!;
-    
-    console.log('🔄 Stripe webhook received');
-    console.log('📝 Signature present:', !!signature);
-    console.log('📝 Body length:', body.length);
+
     
     // Verify webhook signature
     let event: Stripe.Event;

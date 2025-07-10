@@ -5,8 +5,8 @@ export interface LoanData {
   loanNumber: string;
   principalAmount: number;
   interestRate: number;
-  termMonths: number;
-  monthlyPayment: number;
+  termWeeks: number;
+  weeklyPayment: number;
   purpose: string;
   borrower: {
     firstName: string;
@@ -86,11 +86,11 @@ export const generateLoanAgreementHTML = (loanData: LoanData): string => {
             </tr>
             <tr>
                 <th>Term</th>
-                <td>${loanData.termMonths} months</td>
+                <td>${loanData.termWeeks} weeks</td>
             </tr>
             <tr>
-                <th>Monthly Payment</th>
-                <td>$${loanData.monthlyPayment.toLocaleString()}</td>
+                <th>Weekly Payment</th>
+                <td>$${loanData.weeklyPayment.toLocaleString()}</td>
             </tr>
             <tr>
                 <th>Loan Purpose</th>
@@ -142,7 +142,7 @@ export const generateLoanAgreementHTML = (loanData: LoanData): string => {
     <div class="section">
         <h3>TERMS AND CONDITIONS</h3>
         <ol>
-            <li><strong>Payment Schedule:</strong> The borrower agrees to make monthly payments of $${loanData.monthlyPayment.toLocaleString()} beginning 30 days from the date of this agreement.</li>
+            <li><strong>Payment Schedule:</strong> The borrower agrees to make weekly payments of $${loanData.weeklyPayment.toLocaleString()} beginning 7 days from the date of this agreement.</li>
             <li><strong>Interest:</strong> Interest will accrue at the rate of ${(loanData.interestRate * 100).toFixed(2)}% per annum on the outstanding principal balance.</li>
             <li><strong>Late Fees:</strong> A late fee of $25 will be charged for payments received more than 10 days after the due date.</li>
             <li><strong>Prepayment:</strong> The borrower may prepay the loan in whole or in part at any time without penalty.</li>

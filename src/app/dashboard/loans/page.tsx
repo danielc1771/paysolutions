@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/client';
 import UserLayout from '@/components/UserLayout';
 import Link from 'next/link';
 import { RoleRedirect } from '@/components/auth/RoleRedirect';
+import CustomSelect from '@/components/CustomSelect';
 
 interface Loan {
   id: string;
@@ -50,6 +51,13 @@ export default function UserLoans() {
   const supabase = createClient();
 
   useEffect(() => {
+    // Check for action_required filter from URL params
+    const urlParams = new URLSearchParams(window.location.search);
+    const filterParam = urlParams.get('filter');
+    if (filterParam === 'action_required') {
+      setFilterStatus('action_required');
+    }
+
     const fetchLoans = async () => {
       try {
         setLoading(true);
@@ -142,7 +150,18 @@ export default function UserLoans() {
 
   // Filter loans based on status and search term
   const filteredLoans = loans.filter(loan => {
-    const matchesStatus = filterStatus === 'all' || loan.status === filterStatus;
+    let matchesStatus = false;
+    
+    if (filterStatus === 'all') {
+      matchesStatus = true;
+    } else if (filterStatus === 'action_required') {
+      // Action required: application completed or signed ready for funding
+      matchesStatus = loan.status === 'application_completed' || 
+                     (loan.docusign_status === 'signed' && loan.status !== 'funded');
+    } else {
+      matchesStatus = loan.status === filterStatus;
+    }
+    
     const matchesSearch = searchTerm === '' || 
       loan.loan_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
       loan.borrower?.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -225,6 +244,7 @@ export default function UserLoans() {
 
   const statusOptions = [
     { value: 'all', label: 'All Loans' },
+    { value: 'action_required', label: '🚨 Action Required' },
     { value: 'new', label: 'New' },
     { value: 'application_sent', label: 'Application Sent' },
     { value: 'application_completed', label: 'Application Completed' },
@@ -279,17 +299,12 @@ export default function UserLoans() {
                   </div>
                 </div>
                 <div className="w-full sm:w-64">
-                  <select
+                  <CustomSelect
+                    options={statusOptions}
                     value={filterStatus}
-                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFilterStatus(e.target.value)}
-                    className="w-full px-4 py-3 rounded-2xl border-0 bg-white/60 backdrop-blur-sm shadow-sm focus:ring-2 focus:ring-green-500 focus:outline-none text-sm text-gray-900"
-                  >
-                    {statusOptions.map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setFilterStatus}
+                    placeholder="Filter by status"
+                  />
                 </div>
               </div>
             </div>
@@ -299,12 +314,19 @@ export default function UserLoans() {
               <div className="px-8 py-6 bg-gradient-to-r from-gray-50 to-gray-100/50">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">All Loans</h2>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                      {filterStatus === 'action_required' ? '🚨 Loans Requiring Action' : 'All Loans'}
+                    </h2>
                     <p className="text-gray-600">
                       {filteredLoans.length} of {loans.length} loans
-                      {filterStatus !== 'all' && ` • Filtered by: ${statusOptions.find(s => s.value === filterStatus)?.label}`}
+                      {filterStatus !== 'all' && ` • Filtered by: ${statusOptions.find(s => s.value === filterStatus)?.label?.replace('🚨 ', '')}`}
                     </p>
                   </div>
+                  {filterStatus === 'action_required' && filteredLoans.length > 0 && (
+                    <div className="bg-orange-100 text-orange-800 px-4 py-2 rounded-full text-sm font-semibold border border-orange-300">
+                      Take action on these loans
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -438,6 +460,43 @@ export default function UserLoans() {
                               </div>
                               
                               <div className="flex items-center space-x-2">
+                                {needsAction && (
+                                  <>
+                                    {loan.status === 'application_completed' && (
+                                      <button 
+                                        className="px-4 py-2 bg-green-100 text-green-700 rounded-xl text-sm font-medium transition-all duration-300 hover:bg-green-200 hover:scale-105"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          window.location.href = `/dashboard/loans/${loan.id}?action=review`;
+                                        }}
+                                        title="Review Application"
+                                      >
+                                        <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        Review
+                                      </button>
+                                    )}
+                                    {loan.docusign_status === 'signed' && loan.status !== 'funded' && (
+                                      <button 
+                                        className="px-4 py-2 bg-blue-100 text-blue-700 rounded-xl text-sm font-medium transition-all duration-300 hover:bg-blue-200 hover:scale-105"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          window.location.href = `/dashboard/loans/${loan.id}?action=fund`;
+                                        }}
+                                        title="Fund Loan"
+                                      >
+                                        <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                                        </svg>
+                                        Fund
+                                      </button>
+                                    )}
+                                  </>
+                                )}
+                                
                                 <button 
                                   className="p-3 bg-blue-100 text-blue-600 rounded-2xl transition-all duration-300 group-hover:scale-110 hover:bg-blue-200"
                                   onClick={(e) => {

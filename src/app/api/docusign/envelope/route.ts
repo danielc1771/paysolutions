@@ -41,8 +41,8 @@ export async function POST(request: NextRequest) {
       loanNumber: loan.loan_number,
       principalAmount: parseFloat(loan.principal_amount),
       interestRate: parseFloat(loan.interest_rate),
-      termMonths: loan.term_months,
-      monthlyPayment: parseFloat(loan.monthly_payment),
+      termWeeks: loan.term_weeks,
+      weeklyPayment: parseFloat(loan.weekly_payment),
       purpose: loan.purpose || 'General purpose',
       borrower: {
         firstName: loan.borrower.first_name,

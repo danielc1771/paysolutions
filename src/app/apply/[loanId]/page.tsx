@@ -3,10 +3,11 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowRight, Check, DollarSign, User, Mail, Phone, Loader2, AlertCircle, Calendar, Lock } from 'lucide-react';
+import { ArrowRight, Check, DollarSign, User, Mail, Phone, Loader2, AlertCircle, Calendar, Lock, MessageSquare } from 'lucide-react';
 import Image from 'next/image';
 import CustomSelect from '@/components/CustomSelect';
 import { createClient } from '@/utils/supabase/client';
+import OTPInput from '@/components/OTPInput';
 
 // Define the structure for loan data we expect to fetch
 interface LoanApplicationData {
@@ -37,6 +38,10 @@ export default function ApplyPage() {
   const [step, setStep] = useState(0); // 0: loading, 1: welcome, 2-4: form, 5: success, -1: error
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [formData, setFormData] = useState<Record<string, unknown>>({
+    // Phone verification
+    phoneNumber: '',
+    phoneVerificationStatus: 'pending',
+    verificationCode: '',
     dateOfBirth: '',
     address: '',
     city: '',
@@ -96,9 +101,56 @@ export default function ApplyPage() {
           return dbStatus;
         };
 
+        // Parse communication consent if available
+        let consentData = {
+          consentToContact: false,
+          consentToText: false,
+          consentToCall: false,
+          communicationPreferences: 'email'
+        };
+        
+        if (data.borrower.communication_consent) {
+          try {
+            consentData = JSON.parse(data.borrower.communication_consent);
+          } catch (error) {
+            console.warn('Failed to parse communication consent:', error);
+          }
+        }
+
         setFormData(prev => ({
           ...prev,
+          // Basic borrower info
           ...sanitizeData(data.borrower),
+          // Phone verification
+          phoneNumber: data.loan.verifiedPhoneNumber || data.borrower.phone || '',
+          phoneVerificationStatus: data.loan.phoneVerificationStatus || 'pending',
+          // Personal information (using database field names mapped to form field names)
+          dateOfBirth: data.borrower.date_of_birth || '',
+          address: data.borrower.address_line1 || '',
+          city: data.borrower.city || '',
+          state: data.borrower.state || '',
+          zipCode: data.borrower.zip_code || '',
+          // Employment details
+          employmentStatus: data.borrower.employment_status || 'employed',
+          annualIncome: data.borrower.annual_income || '',
+          currentEmployerName: data.borrower.current_employer_name || '',
+          timeWithEmployment: data.borrower.time_with_employment || '',
+          // References
+          reference1Name: data.borrower.reference1_name || '',
+          reference1Phone: data.borrower.reference1_phone || '',
+          reference1Email: data.borrower.reference1_email || '',
+          reference2Name: data.borrower.reference2_name || '',
+          reference2Phone: data.borrower.reference2_phone || '',
+          reference2Email: data.borrower.reference2_email || '',
+          reference3Name: data.borrower.reference3_name || '',
+          reference3Phone: data.borrower.reference3_phone || '',
+          reference3Email: data.borrower.reference3_email || '',
+          // Communication consent
+          consentToContact: consentData.consentToContact || false,
+          consentToText: consentData.consentToText || false,
+          consentToCall: consentData.consentToCall || false,
+          communicationPreferences: consentData.communicationPreferences || 'email',
+          // Stripe verification
           stripeVerificationSessionId: data.loan.stripeVerificationSessionId ?? '',
           stripeVerificationStatus: mapVerificationStatus(data.loan.stripeVerificationStatus || 'pending'),
         }));
@@ -152,6 +204,30 @@ export default function ApplyPage() {
           console.log('Received loan update:', payload);
           const newRecord = payload.new as any;
           
+          // Update phone verification status and verified phone number
+          if (newRecord.phone_verification_status || newRecord.verified_phone_number) {
+            const phoneStatus = newRecord.phone_verification_status;
+            const verifiedPhone = newRecord.verified_phone_number;
+            console.log('📱 Phone verification update:', { phoneStatus, verifiedPhone });
+            
+            setFormData((prev) => {
+              const updates: Record<string, unknown> = {};
+              
+              if (phoneStatus && String(prev.phoneVerificationStatus) !== phoneStatus) {
+                updates.phoneVerificationStatus = phoneStatus;
+              }
+              
+              if (verifiedPhone && String(prev.phoneNumber) !== verifiedPhone) {
+                updates.phoneNumber = verifiedPhone;
+              }
+              
+              if (Object.keys(updates).length > 0) {
+                return { ...prev, ...updates };
+              }
+              return prev;
+            });
+          }
+
           // Update stripe verification status
           if (newRecord.stripe_verification_status) {
             const dbStatus = newRecord.stripe_verification_status;
@@ -243,12 +319,13 @@ export default function ApplyPage() {
 
   const steps = [
     { id: 1, name: 'Welcome', component: WelcomeStep },
-    { id: 2, name: 'Personal Information', component: PersonalDetailsStep },
-    { id: 3, name: 'Employment Details', component: EmploymentDetailsStep },
-    { id: 4, name: 'References', component: ReferencesStep },
-    { id: 5, name: 'Identity Verification', component: StripeVerificationStep },
-    { id: 6, name: 'Consent & Preferences', component: ConsentStep },
-    { id: 7, name: 'Review & Submit', component: ReviewStep },
+    { id: 2, name: 'Phone Verification', component: PhoneVerificationStep },
+    { id: 3, name: 'Personal Information', component: PersonalDetailsStep },
+    { id: 4, name: 'Employment Details', component: EmploymentDetailsStep },
+    { id: 5, name: 'References', component: ReferencesStep },
+    { id: 6, name: 'Identity Verification', component: StripeVerificationStep },
+    { id: 7, name: 'Consent & Preferences', component: ConsentStep },
+    { id: 8, name: 'Review & Submit', component: ReviewStep },
   ];
 
   const CurrentStepComponent = steps.find(s => s.id === step)?.component;
@@ -257,7 +334,7 @@ export default function ApplyPage() {
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 flex flex-col items-center justify-center p-4 font-sans">
       <div className="w-full max-w-4xl">
         {/* Header and Step Indicator */}
-        {step > 1 && step <= 8 && (
+        {step > 1 && step <= 9 && (
           <div className="mb-8">
             <p className="text-sm font-semibold text-purple-600">Step {step - 1} of {steps.length -1}</p>
             <div className="mt-2 w-full bg-gray-200 rounded-full h-1.5">
@@ -294,7 +371,7 @@ export default function ApplyPage() {
               />
             )}
 
-            {step === 8 && <SuccessMessage />}
+            {step === 9 && <SuccessMessage />}
             
             {/* Success Dialog Modal */}
             {showSuccessDialog && (
@@ -314,7 +391,7 @@ export default function ApplyPage() {
                         className="w-full bg-gradient-to-r from-green-500 to-teal-500 text-white font-bold py-4 px-8 rounded-2xl hover:from-green-600 hover:to-teal-600 transition-all duration-300 shadow-lg hover:shadow-xl"
                         onClick={() => {
                           setShowSuccessDialog(false);
-                          setStep(8); // Show the detailed success page
+                          setStep(9); // Show the detailed success page
                         }}
                       >
                         View Details
@@ -335,6 +412,300 @@ export default function ApplyPage() {
             )}
           </motion.div>
         </AnimatePresence>
+      </div>
+    </div>
+  );
+}
+
+// Step 2: Phone Verification
+function PhoneVerificationStep({ formData, setFormData, initialData, handleNext, handlePrev }: { 
+  formData: Record<string, unknown>; 
+  setFormData: React.Dispatch<React.SetStateAction<Record<string, unknown>>>; 
+  initialData: LoanApplicationData | null;
+  handleNext: () => void; 
+  handlePrev: () => void; 
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [showOTPInput, setShowOTPInput] = useState(false);
+
+  const phoneNumber = String(formData.phoneNumber || '');
+  const verificationCode = String(formData.verificationCode || '');
+  const verificationStatus = String(formData.phoneVerificationStatus || 'pending');
+
+  const canProceed = verificationStatus === 'verified';
+
+  // Remove auto-send - only send when user clicks button
+
+  const sendVerificationCode = async () => {
+    if (!phoneNumber.trim()) {
+      setError('Please enter your phone number');
+      return;
+    }
+
+    setIsSending(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const response = await fetch('/api/twilio/send-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phoneNumber: phoneNumber.trim(),
+          loanId: initialData?.loanId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send verification code');
+      }
+
+      setFormData(prev => ({ 
+        ...prev, 
+        phoneNumber: data.phoneNumber,
+        phoneVerificationStatus: 'sent' 
+      }));
+      setSuccessMessage('Verification code sent! Please check your messages.');
+      setIsEditing(false);
+      setShowOTPInput(true);
+
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to send verification code';
+      setError(errorMessage);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const verifyCode = async () => {
+    if (!verificationCode.trim() || verificationCode.length < 6) {
+      setError('Please enter the complete 6-digit verification code');
+      return;
+    }
+
+    setIsVerifying(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const response = await fetch('/api/twilio/verify-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phoneNumber,
+          code: verificationCode.trim(),
+          loanId: initialData?.loanId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to verify code');
+      }
+
+      if (data.success && data.status === 'approved') {
+        setFormData(prev => ({ 
+          ...prev, 
+          phoneVerificationStatus: 'verified',
+          verificationCode: '' 
+        }));
+        setSuccessMessage('Phone number verified successfully!');
+        setShowOTPInput(false);
+      } else {
+        setError('Invalid verification code. Please try again.');
+        // Clear the code so user can try again
+        setFormData(prev => ({ ...prev, verificationCode: '' }));
+      }
+
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to verify code';
+      setError(errorMessage);
+      // Clear the code so user can try again
+      setFormData(prev => ({ ...prev, verificationCode: '' }));
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  // Auto-verify when code is complete
+  useEffect(() => {
+    if (verificationCode.length === 6 && showOTPInput && verificationStatus !== 'verified' && !isVerifying) {
+      verifyCode();
+    }
+  }, [verificationCode, showOTPInput, verificationStatus, isVerifying]);
+
+
+  // Case 1: Phone number is verified - show success screen
+  if (verificationStatus === 'verified') {
+    return (
+      <div className="max-w-md mx-auto">
+        <div className="text-center mb-8">
+          <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+            <Check className="w-10 h-10 text-white" />
+          </div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Phone Verified!</h1>
+          <p className="text-gray-600">Your phone number has been successfully verified.</p>
+          <p className="text-lg font-medium text-gray-800 mt-4">{phoneNumber}</p>
+        </div>
+
+        <div className="mt-10 flex justify-center">
+          <button 
+            onClick={handleNext} 
+            className="px-8 py-4 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-2xl font-semibold hover:from-purple-600 hover:to-blue-600 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center"
+          >
+            Continue <ArrowRight className="w-5 h-5 ml-2" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Case 2: OTP input screen - when code has been sent
+  if ((verificationStatus === 'sent' || showOTPInput) && phoneNumber && !isEditing) {
+    return (
+      <div className="max-w-md mx-auto">
+        <div className="text-center mb-8">
+          <div className="w-20 h-20 bg-gradient-to-br from-purple-400 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+            <MessageSquare className="w-10 h-10 text-white" />
+          </div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">OTP Verification</h1>
+          <p className="text-gray-600 mb-2">Enter the OTP sent to</p>
+          <p className="text-lg font-medium text-gray-800">{phoneNumber}</p>
+        </div>
+
+        <div className="space-y-6">
+          <OTPInput 
+            value={verificationCode}
+            onChange={(value) => setFormData({...formData, verificationCode: value})}
+            disabled={isVerifying}
+          />
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+              <div className="flex items-center">
+                <AlertCircle className="w-5 h-5 text-red-500 mr-2" />
+                <span className="text-red-700 text-sm">{error}</span>
+              </div>
+            </div>
+          )}
+
+          {successMessage && (
+            <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+              <div className="flex items-center">
+                <Check className="w-5 h-5 text-green-500 mr-2" />
+                <span className="text-green-700 text-sm">{successMessage}</span>
+              </div>
+            </div>
+          )}
+
+          <div className="text-center">
+            <p className="text-gray-600 text-sm">
+              Don't receive the OTP? 
+              <button
+                onClick={sendVerificationCode}
+                disabled={isSending}
+                className="text-purple-600 hover:text-purple-700 font-medium ml-1 disabled:opacity-50"
+              >
+                {isSending ? 'SENDING...' : 'RESEND OTP'}
+              </button>
+            </p>
+          </div>
+
+          <button
+            onClick={verifyCode}
+            disabled={isVerifying || verificationCode.length < 6}
+            className="w-full px-6 py-4 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-2xl font-semibold hover:from-purple-600 hover:to-blue-600 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+          >
+            {isVerifying ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                Verifying...
+              </>
+            ) : (
+              'VERIFY & PROCEED'
+            )}
+          </button>
+        </div>
+
+        <div className="mt-10 flex justify-between">
+          <button 
+            onClick={() => {
+              setIsEditing(true);
+              setShowOTPInput(false);
+              setFormData(prev => ({ ...prev, verificationCode: '' }));
+            }} 
+            className="px-8 py-3 bg-white/60 backdrop-blur-sm border border-gray-200 rounded-xl text-gray-700 font-medium hover:bg-gray-50 transition-all duration-300 shadow-sm"
+          >
+            Change Number
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Case 3: Phone number entry screen - default state or editing
+  return (
+    <div className="max-w-md mx-auto">
+      <div className="text-center mb-8">
+        <div className="w-20 h-20 bg-gradient-to-br from-purple-400 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+          <Phone className="w-10 h-10 text-white" />
+        </div>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Enter Your Phone Number</h1>
+        <p className="text-gray-600">We'll send you a one-time password to verify your phone number</p>
+      </div>
+
+      <div className="space-y-6">
+        <InputField
+          icon={<Phone />}
+          label="Mobile Number"
+          name="phoneNumber"
+          type="tel"
+          placeholder="+1 (555) 123-4567"
+          value={phoneNumber}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+            setFormData({...formData, phoneNumber: e.target.value})
+          }
+        />
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+            <div className="flex items-center">
+              <AlertCircle className="w-5 h-5 text-red-500 mr-2" />
+              <span className="text-red-700 text-sm">{error}</span>
+            </div>
+          </div>
+        )}
+
+        <button
+          onClick={sendVerificationCode}
+          disabled={isSending || !phoneNumber.trim()}
+          className="w-full px-6 py-4 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-2xl font-semibold hover:from-purple-600 hover:to-blue-600 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+        >
+          {isSending ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin mr-2" />
+              Sending...
+            </>
+          ) : (
+            'GET OTP'
+          )}
+        </button>
+      </div>
+
+      <div className="mt-10 flex justify-start">
+        <button 
+          onClick={handlePrev} 
+          className="px-8 py-3 bg-white/60 backdrop-blur-sm border border-gray-200 rounded-xl text-gray-700 font-medium hover:bg-gray-50 transition-all duration-300 shadow-sm"
+        >
+          Back
+        </button>
       </div>
     </div>
   );
@@ -362,13 +733,73 @@ function WelcomeStep({ initialData, handleNext }: { initialData: LoanApplication
     );
 }
 
-// Step 2: Personal Details
-function PersonalDetailsStep({ formData, setFormData, initialData, handleNext }: { 
+// Step 3: Personal Details
+function PersonalDetailsStep({ formData, setFormData, initialData, handleNext, handlePrev }: { 
   formData: Record<string, unknown>; 
   setFormData: React.Dispatch<React.SetStateAction<Record<string, unknown>>>; 
   initialData: LoanApplicationData | null; 
   handleNext: () => void; 
+  handlePrev: () => void; 
 }) {
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Validation function
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+
+    // Date of birth validation
+    if (!formData.dateOfBirth || String(formData.dateOfBirth).trim() === '') {
+      newErrors.dateOfBirth = 'Date of birth is required';
+    } else {
+      const dob = new Date(String(formData.dateOfBirth));
+      const today = new Date();
+      const age = today.getFullYear() - dob.getFullYear();
+      if (age < 18 || age > 100) {
+        newErrors.dateOfBirth = 'You must be between 18 and 100 years old';
+      }
+    }
+
+    // Address validation
+    if (!formData.address || String(formData.address).trim() === '') {
+      newErrors.address = 'Address is required';
+    } else if (String(formData.address).trim().length < 5) {
+      newErrors.address = 'Please enter a complete address';
+    }
+
+    // City validation
+    if (!formData.city || String(formData.city).trim() === '') {
+      newErrors.city = 'City is required';
+    } else if (String(formData.city).trim().length < 2) {
+      newErrors.city = 'Please enter a valid city name';
+    }
+
+    // State validation
+    if (!formData.state || String(formData.state).trim() === '') {
+      newErrors.state = 'State is required';
+    } else if (String(formData.state).trim().length < 2) {
+      newErrors.state = 'Please enter a valid state';
+    }
+
+    // ZIP code validation
+    if (!formData.zipCode || String(formData.zipCode).trim() === '') {
+      newErrors.zipCode = 'ZIP code is required';
+    } else {
+      const zipCode = String(formData.zipCode).trim();
+      const zipRegex = /^\d{5}(-\d{4})?$/;
+      if (!zipRegex.test(zipCode)) {
+        newErrors.zipCode = 'Please enter a valid ZIP code (e.g., 12345 or 12345-6789)';
+      }
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleNextClick = () => {
+    if (validateForm()) {
+      handleNext();
+    }
+  };
   return (
     <div>
       <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Personal Information</h1>
@@ -378,8 +809,21 @@ function PersonalDetailsStep({ formData, setFormData, initialData, handleNext }:
         {/* Pre-filled, non-changeable fields */}
         <div className="grid md:grid-cols-2 gap-6">
           <InfoField icon={<User />} label="Full Name" value={`${initialData?.borrower.first_name} ${initialData?.borrower.last_name}`} />
-          <InfoField icon={<DollarSign />} label="Loan Amount" value={`${initialData?.loan.principal_amount.toLocaleString()}`} />
-          <InfoField icon={initialData?.borrower.email ? <Mail /> : <Phone />} label="Contact" value={initialData?.borrower.email || initialData?.borrower.phone || ''} />
+          <InfoField icon={<DollarSign />} label="Loan Amount" value={`$${initialData?.loan.principal_amount.toLocaleString()}`} />
+          {initialData?.borrower.email && (
+            <InfoField icon={<Mail />} label="Email" value={initialData.borrower.email} />
+          )}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Verified Phone Number</label>
+            <div className="relative">
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400">
+                <Phone />
+              </div>
+              <div className="w-full pl-12 pr-12 py-3 bg-green-50 border border-green-200 rounded-2xl text-gray-700 font-medium flex items-center justify-between">
+                <span>{String(formData.phoneNumber || initialData?.borrower.phone || '')}</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <hr className="border-gray-200" />
@@ -399,17 +843,66 @@ function PersonalDetailsStep({ formData, setFormData, initialData, handleNext }:
         <hr className="border-gray-200" />
 
         {/* Form fields */}
-        <InputField icon={<Calendar />} label="Date of Birth" name="dateOfBirth" type="date" value={formData.dateOfBirth} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, dateOfBirth: e.target.value})} />
-        <InputField label="Address" name="address" type="text" value={formData.address} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, address: e.target.value })} icon={undefined} />
+        <InputFieldWithError 
+          icon={<Calendar />} 
+          label="Date of Birth" 
+          name="dateOfBirth" 
+          type="date" 
+          value={formData.dateOfBirth} 
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, dateOfBirth: e.target.value})}
+          error={errors.dateOfBirth}
+        />
+        <InputFieldWithError 
+          label="Address" 
+          name="address" 
+          type="text" 
+          placeholder="123 Main Street"
+          value={formData.address} 
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, address: e.target.value })} 
+          error={errors.address}
+        />
         <div className="grid md:grid-cols-3 gap-4">
-          <InputField label="City" name="city" type="text" value={formData.city} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, city: e.target.value })} icon={undefined} />
-          <InputField label="State" name="state" type="text" value={formData.state} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, state: e.target.value })} icon={undefined} />
-          <InputField label="ZIP Code" name="zipCode" type="text" value={formData.zipCode} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, zipCode: e.target.value })} icon={undefined} />
+          <InputFieldWithError 
+            label="City" 
+            name="city" 
+            type="text" 
+            placeholder="Miami"
+            value={formData.city} 
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, city: e.target.value })} 
+            error={errors.city}
+          />
+          <InputFieldWithError 
+            label="State" 
+            name="state" 
+            type="text" 
+            placeholder="FL"
+            value={formData.state} 
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, state: e.target.value })} 
+            error={errors.state}
+          />
+          <InputFieldWithError 
+            label="ZIP Code" 
+            name="zipCode" 
+            type="text" 
+            placeholder="33101"
+            value={formData.zipCode} 
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, zipCode: e.target.value })} 
+            error={errors.zipCode}
+          />
         </div>
       </div>
 
-      <div className="mt-10 flex justify-end">
-        <button onClick={handleNext} className="w-full md:w-auto px-8 py-4 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-2xl font-semibold hover:from-purple-600 hover:to-blue-600 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center">
+      <div className="mt-10 flex flex-col-reverse md:flex-row md:justify-between gap-4">
+        <button 
+          onClick={handlePrev} 
+          className="w-full md:w-auto px-8 py-4 bg-white/60 backdrop-blur-sm border border-white/30 rounded-2xl text-gray-700 font-semibold hover:bg-white/80 hover:shadow-lg transition-all duration-300 shadow-sm justify-center"
+        >
+          Back
+        </button>
+        <button 
+          onClick={handleNextClick} 
+          className="w-full md:w-auto px-8 py-4 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-2xl font-semibold hover:from-purple-600 hover:to-blue-600 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center"
+        >
           Next <ArrowRight className="w-5 h-5 ml-2" />
         </button>
       </div>
@@ -417,13 +910,67 @@ function PersonalDetailsStep({ formData, setFormData, initialData, handleNext }:
   );
 }
 
-// Step 3: Employment Details (New)
+// Step 4: Employment Details
 function EmploymentDetailsStep({ formData, setFormData, handleNext, handlePrev }: { 
   formData: Record<string, unknown>; 
   setFormData: React.Dispatch<React.SetStateAction<Record<string, unknown>>>; 
   handleNext: () => void; 
   handlePrev: () => void; 
 }) {
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Validation function
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+
+    // Employment status validation
+    if (!formData.employmentStatus || String(formData.employmentStatus).trim() === '') {
+      newErrors.employmentStatus = 'Employment status is required';
+    }
+
+    // Annual income validation
+    if (!formData.annualIncome || String(formData.annualIncome).trim() === '') {
+      newErrors.annualIncome = 'Annual income is required';
+    } else {
+      const income = parseFloat(String(formData.annualIncome));
+      if (isNaN(income) || income <= 0) {
+        newErrors.annualIncome = 'Please enter a valid annual income';
+      } else if (income < 1000) {
+        newErrors.annualIncome = 'Annual income must be at least $1,000';
+      } else if (income > 10000000) {
+        newErrors.annualIncome = 'Please enter a reasonable annual income';
+      }
+    }
+
+    // Employer name validation (required for employed/self-employed)
+    const employmentStatus = String(formData.employmentStatus);
+    if (employmentStatus === 'employed' || employmentStatus === 'self_employed') {
+      if (!formData.currentEmployerName || String(formData.currentEmployerName).trim() === '') {
+        newErrors.currentEmployerName = 'Employer name is required';
+      } else if (String(formData.currentEmployerName).trim().length < 2) {
+        newErrors.currentEmployerName = 'Please enter a valid employer name';
+      }
+
+      // Time with employment validation (required for employed/self-employed)
+      if (!formData.timeWithEmployment || String(formData.timeWithEmployment).trim() === '') {
+        newErrors.timeWithEmployment = 'Time with current employment is required';
+      } else if (String(formData.timeWithEmployment).trim().length < 2) {
+        newErrors.timeWithEmployment = 'Please enter a valid duration (e.g., "2 years", "6 months")';
+      }
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleNextClick = () => {
+    if (validateForm()) {
+      handleNext();
+    }
+  };
+
+  const employmentStatus = String(formData.employmentStatus || 'employed');
+  const showEmployerFields = employmentStatus === 'employed' || employmentStatus === 'self_employed';
   return (
     <div>
       <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Employment Details</h1>
@@ -444,15 +991,74 @@ function EmploymentDetailsStep({ formData, setFormData, handleNext, handlePrev }
             onChange={(value) => setFormData({...formData, employmentStatus: value})}
             placeholder="Select Employment Status"
           />
+          {errors.employmentStatus && (
+            <p className="mt-2 text-sm text-red-600 flex items-center">
+              <AlertCircle className="w-4 h-4 mr-1" />
+              {errors.employmentStatus}
+            </p>
+          )}
         </div>
-        <InputField label="Annual Income" name="annualIncome" type="number" placeholder="50000" value={formData.annualIncome} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, annualIncome: e.target.value })} icon={undefined} />
-        <InputField label="Current Employer Name" name="currentEmployerName" type="text" value={formData.currentEmployerName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, currentEmployerName: e.target.value })} icon={undefined} />
-        <InputField label="Time with Current Employment (Years)" name="timeWithEmployment" type="text" placeholder="e.g., 5 years" value={formData.timeWithEmployment} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, timeWithEmployment: e.target.value })} icon={undefined} />
+
+        <InputFieldWithError 
+          label="Annual Income" 
+          name="annualIncome" 
+          type="number" 
+          placeholder="50000" 
+          value={formData.annualIncome} 
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, annualIncome: e.target.value })} 
+          error={errors.annualIncome}
+        />
+
+        {showEmployerFields && (
+          <>
+            <InputFieldWithError 
+              label={employmentStatus === 'self_employed' ? 'Business/Company Name' : 'Current Employer Name'} 
+              name="currentEmployerName" 
+              type="text" 
+              placeholder={employmentStatus === 'self_employed' ? 'Your Business Name' : 'Company Name'}
+              value={formData.currentEmployerName} 
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, currentEmployerName: e.target.value })} 
+              error={errors.currentEmployerName}
+            />
+            <InputFieldWithError 
+              label="Time with Current Employment" 
+              name="timeWithEmployment" 
+              type="text" 
+              placeholder="e.g., 2 years, 6 months, 1.5 years" 
+              value={formData.timeWithEmployment} 
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, timeWithEmployment: e.target.value })} 
+              error={errors.timeWithEmployment}
+            />
+          </>
+        )}
+
+        {!showEmployerFields && (
+          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6">
+            <div className="flex items-start space-x-3">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                  <AlertCircle className="w-5 h-5 text-blue-600" />
+                </div>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-blue-900 mb-2">Additional Information</h3>
+                <p className="text-blue-800 text-sm">
+                  {employmentStatus === 'unemployed' && 'Please note that unemployment status may affect loan approval. You may be asked to provide additional documentation.'}
+                  {employmentStatus === 'retired' && 'Please be prepared to provide information about your retirement income, pensions, or social security benefits.'}
+                  {employmentStatus === 'student' && 'As a student, you may need to provide information about financial aid, part-time employment, or a co-signer.'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="mt-10 flex flex-col-reverse md:flex-row md:justify-between gap-4">
         <button onClick={handlePrev} className="w-full md:w-auto px-8 py-4 bg-white/60 backdrop-blur-sm border border-white/30 rounded-2xl text-gray-700 font-semibold hover:bg-white/80 hover:shadow-lg transition-all duration-300 shadow-sm justify-center">Back</button>
-        <button onClick={handleNext} className="w-full md:w-auto px-8 py-4 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-2xl font-semibold hover:from-purple-600 hover:to-blue-600 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center">
+        <button 
+          onClick={handleNextClick} 
+          className="w-full md:w-auto px-8 py-4 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-2xl font-semibold hover:from-purple-600 hover:to-blue-600 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center"
+        >
           Next <ArrowRight className="w-5 h-5 ml-2" />
         </button>
       </div>
@@ -486,7 +1092,7 @@ function ReviewStep({ formData, initialData, handlePrev, handleSubmit, loading }
           <div className="space-y-2">
             <ReviewItem label="Full Name" value={`${reviewData.first_name || ''} ${reviewData.last_name || ''}`} />
             <ReviewItem label="Email" value={reviewData.email || 'Not provided'} />
-            <ReviewItem label="Phone" value={reviewData.phone || 'Not provided'} />
+            <ReviewItem label="Verified Phone" value={`✅ ${(reviewData as Record<string, unknown>).phoneNumber as string || reviewData.phone || 'Not provided'}`} />
             <ReviewItem label="Date of Birth" value={(reviewData as Record<string, unknown>).dateOfBirth as string || 'Not provided'} />
           </div>
         </div>
@@ -599,14 +1205,11 @@ function ReviewStep({ formData, initialData, handlePrev, handleSubmit, loading }
           <div className="space-y-2">
             <ReviewItem 
               label="Identity Verification" 
-              value={(reviewData as Record<string, unknown>).stripeVerificationStatus === 'completed' ? '✅ Verified via Stripe Identity' : '⏳ Pending verification'} 
+              value={(reviewData as Record<string, unknown>).stripeVerificationStatus === 'completed' ? '✅ Verified' : '⏳ Pending verification'} 
             />
             <ReviewItem label="Communication Consent" value={(reviewData as Record<string, unknown>).consentToContact ? '✅ Yes' : '❌ No'} />
             {(reviewData as Record<string, unknown>).consentToText ? <ReviewItem label="Text Message Consent" value="✅ Yes" /> : null}
             {(reviewData as Record<string, unknown>).consentToCall ? <ReviewItem label="Phone Call Consent" value="✅ Yes" /> : null}
-            {(reviewData as Record<string, unknown>).communicationPreferences ? (
-              <ReviewItem label="Preferred Contact Method" value={(reviewData as Record<string, unknown>).communicationPreferences as string} />
-            ) : null}
           </div>
         </div>
       </div>
@@ -634,6 +1237,36 @@ const InputField = ({ icon, label, ...props }: { icon?: React.ReactNode; label: 
         className={`w-full py-3 border border-gray-200 rounded-2xl bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition-all duration-300 ${icon ? 'pl-12 pr-4' : 'px-4'} ${props.type === 'date' ? 'appearance-none' : ''}`} 
       />
     </div>
+  </div>
+);
+
+const InputFieldWithError = ({ icon, label, error, ...props }: { 
+  icon?: React.ReactNode; 
+  label: string; 
+  error?: string;
+  [key: string]: unknown;
+}) => (
+  <div>
+    <label htmlFor={props.name as string} className="block text-sm font-semibold text-gray-700 mb-2">{label}</label>
+    <div className="relative">
+      {icon && <div className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400">{icon}</div>}
+      <input 
+        {...props} 
+        id={props.name as string} 
+        value={props.value != null ? String(props.value) : ''} // Convert null/undefined/NaN to empty string
+        className={`w-full py-3 border rounded-2xl bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:outline-none transition-all duration-300 ${icon ? 'pl-12 pr-4' : 'px-4'} ${props.type === 'date' ? 'appearance-none' : ''} ${
+          error 
+            ? 'border-red-300 focus:ring-red-500 focus:border-red-500' 
+            : 'border-gray-200 focus:ring-purple-500 focus:border-purple-500'
+        }`} 
+      />
+    </div>
+    {error && (
+      <p className="mt-2 text-sm text-red-600 flex items-center">
+        <AlertCircle className="w-4 h-4 mr-1" />
+        {error}
+      </p>
+    )}
   </div>
 );
 

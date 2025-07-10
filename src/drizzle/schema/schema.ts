@@ -3,10 +3,11 @@ import { sql } from "drizzle-orm"
 // import { organization } from "./auth";
 
 // Enum declarations first
-export const roleEnum = pgEnum('role', ['admin', 'organization_owner', 'team_member', 'borrower']);
+export const roleEnum = pgEnum('role', ['admin', 'organization_owner', 'team_member', 'borrower', 'user']);
 export const profileStatusEnum = pgEnum('profile_status', ['INVITED', 'ACTIVE']);
 export const subscriptionStatusEnum = pgEnum('subscription_status', ['trial', 'active', 'suspended', 'cancelled']);
-export const stripeVerificationStatusEnum = pgEnum('stripe_verification_status', ['pending', 'requires_action', 'verified', 'canceled', 'unverified', 'processing']);
+export const stripeVerificationStatusEnum = pgEnum('stripe_verification_status', ['pending', 'requires_action', 'verified', 'canceled', 'unverified', 'processing', 'completed']);
+export const phoneVerificationStatusEnum = pgEnum('phone_verification_status', ['pending', 'sent', 'verified', 'failed', 'expired']);
 
 export const organization = pgTable("organizations", {
 	id: uuid("id").defaultRandom().primaryKey(),
@@ -67,6 +68,7 @@ export const borrowers = pgTable("borrowers", {
 	reference3Name: varchar("reference3_name", { length: 255 }),
 	reference3Phone: varchar("reference3_phone", { length: 20 }),
 	reference3Email: varchar("reference3_email", { length: 255 }),
+	communicationConsent: text("communication_consent"), // JSON field for consent preferences
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	organizationId: uuid('organization_id').references(() => organization.id),
@@ -133,8 +135,8 @@ export const loans = pgTable("loans", { // Added vehicle fields
 	borrowerId: uuid("borrower_id"),
 	principalAmount: numeric("principal_amount", { precision: 12, scale:  2 }).notNull(),
 	interestRate: numeric("interest_rate", { precision: 5, scale:  4 }).notNull(),
-	termMonths: integer("term_months").notNull(),
-	monthlyPayment: numeric("monthly_payment", { precision: 10, scale:  2 }).notNull(),
+	termWeeks: integer("term_weeks").notNull(),
+	weeklyPayment: numeric("weekly_payment", { precision: 10, scale:  2 }).notNull(),
 	purpose: text(),
 	status: varchar({ length: 50 }).default('new'),
 	fundingDate: date("funding_date"),
@@ -153,6 +155,9 @@ export const loans = pgTable("loans", { // Added vehicle fields
 	applicationStep: integer("application_step").default(1),
 	stripeVerificationSessionId: varchar("stripe_verification_session_id", { length: 255 }),
 	stripeVerificationStatus: stripeVerificationStatusEnum('stripe_verification_status').default('pending'),
+	phoneVerificationSessionId: varchar("phone_verification_session_id", { length: 255 }),
+	phoneVerificationStatus: phoneVerificationStatusEnum('phone_verification_status').default('pending'),
+	verifiedPhoneNumber: varchar("verified_phone_number", { length: 20 }),
 }, (table) => [
 	index("idx_loans_borrower_id").using("btree", table.borrowerId.asc().nullsLast().op("uuid_ops")),
 	index("idx_loans_docusign_envelope_id").using("btree", table.docusignEnvelopeId.asc().nullsLast().op("text_ops")),
@@ -165,7 +170,7 @@ export const loans = pgTable("loans", { // Added vehicle fields
 		}).onDelete("cascade"),
 	unique("loans_loan_number_key").on(table.loanNumber),
 	pgPolicy("Enable all operations for service role", { as: "permissive", for: "all", to: ["public"], using: sql`true` }),
-	check("check_positive_amounts", sql`(principal_amount > (0)::numeric) AND (interest_rate >= (0)::numeric) AND (term_months > 0) AND (monthly_payment > (0)::numeric)`),
+	check("check_positive_amounts", sql`(principal_amount > (0)::numeric) AND (interest_rate >= (0)::numeric) AND (term_weeks > 0) AND (weekly_payment > (0)::numeric)`),
 ]);
 
 export const organizationSettings = pgTable("organization_settings", {

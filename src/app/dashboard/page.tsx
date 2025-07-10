@@ -11,8 +11,8 @@ interface Loan {
   loan_number: string;
   principal_amount: string;
   interest_rate: string;
-  term_months: number;
-  monthly_payment: string;
+  term_weeks: number;
+  weekly_payment: string;
   status: string;
   borrower: {
     first_name: string;
@@ -88,8 +88,10 @@ export default function UserDashboard() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'new': return 'bg-blue-100 text-blue-800';
+      case 'application_sent': return 'bg-yellow-100 text-yellow-800';
+      case 'application_completed': return 'bg-orange-100 text-orange-800';
       case 'review': return 'bg-orange-100 text-orange-800';
-      case 'signed': return 'bg-purple-100 text-purple-800';
+      case 'signed': return 'bg-emerald-100 text-emerald-800';
       case 'funded': return 'bg-green-100 text-green-800';
       case 'active': return 'bg-green-100 text-green-800';
       case 'closed': return 'bg-gray-100 text-gray-800';
@@ -97,11 +99,31 @@ export default function UserDashboard() {
     }
   };
 
+  const formatStatus = (status: string) => {
+    switch (status) {
+      case 'new': return 'New';
+      case 'application_sent': return 'Application Sent';
+      case 'application_completed': return 'Application Completed';
+      case 'review': return 'Under Review';
+      case 'signed': return 'Signed - Ready for Funding';
+      case 'funded': return 'Funded';
+      case 'active': return 'Active';
+      case 'closed': return 'Closed';
+      default: return status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ');
+    }
+  };
+
   // Calculate stats
   const totalLoans = loans?.length || 0;
   const activeLoans = loans?.filter(l => l.status === 'active').length || 0;
-  const pendingLoans = loans?.filter(l => ['new', 'review'].includes(l.status)).length || 0;
+  const pendingLoans = loans?.filter(l => l.status === 'application_completed').length || 0;
   const totalPrincipal = loans?.reduce((sum, loan) => sum + parseFloat(loan.principal_amount), 0) || 0;
+  
+  // Action required loans (application completed or signed ready for funding)
+  const actionRequiredLoans = loans?.filter(l => 
+    l.status === 'application_completed' || 
+    (l.docusign_status === 'signed' && l.status !== 'funded')
+  ) || [];
 
   return (
     <RoleRedirect allowedRoles={['user']}>
@@ -120,20 +142,23 @@ export default function UserDashboard() {
 
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-10">
-              <div className="group bg-white/70 backdrop-blur-sm rounded-3xl p-8 shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-white/20">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="p-4 bg-gradient-to-br from-orange-400 to-red-500 rounded-2xl shadow-lg group-hover:scale-110 transition-transform duration-300">
-                    <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+              <Link href="/dashboard/loans?filter=action_required" className="block">
+                <div className="group bg-white/70 backdrop-blur-sm rounded-3xl p-8 shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-white/20 cursor-pointer">
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="p-4 bg-gradient-to-br from-orange-400 to-red-500 rounded-2xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                      <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-3xl font-bold text-gray-800">{pendingLoans}</p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-3xl font-bold text-gray-800">{pendingLoans}</p>
-                  </div>
+                  <h3 className="text-gray-700 font-semibold text-lg">Pending Loans</h3>
+                  <p className="text-gray-500 text-sm mt-1">Awaiting review</p>
+
                 </div>
-                <h3 className="text-gray-700 font-semibold text-lg">Pending Loans</h3>
-                <p className="text-gray-500 text-sm mt-1">Awaiting review</p>
-              </div>
+              </Link>
 
               <div className="group bg-white/70 backdrop-blur-sm rounded-3xl p-8 shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-white/20">
                 <div className="flex items-center justify-between mb-6">
@@ -314,7 +339,7 @@ export default function UserDashboard() {
                                     {loan.borrower?.first_name} {loan.borrower?.last_name}
                                   </h3>
                                   <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${getStatusColor(loan.status)}`}>
-                                    {loan.status}
+                                    {formatStatus(loan.status)}
                                   </span>
                                   {needsAction && (
                                     <span className="inline-flex items-center px-3 py-1 text-xs font-bold rounded-full bg-orange-100 text-orange-800 border border-orange-300">
