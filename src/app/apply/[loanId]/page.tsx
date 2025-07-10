@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowRight, Check, DollarSign, User, Mail, Phone, Loader2, AlertCircle, Calendar, Lock, MessageSquare } from 'lucide-react';
@@ -484,7 +484,7 @@ function PhoneVerificationStep({ formData, setFormData, initialData, handleNext,
     }
   };
 
-  const verifyCode = async () => {
+  const verifyCode = useCallback(async () => {
     if (!verificationCode.trim() || verificationCode.length < 6) {
       setError('Please enter the complete 6-digit verification code');
       return;
@@ -533,14 +533,14 @@ function PhoneVerificationStep({ formData, setFormData, initialData, handleNext,
     } finally {
       setIsVerifying(false);
     }
-  };
+  }, [verificationCode, initialData?.loanId, phoneNumber, setFormData]);
 
   // Auto-verify when code is complete
   useEffect(() => {
     if (verificationCode.length === 6 && showOTPInput && verificationStatus !== 'verified' && !isVerifying) {
       verifyCode();
     }
-  }, [verificationCode, showOTPInput, verificationStatus, isVerifying]);
+  }, [verificationCode, showOTPInput, verificationStatus, isVerifying, verifyCode]);
 
 
   // Case 1: Phone number is verified - show success screen

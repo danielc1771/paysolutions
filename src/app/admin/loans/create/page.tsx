@@ -6,7 +6,7 @@ import AdminLayout from '@/components/AdminLayout';
 import { Send, Edit, User, Mail, CheckCircle, AlertCircle, Loader2, Calculator, DollarSign } from 'lucide-react';
 
 import CustomSelect from '@/components/CustomSelect';
-import { getAvailableTerms, calculateLoanPayment, generateWeeklyPaymentSchedule, type LoanCalculation } from '@/utils/loan-calculations';
+import { getAvailableTerms, calculateLoanPayment, generateWeeklyPaymentSchedule } from '@/utils/loan-calculations';
 
 export default function CreateLoanPage() {
   const [mode, setMode] = useState('send');
@@ -371,10 +371,10 @@ function ManualEntryForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           borrower_id: borrower.id, 
-          principal_amount: loanCalculationManual.principalAmount, 
-          interest_rate: loanCalculationManual.annualInterestRate, 
-          term_weeks: loanCalculationManual.termWeeks, 
-          weekly_payment: loanCalculationManual.weeklyPayment, 
+          principal_amount: loanCalculationManual?.principalAmount || parseFloat(formData.principalAmount) || 0, 
+          interest_rate: loanCalculationManual?.annualInterestRate || 0.3, 
+          term_weeks: loanCalculationManual?.termWeeks || parseInt(formData.termWeeks) || 4, 
+          weekly_payment: loanCalculationManual?.weeklyPayment || 0, 
           purpose: formData.purpose,
         }),
       });
@@ -427,10 +427,17 @@ function ManualEntryForm() {
           <h3 className="text-lg font-semibold text-gray-900 mb-6">Loan Information</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Input fields for loan... */}
-            <div><label className="block text-sm font-medium text-gray-700 mb-2">Principal Amount *</label><input type="number" name="principalAmount" value={formData.principalAmount} onChange={handleInputChange} required min="0" step="0.01" className="w-full px-4 py-3 border border-gray-200 rounded-2xl bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition-all duration-300" /></div>
-            <div><label className="block text-sm font-medium text-gray-700 mb-2">Interest Rate (%) *</label><input type="number" name="interestRate" value={formData.interestRate} onChange={handleInputChange} required min="0" max="100" step="0.01" className="w-full px-4 py-3 border border-gray-200 rounded-2xl bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition-all duration-300" /></div>
-            <div><label className="block text-sm font-medium text-gray-700 mb-2">Term (Months) *</label><input type="number" name="termMonths" value={formData.termMonths} onChange={handleInputChange} required min="1" className="w-full px-4 py-3 border border-gray-200 rounded-2xl bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition-all duration-300" /></div>
-            <div><label className="block text-sm font-medium text-gray-700 mb-2">Monthly Payment</label><div className="w-full px-4 py-3 bg-gray-100 border border-gray-200 rounded-2xl text-gray-700">${calculateMonthlyPayment()}</div></div>
+            <div><label className="block text-sm font-medium text-gray-700 mb-2">Principal Amount *</label><input type="number" name="principalAmount" value={formData.principalAmount} onChange={handlePrincipalAmountChange} required min="0" step="0.01" className="w-full px-4 py-3 border border-gray-200 rounded-2xl bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition-all duration-300" /></div>
+            {availableTermsManual.length > 0 && (
+              <div><label className="block text-sm font-medium text-gray-700 mb-2">Loan Term *</label><select name="termWeeks" value={formData.termWeeks} onChange={handleInputChange} required className="w-full px-4 py-3 border border-gray-200 rounded-2xl bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition-all duration-300">{availableTermsManual.map(option => (<option key={option.value} value={option.value}>{option.label}</option>))}</select></div>
+            )}
+            <div><label className="block text-sm font-medium text-gray-700 mb-2">Interest Rate (Fixed)</label><div className="w-full px-4 py-3 bg-gray-100 border border-gray-200 rounded-2xl text-gray-700">30% Annual (Fixed)</div></div>
+            {loanCalculationManual && (
+              <div><label className="block text-sm font-medium text-gray-700 mb-2">Weekly Payment</label><div className="w-full px-4 py-3 bg-gray-100 border border-gray-200 rounded-2xl text-gray-700">${loanCalculationManual.weeklyPayment.toFixed(2)}</div></div>
+            )}
+            {loanCalculationManual && (
+              <div><label className="block text-sm font-medium text-gray-700 mb-2">Total Payment</label><div className="w-full px-4 py-3 bg-gray-100 border border-gray-200 rounded-2xl text-gray-700">${loanCalculationManual.totalPayment.toFixed(2)}</div></div>
+            )}
             <div><label className="block text-sm font-semibold text-gray-700 mb-2">Loan Purpose *</label><select name="purpose" value={formData.purpose} onChange={handleInputChange} required className="w-full px-4 py-3 border border-gray-200 rounded-2xl bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition-all duration-300"><option value="personal">Personal</option><option value="business">Business</option><option value="auto">Auto</option><option value="home">Home</option><option value="education">Education</option><option value="other">Other</option></select></div>
           </div>
         </div>

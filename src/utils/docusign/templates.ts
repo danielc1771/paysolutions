@@ -37,8 +37,8 @@ export interface LoanData {
   loanNumber: string;
   principalAmount: number;
   interestRate: number;
-  termMonths: number;
-  monthlyPayment: number;
+  termWeeks: number;
+  weeklyPayment: number;
   purpose: string;
   vehicle?: {
     year: string;
