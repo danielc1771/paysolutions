@@ -65,7 +65,9 @@ export async function POST(request: NextRequest) {
     const body = await request.text();
     const signature = request.headers.get('stripe-signature')!;
     
-    console.log('🔄 Stripe webhook received');
+    console.log('🔄 Stripe webhook received at:', new Date().toISOString());
+    console.log('📝 Domain:', request.headers.get('host'));
+    console.log('📝 URL:', request.url);
     console.log('📝 Signature present:', !!signature);
     console.log('📝 Body length:', body.length);
     
@@ -106,7 +108,7 @@ export async function POST(request: NextRequest) {
 
       case 'identity.verification_session.verified':
         console.log('✅ Identity verification succeeded:', event.data.object.id);
-        await handleIdentityVerification(event.data.object, 'verified');
+        await handleIdentityVerification(event.data.object, 'completed');
         break;
 
       case 'identity.verification_session.requires_input':

@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient();
 
-    // Get loan and borrower data
+    // Get loan and borrower data including vehicle information
     const { data: loan, error: loanError } = await supabase
       .from('loans')
       .select(`
@@ -44,6 +44,12 @@ export async function POST(request: NextRequest) {
       termMonths: loan.term_months,
       monthlyPayment: parseFloat(loan.monthly_payment),
       purpose: loan.purpose || 'General purpose',
+      vehicle: {
+        year: loan.vehicle_year || '',
+        make: loan.vehicle_make || '',
+        model: loan.vehicle_model || '', 
+        vin: loan.vehicle_vin || ''
+      },
       borrower: {
         firstName: loan.borrower.first_name,
         lastName: loan.borrower.last_name,

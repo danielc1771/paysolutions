@@ -117,12 +117,21 @@ export default function ApplyPage() {
 
   // Real-time status updates using Supabase Realtime
   useEffect(() => {
-    if (!loanId) return;
+    if (!loanId) {
+      console.log('❌ No loanId provided for status updates');
+      return;
+    }
 
+    console.log('🔄 Setting up status update mechanism for loan:', loanId);
     const supabase = createClient();
+    
+    // Disable Realtime WebSocket connection for anonymous users
+    // This prevents the continuous WebSocket connection failures
+    const ENABLE_REALTIME = false; // Set to true when proper authentication is implemented
     
     // Map database verification status to UI status consistently
     const mapVerificationStatus = (dbStatus: string) => {
+      console.log('🔄 Mapping verification status:', dbStatus);
       if (dbStatus === 'verified') return 'completed';
       return dbStatus;
     };
@@ -133,60 +142,188 @@ export default function ApplyPage() {
       const currentIndex = statusOrder.indexOf(currentStatus);
       const newIndex = statusOrder.indexOf(newStatus);
       
-      // Allow transitions to same status, forward transitions, or error states
-      return newIndex >= currentIndex || newStatus === 'requires_action' || newStatus === 'failed';
+      const canTransition = newIndex >= currentIndex || newStatus === 'requires_action' || newStatus === 'failed';
+      console.log('🔄 Status transition check:', {
+        currentStatus,
+        newStatus,
+        currentIndex,
+        newIndex,
+        canTransition
+      });
+      
+      return canTransition;
     };
 
-    // Set up real-time subscription for loan updates
-    const channel = supabase
-      .channel(`loan-updates-${loanId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'loans',
-          filter: `id=eq.${loanId}`
-        },
-        (payload) => {
-          console.log('Received loan update:', payload);
-          const newRecord = payload.new as Record<string, unknown>;
-          
-          // Update stripe verification status
-          if (newRecord.stripe_verification_status) {
-            const dbStatus = newRecord.stripe_verification_status as string;
-            const uiStatus = mapVerificationStatus(dbStatus);
-            
-            setFormData((prev) => {
-              const currentStatus = String(prev.stripeVerificationStatus || 'pending');
-              if (canTransitionTo(currentStatus, uiStatus) && currentStatus !== uiStatus) {
-                return { ...prev, stripeVerificationStatus: uiStatus };
-              }
-              return prev;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    
+    if (ENABLE_REALTIME) {
+      // Set up real-time subscription for loan updates
+      console.log('📡 Creating Realtime channel for loan updates...');
+      
+      // Configure channel with proper authentication options
+      channel = supabase
+        .channel(`loan-updates-${loanId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'loans',
+            filter: `id=eq.${loanId}`
+          },
+          (payload) => {
+            console.log('🔔 Received loan update via Realtime:', {
+              eventType: payload.eventType,
+              table: payload.table,
+              schema: payload.schema,
+              timestamp: new Date().toISOString()
             });
-          }
+            console.log('📋 Payload old record:', payload.old);
+            console.log('📋 Payload new record:', payload.new);
+            
+            const newRecord = payload.new as Record<string, unknown>;
+            
+            // Update stripe verification status
+            if (newRecord.stripe_verification_status) {
+              const dbStatus = newRecord.stripe_verification_status as string;
+              const uiStatus = mapVerificationStatus(dbStatus);
+              
+              console.log('🔄 Processing stripe verification status update:', {
+                dbStatus,
+                uiStatus,
+                loanId
+              });
+              
+              setFormData((prev) => {
+                const currentStatus = String(prev.stripeVerificationStatus || 'pending');
+                console.log('🔄 Current UI status:', currentStatus);
+                
+                if (canTransitionTo(currentStatus, uiStatus) && currentStatus !== uiStatus) {
+                  console.log('✅ Updating stripe verification status from', currentStatus, 'to', uiStatus);
+                  return { ...prev, stripeVerificationStatus: uiStatus };
+                } else {
+                  console.log('⚠️ Skipping status transition (no change or invalid transition)');
+                  return prev;
+                }
+              });
+            }
 
-          // Check for application completion
-          if (newRecord.status === 'application_completed' && !showSuccessDialog) {
-            setShowSuccessDialog(true);
+            // Check for application completion
+            if (newRecord.status === 'application_completed' && !showSuccessDialog) {
+              console.log('🎉 Application completed - showing success dialog');
+              setShowSuccessDialog(true);
+            }
           }
-        }
-      )
-      .subscribe((status) => {
-        console.log('Realtime subscription status:', status);
-        if (status === 'SUBSCRIBED') {
-          console.log('✅ Successfully subscribed to loan updates');
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error('❌ Realtime subscription error');
-        } else if (status === 'TIMED_OUT') {
-          console.error('⏰ Realtime subscription timed out');
-        }
-      });
+        )
+        .subscribe((status, error) => {
+          console.log('📡 Realtime subscription status changed:', {
+            status,
+            error,
+            loanId,
+            timestamp: new Date().toISOString()
+          });
+          
+          if (status === 'SUBSCRIBED') {
+            console.log('✅ Successfully subscribed to loan updates for loan:', loanId);
+          } else if (status === 'CHANNEL_ERROR') {
+            console.error('❌ Realtime subscription error for loan:', loanId);
+            console.error('❌ Error details:', error);
+          } else if (status === 'TIMED_OUT') {
+            console.error('⏰ Realtime subscription timed out for loan:', loanId);
+          } else if (status === 'CLOSED') {
+            console.log('🔒 Realtime subscription closed for loan:', loanId);
+          }
+        });
+    } else {
+      console.log('⚠️ Realtime disabled - using polling-only mode');
+    }
 
+    // Polling mechanism for status updates
+    let pollInterval: NodeJS.Timeout | null = null;
+    let pollAttempts = 0;
+    const maxPollAttempts = 20; // Poll for 10 minutes max (30s intervals)
+    
+    const startPolling = () => {
+      console.log('🔄 Starting polling for loan status updates...');
+      
+      pollInterval = setInterval(async () => {
+        try {
+          pollAttempts++;
+          console.log(`📊 Polling attempt ${pollAttempts}/${maxPollAttempts} for loan:`, loanId);
+          
+          const { data: currentLoan, error } = await supabase
+            .from('loans')
+            .select('stripe_verification_status, status')
+            .eq('id', loanId)
+            .single();
+          
+          if (error) {
+            console.error('❌ Polling error:', error);
+            return;
+          }
+          
+          if (currentLoan) {
+            console.log('📊 Polling result:', currentLoan);
+            
+            // Update stripe verification status
+            if (currentLoan.stripe_verification_status) {
+              const dbStatus = currentLoan.stripe_verification_status as string;
+              const uiStatus = mapVerificationStatus(dbStatus);
+              
+              setFormData((prev) => {
+                const currentStatus = String(prev.stripeVerificationStatus || 'pending');
+                if (canTransitionTo(currentStatus, uiStatus) && currentStatus !== uiStatus) {
+                  console.log('✅ Polling update: stripe verification status from', currentStatus, 'to', uiStatus);
+                  return { ...prev, stripeVerificationStatus: uiStatus };
+                }
+                return prev;
+              });
+            }
+            
+            // Check for application completion
+            if (currentLoan.status === 'application_completed' && !showSuccessDialog) {
+              console.log('🎉 Polling detected application completed');
+              setShowSuccessDialog(true);
+            }
+          }
+          
+          // Stop polling after max attempts or if status is completed
+          if (pollAttempts >= maxPollAttempts || currentLoan?.stripe_verification_status === 'completed') {
+            console.log('🛑 Stopping polling:', pollAttempts >= maxPollAttempts ? 'Max attempts reached' : 'Status completed');
+            if (pollInterval) {
+              clearInterval(pollInterval);
+              pollInterval = null;
+            }
+          }
+        } catch (error) {
+          console.error('❌ Polling error:', error);
+        }
+      }, 15000); // Poll every 15 seconds for faster updates
+    };
+    
+    // Start polling immediately if Realtime is disabled, or as fallback
+    if (!ENABLE_REALTIME) {
+      console.log('📊 Starting polling immediately (Realtime disabled)');
+      startPolling();
+    } else {
+      // Start polling if Realtime connection fails
+      setTimeout(() => {
+        console.log('⏰ Realtime connection timeout - starting polling fallback');
+        startPolling();
+      }, 10000); // Wait 10 seconds for Realtime to connect
+    }
+    
     // Cleanup subscription on unmount
     return () => {
-      console.log('Cleaning up realtime subscription');
-      supabase.removeChannel(channel);
+      console.log('🧹 Cleaning up status update mechanisms for loan:', loanId);
+      
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+      
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
     };
   }, [loanId, showSuccessDialog]);
 
@@ -770,13 +907,14 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
   handlePrev: () => void; 
   saveProgress: (step: number, data: Record<string, unknown>) => void; 
 }) {
-  const [verificationStatus, setVerificationStatus] = useState(formData.stripeVerificationStatus || 'not_started'); // not_started, in_progress, completed, failed
+  const [verificationStatus, setVerificationStatus] = useState(formData.stripeVerificationStatus || 'not_started');
   const [isVerifying, setIsVerifying] = useState(false);
   const [stripe, setStripe] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
 
+  // Load Stripe.js
   useEffect(() => {
-    // Load Stripe.js
     const loadStripe = async () => {
       const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
       console.log('🔑 Stripe publishable key:', publishableKey ? 'Found' : 'Missing');
@@ -787,13 +925,17 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
       }
       
       if (window.Stripe) {
-        setStripe(window.Stripe(publishableKey));
+        const stripeInstance = window.Stripe(publishableKey);
+        setStripe(stripeInstance);
+        console.log('✅ Stripe loaded from window');
       } else {
         // Add Stripe.js script if not already loaded
         const script = document.createElement('script');
         script.src = 'https://js.stripe.com/v3/';
         script.onload = () => {
-          setStripe(window.Stripe(publishableKey));
+          const stripeInstance = window.Stripe(publishableKey);
+          setStripe(stripeInstance);
+          console.log('✅ Stripe loaded from script');
         };
         document.head.appendChild(script);
       }
@@ -802,9 +944,10 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
     loadStripe();
   }, []);
 
+  // Update local status when formData changes (from webhooks)
   useEffect(() => {
     const newStatus = formData.stripeVerificationStatus || 'not_started';
-    console.log('🔄 StripeVerificationStep: Updating local status to:', newStatus);
+    console.log('🔄 StripeVerificationStep: Status updated to:', newStatus);
     setVerificationStatus(newStatus);
   }, [formData.stripeVerificationStatus]);
 
@@ -823,13 +966,13 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
         throw new Error(err.message || 'Failed to skip verification.');
       }
 
-      // Update through formData only, not local state
+      console.log('✅ Verification skipped successfully');
       setFormData({
         ...formData,
         stripeVerificationStatus: 'completed',
       });
     } catch (err: unknown) {
-      console.error('Error skipping verification:', err);
+      console.error('❌ Error skipping verification:', err);
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
       setError(errorMessage);
     } finally {
@@ -845,10 +988,11 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
 
     setIsVerifying(true);
     setError(null);
-    // Don't set verificationStatus here - let it be controlled by formData.stripeVerificationStatus
+    console.log('🚀 Starting verification process...');
     
     try {
       // Create verification session on the server
+      console.log('📞 Creating verification session...');
       const response = await fetch('/api/stripe/create-verification-session', {
         method: 'POST',
         headers: {
@@ -868,53 +1012,71 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
         throw new Error(session.error || 'Failed to create verification session');
       }
 
+      console.log('✅ Verification session created:', session.verification_session_id);
+
       // Save the session ID to the database
       await saveProgress(5, { ...formData, stripeVerificationSessionId: session.verification_session_id });
       setFormData({ ...formData, stripeVerificationSessionId: session.verification_session_id });
 
       // Show the verification modal using Stripe.js
+      console.log('🎯 Launching Stripe Identity modal...');
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const result = await (stripe as any).verifyIdentity(session.client_secret);
 
       if (result.error) {
-        // Handle verification errors
-        console.error('Verification error:', result.error);
-        // Don't set verificationStatus here directly - update through formData
+        // Handle specific error codes according to Stripe documentation
+        console.error('❌ Verification error:', result.error);
         
-        // Handle various error message formats
         let errorMessage = 'Verification failed. Please try again.';
-        if (result.error.message) {
-          errorMessage = result.error.message;
-        } else if (result.error.type) {
-          errorMessage = `Verification failed: ${result.error.type}`;
-        } else if (typeof result.error === 'string') {
-          errorMessage = result.error;
+        
+        // Handle specific error codes
+        switch (result.error.code) {
+          case 'consent_declined':
+            errorMessage = 'Verification was declined. Please try again and accept the terms.';
+            break;
+          case 'device_unsupported':
+            errorMessage = 'Your device is not supported. Please use a device with a camera.';
+            break;
+          case 'document_unverified_other':
+            errorMessage = 'Document could not be verified. Please try with a different document.';
+            break;
+          case 'document_expired':
+            errorMessage = 'Document has expired. Please use a current document.';
+            break;
+          case 'document_type_not_supported':
+            errorMessage = 'Document type not supported. Please use a government-issued ID.';
+            break;
+          default:
+            if (result.error.message) {
+              errorMessage = result.error.message;
+            }
         }
         
         setError(errorMessage);
-        setFormData({...formData, stripeVerificationStatus: 'failed'});
+        // Don't automatically set to failed - let the webhook handle the status
+        console.log('⚠️ Verification error, but not setting to failed automatically');
       } else {
         // Verification was submitted successfully to Stripe
+        console.log('✅ Verification submitted successfully to Stripe');
+        console.log('⏳ Waiting for webhook to update status...');
+        setSubmitted(true);
+        
         // Don't set status here - let webhook handle the actual verification result
         // The realtime subscription will update the status based on webhook events
-        console.log('Verification submitted. Waiting for webhook updates...');
-        console.log('🎯 Stripe verification modal completed successfully');
       }
     } catch (error) {
-      console.error('Error starting verification:', error);
-      // Don't set verificationStatus here directly - update through formData
+      console.error('❌ Error in verification process:', error);
       
-      // Handle error message safely
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const errorMessage = (error as any)?.message || (error as any)?.toString() || 'An unexpected error occurred during verification';
+      // Only show error, don't set status to failed
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred during verification';
       setError(errorMessage);
-      setFormData({...formData, stripeVerificationStatus: 'failed'});
+      console.log('⚠️ Network/system error, but not setting to failed automatically');
     } finally {
       setIsVerifying(false);
     }
   };
 
-  const canProceed = verificationStatus === 'completed';
+  const canProceed = verificationStatus === 'completed' || verificationStatus === 'verified';
 
   return (
     <div>
@@ -953,40 +1115,45 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
         {/* Verification Status */}
         <div className="bg-white border border-gray-200 rounded-2xl p-6">
           <div className="text-center">
-            {(verificationStatus === 'not_started' || verificationStatus === 'pending' || verificationStatus === 'requires_action' || verificationStatus === 'canceled' || verificationStatus === 'unverified') && (
+            {/* Initial state - ready to verify */}
+            {(verificationStatus === 'not_started' || verificationStatus === 'pending' || verificationStatus === 'requires_action' || verificationStatus === 'canceled' || verificationStatus === 'unverified') && !submitted && (
               <div>
                 <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Lock className="w-8 h-8 text-gray-400" />
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-2">Ready to Verify</h3>
                 <p className="text-gray-600 mb-6">Click the button below to start the identity verification process.</p>
-                <button
-                  onClick={startVerification}
-                  disabled={isVerifying}
-                  className="px-8 py-4 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-2xl font-semibold hover:from-green-600 hover:to-teal-600 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
-                >
-                  Start Verification
-                </button>
-                <button
-                  onClick={handleSkipVerification}
-                  disabled={isVerifying}
-                  className="mt-4 px-8 py-4 bg-gray-300 text-gray-800 rounded-2xl font-semibold hover:bg-gray-400 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
-                >
-                  Skip Verification (for testing)
-                </button>
+                <div className="space-y-4">
+                  <button
+                    onClick={startVerification}
+                    disabled={isVerifying}
+                    className="w-full px-8 py-4 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-2xl font-semibold hover:from-green-600 hover:to-teal-600 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
+                  >
+                    {isVerifying ? 'Starting...' : 'Start Verification'}
+                  </button>
+                  <button
+                    onClick={handleSkipVerification}
+                    disabled={isVerifying}
+                    className="w-full px-8 py-4 bg-gray-300 text-gray-800 rounded-2xl font-semibold hover:bg-gray-400 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
+                  >
+                    Skip Verification (for testing)
+                  </button>
+                </div>
               </div>
             )}
 
-            {verificationStatus === 'in_progress' && (
+            {/* Verification submitted and waiting for webhook */}
+            {submitted && verificationStatus !== 'completed' && verificationStatus !== 'verified' && verificationStatus !== 'failed' && (
               <div>
                 <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">Starting Verification</h3>
-                <p className="text-gray-600 mb-6">Please complete the identity verification in the Stripe modal...</p>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Verification Submitted</h3>
+                <p className="text-gray-600 mb-6">Your verification has been submitted to Stripe. We&apos;re processing your documents...</p>
               </div>
             )}
 
+            {/* Processing state from webhook */}
             {verificationStatus === 'processing' && (
               <div>
                 <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -997,7 +1164,8 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
               </div>
             )}
 
-            {verificationStatus === 'completed' && (
+            {/* Success states */}
+            {(verificationStatus === 'completed' || verificationStatus === 'verified') && (
               <div>
                 <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Check className="w-8 h-8 text-green-500" />
@@ -1007,6 +1175,7 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
               </div>
             )}
 
+            {/* Failure state */}
             {verificationStatus === 'failed' && (
               <div>
                 <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -1017,9 +1186,8 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
                 <button
                   onClick={() => {
                     setError(null);
-                    // Reset verification status through formData instead of local state
+                    setSubmitted(false);
                     setFormData({...formData, stripeVerificationStatus: 'not_started'});
-                    startVerification();
                   }}
                   disabled={isVerifying}
                   className="px-8 py-4 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-2xl font-semibold hover:from-red-600 hover:to-red-700 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
