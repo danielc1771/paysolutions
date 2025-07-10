@@ -20,9 +20,9 @@ export async function GET(
           principal_amount,
           status,
           created_at,
-          monthly_payment,
+          weekly_payment,
           interest_rate,
-          term_months
+          term_weeks
         )
       `)
       .eq('id', id)

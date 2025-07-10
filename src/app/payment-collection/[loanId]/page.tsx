@@ -43,7 +43,7 @@ function PaymentForm({ loan, onPaymentSuccess }: { loan: LoanSummary; onPaymentS
   const [error, setError] = useState<string | null>(null);
   const [cardholderName, setCardholderName] = useState('');
   const [paymentMode, setPaymentMode] = useState<'setup' | 'onetime'>('setup');
-  const [paymentAmount, setPaymentAmount] = useState(parseFloat(loan.monthly_payment));
+  const [paymentAmount, setPaymentAmount] = useState(parseFloat(loan.weekly_payment));
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -183,7 +183,7 @@ function PaymentForm({ loan, onPaymentSuccess }: { loan: LoanSummary; onPaymentS
                 <div>
                   <h3 className="font-semibold text-gray-900">Setup Auto-Billing (Recommended)</h3>
                   <p className="text-sm text-gray-600">
-                    Save your card for automatic monthly payments of ${parseFloat(loan.monthly_payment).toLocaleString()}
+                    Save your card for automatic weekly payments of ${parseFloat(loan.weekly_payment).toLocaleString()}
                   </p>
                 </div>
               </div>
@@ -236,7 +236,7 @@ function PaymentForm({ loan, onPaymentSuccess }: { loan: LoanSummary; onPaymentS
               />
             </div>
             <p className="text-sm text-gray-500 mt-1">
-              Monthly payment: ${parseFloat(loan.monthly_payment).toLocaleString()}
+              Weekly payment: ${parseFloat(loan.weekly_payment).toLocaleString()}
             </p>
           </div>
         )}
@@ -472,11 +472,11 @@ export default function PaymentCollectionPage() {
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-100">
                   <span className="text-gray-600 font-medium">Term:</span>
-                  <span className="font-semibold text-gray-900">{loan.term_months} months</span>
+                  <span className="font-semibold text-gray-900">{loan.term_weeks} weeks</span>
                 </div>
                 <div className="flex justify-between py-2">
-                  <span className="text-gray-600 font-medium">Monthly Payment:</span>
-                  <span className="font-semibold text-gray-900">${parseFloat(loan.monthly_payment).toLocaleString()}</span>
+                  <span className="text-gray-600 font-medium">Weekly Payment:</span>
+                  <span className="font-semibold text-gray-900">${parseFloat(loan.weekly_payment).toLocaleString()}</span>
                 </div>
               </div>
             </div>

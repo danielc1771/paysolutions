@@ -218,8 +218,8 @@ export default function BorrowerDashboard() {
                         <p className="text-3xl font-bold">${parseFloat(loan.principal_amount).toLocaleString()}</p>
                       </div>
                       <div>
-                        <p className="text-blue-200 text-sm mb-1">Monthly Payment</p>
-                        <p className="text-3xl font-bold">${parseFloat(loan.monthly_payment).toLocaleString()}</p>
+                        <p className="text-blue-200 text-sm mb-1">Weekly Payment</p>
+                        <p className="text-3xl font-bold">${parseFloat(loan.weekly_payment).toLocaleString()}</p>
                       </div>
                       <div>
                         <p className="text-blue-200 text-sm mb-1">Interest Rate</p>
@@ -271,11 +271,11 @@ export default function BorrowerDashboard() {
                         </svg>
                       </div>
                       <div className="text-right">
-                        <p className="text-3xl font-bold text-gray-800">{loan.term_months}</p>
+                        <p className="text-3xl font-bold text-gray-800">{loan.term_weeks}</p>
                       </div>
                     </div>
                     <h3 className="text-gray-700 font-semibold text-lg">Loan Term</h3>
-                    <p className="text-gray-500 text-sm mt-1">Months</p>
+                    <p className="text-gray-500 text-sm mt-1">Weeks</p>
                   </div>
 
                   <div className="group bg-white/70 backdrop-blur-sm rounded-3xl p-8 shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-white/20">

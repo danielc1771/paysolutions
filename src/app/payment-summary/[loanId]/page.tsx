@@ -89,9 +89,9 @@ export default function PaymentSummaryPage() {
   }
 
   const totalAmount = parseFloat(loan.principal_amount);
-  const monthlyPayment = parseFloat(loan.monthly_payment);
+  const weeklyPayment = parseFloat(loan.weekly_payment);
   const interestRate = parseFloat(loan.interest_rate);
-  const termMonths = parseInt(loan.term_months);
+  const termWeeks = parseInt(loan.term_weeks);
   
   const totalInterest = paymentSchedule.reduce((sum, payment) => sum + payment.interestPayment, 0);
   const totalPayments = totalAmount + totalInterest;
@@ -142,13 +142,13 @@ export default function PaymentSummaryPage() {
                 
                 <div className="flex justify-between items-center">
                   <span className="text-gray-600">Term</span>
-                  <span className="font-semibold text-gray-900">{termMonths} months</span>
+                  <span className="font-semibold text-gray-900">{termWeeks} weeks</span>
                 </div>
                 
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Monthly Payment</span>
+                  <span className="text-gray-600">Weekly Payment</span>
                   <span className="font-semibold text-blue-600 text-lg">
-                    ${monthlyPayment.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    ${weeklyPayment.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
               </div>
@@ -176,7 +176,7 @@ export default function PaymentSummaryPage() {
                 <div className="flex justify-between items-center">
                   <span className="text-gray-600">Payments Made</span>
                   <span className="font-semibold text-green-600">
-                    {paidPayments} of {termMonths}
+                    {paidPayments} of {termWeeks}
                   </span>
                 </div>
               </div>

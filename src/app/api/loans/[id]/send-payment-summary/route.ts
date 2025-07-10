@@ -25,8 +25,8 @@ export async function POST(
         borrower_name,
         principal_amount,
         interest_rate,
-        term_months,
-        monthly_payment,
+        term_weeks,
+        weekly_payment,
         status,
         borrower:borrowers(
           first_name,
@@ -89,8 +89,8 @@ export async function POST(
               <ul style="color: #666; line-height: 1.8;">
                 <li><strong>Loan Amount:</strong> $${parseFloat(loan.principal_amount).toLocaleString()}</li>
                 <li><strong>Interest Rate:</strong> ${parseFloat(loan.interest_rate)}% APR</li>
-                <li><strong>Term:</strong> ${loan.term_months} months</li>
-                <li><strong>Monthly Payment:</strong> $${parseFloat(loan.monthly_payment).toLocaleString()}</li>
+                <li><strong>Term:</strong> ${loan.term_weeks} weeks</li>
+                <li><strong>Weekly Payment:</strong> $${parseFloat(loan.weekly_payment).toLocaleString()}</li>
               </ul>
             </div>
           </div>

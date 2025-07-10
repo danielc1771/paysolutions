@@ -152,10 +152,10 @@ export async function POST(request: NextRequest) {
           items: [{
             price_data: {
               currency: 'usd',
-              unit_amount: Math.round(parseFloat(loan.monthly_payment) * 100), // Convert to cents
+              unit_amount: Math.round(parseFloat(loan.weekly_payment) * 100), // Convert to cents
               product: `Loan Payment - ${loan.loan_number}`,
               recurring: {
-                interval: 'month',
+                interval: 'week',
               },
             },
           }],
@@ -166,8 +166,8 @@ export async function POST(request: NextRequest) {
             borrower_id: loan.borrower.id,
             payment_type: 'basic_loan_payment'
           },
-          // Start the subscription from the next month
-          billing_cycle_anchor: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60), // 30 days from now
+          // Start the subscription from the next week
+          billing_cycle_anchor: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60), // 7 days from now
         });
 
         // Update loan with subscription ID

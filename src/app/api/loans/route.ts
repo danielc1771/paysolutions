@@ -24,13 +24,13 @@ export async function POST(request: NextRequest) {
       borrower_id,
       principal_amount,
       interest_rate,
-      term_months,
-      monthly_payment,
+      term_weeks,
+      weekly_payment,
       purpose,
     } = body;
 
     // Validate required fields
-    if (!borrower_id || !principal_amount || !interest_rate || !term_months || !monthly_payment || !purpose) {
+    if (!borrower_id || !principal_amount || !interest_rate || !term_weeks || !weekly_payment || !purpose) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -62,8 +62,8 @@ export async function POST(request: NextRequest) {
         borrower_id,
         principal_amount,
         interest_rate,
-        term_months,
-        monthly_payment,
+        term_weeks,
+        weekly_payment,
         purpose,
         status: 'new', // Default status
         remaining_balance: principal_amount, // Initially equals principal
