@@ -7,6 +7,8 @@ import { LoanForDocuSign } from '@/types/loan';
 export async function POST(request: NextRequest) {
   try {
     const { loanId } = await request.json();
+
+    console.log('Loan ID:', loanId);
     
     if (!loanId) {
       return NextResponse.json(
