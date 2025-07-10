@@ -202,7 +202,12 @@ export default function ApplyPage() {
         },
         (payload) => {
           console.log('Received loan update:', payload);
-          const newRecord = payload.new as any;
+          const newRecord = payload.new as {
+            phone_verification_status: string;
+            verified_phone_number: string;
+            stripe_verification_status: string;
+            status: string;
+          };
           
           // Update phone verification status and verified phone number
           if (newRecord.phone_verification_status || newRecord.verified_phone_number) {
@@ -436,10 +441,6 @@ function PhoneVerificationStep({ formData, setFormData, initialData, handleNext,
   const verificationCode = String(formData.verificationCode || '');
   const verificationStatus = String(formData.phoneVerificationStatus || 'pending');
 
-  const canProceed = verificationStatus === 'verified';
-
-  // Remove auto-send - only send when user clicks button
-
   const sendVerificationCode = async () => {
     if (!phoneNumber.trim()) {
       setError('Please enter your phone number');
@@ -607,7 +608,7 @@ function PhoneVerificationStep({ formData, setFormData, initialData, handleNext,
 
           <div className="text-center">
             <p className="text-gray-600 text-sm">
-              Don't receive the OTP? 
+              Don&apos;t receive the OTP? 
               <button
                 onClick={sendVerificationCode}
                 disabled={isSending}
@@ -658,7 +659,7 @@ function PhoneVerificationStep({ formData, setFormData, initialData, handleNext,
           <Phone className="w-10 h-10 text-white" />
         </div>
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Enter Your Phone Number</h1>
-        <p className="text-gray-600">We'll send you a one-time password to verify your phone number</p>
+        <p className="text-gray-600">We&apos;ll send you a one-time password to verify your phone number</p>
       </div>
 
       <div className="space-y-6">

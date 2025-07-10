@@ -119,12 +119,6 @@ export default function UserDashboard() {
   const pendingLoans = loans?.filter(l => l.status === 'application_completed').length || 0;
   const totalPrincipal = loans?.reduce((sum, loan) => sum + parseFloat(loan.principal_amount), 0) || 0;
   
-  // Action required loans (application completed or signed ready for funding)
-  const actionRequiredLoans = loans?.filter(l => 
-    l.status === 'application_completed' || 
-    (l.docusign_status === 'signed' && l.status !== 'funded')
-  ) || [];
-
   return (
     <RoleRedirect allowedRoles={['user']}>
       <UserLayout>

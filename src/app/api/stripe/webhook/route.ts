@@ -10,7 +10,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
  * Handle Identity Verification Updates
  * Updates the database with verification status changes
  */
-async function handleIdentityVerification(verificationSession: any, status: string) {
+async function handleIdentityVerification(verificationSession: Stripe.Identity.VerificationSession, status: string) {
   try {
     console.log('🔄 Processing identity verification update:', {
       sessionId: verificationSession.id,

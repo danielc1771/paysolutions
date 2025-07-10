@@ -164,7 +164,8 @@ export async function POST(request: NextRequest) {
         });
       }
 
-    } catch (twilioError: any) {
+    } catch (error) {
+      const twilioError = error as  { code: number; message: string; status: number };
       console.error('❌ Twilio request failed:', twilioError);
       
       // Handle specific Twilio errors
