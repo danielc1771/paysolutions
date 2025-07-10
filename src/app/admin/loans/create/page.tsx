@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminLayout from '@/components/AdminLayout';
-import { Send, Edit, User, Mail, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Send, Edit, User, Mail, CheckCircle, AlertCircle, Loader2, Calculator, DollarSign } from 'lucide-react';
 
 import CustomSelect from '@/components/CustomSelect';
+import { getAvailableTerms, calculateLoanPayment, generateWeeklyPaymentSchedule, type LoanCalculation } from '@/utils/loan-calculations';
 
 export default function CreateLoanPage() {
   const [mode, setMode] = useState('send');
@@ -51,6 +52,7 @@ export default function CreateLoanPage() {
 function SendApplicationForm() {
   const [fullName, setFullName] = useState('');
   const [loanAmount, setLoanAmount] = useState('');
+  const [loanTerm, setLoanTerm] = useState('4'); // Default to 4 weeks
   const [email, setEmail] = useState('');
   const [vehicleYear, setVehicleYear] = useState('');
   const [vehicleMake, setVehicleMake] = useState('');
@@ -61,6 +63,36 @@ function SendApplicationForm() {
   const [success, setSuccess] = useState<string | null>(null);
   const [generatedLink, setGeneratedLink] = useState<string | null>(null);
 
+  // Calculate available terms and payment details
+  const availableTerms = useMemo(() => {
+    if (!loanAmount) return [];
+    return getAvailableTerms(parseFloat(loanAmount)).map(term => ({
+      value: term.weeks.toString(),
+      label: term.label
+    }));
+  }, [loanAmount]);
+
+  const loanCalculation = useMemo(() => {
+    if (!loanAmount || !loanTerm) return null;
+    return calculateLoanPayment(parseFloat(loanAmount), parseInt(loanTerm));
+  }, [loanAmount, loanTerm]);
+
+  const paymentSchedule = useMemo(() => {
+    if (!loanCalculation) return [];
+    return generateWeeklyPaymentSchedule(loanCalculation);
+  }, [loanCalculation]);
+
+  // Reset term when loan amount changes
+  const handleLoanAmountChange = (newAmount: string) => {
+    setLoanAmount(newAmount);
+    if (newAmount) {
+      const terms = getAvailableTerms(parseFloat(newAmount));
+      if (terms.length > 0 && !terms.some(t => t.weeks.toString() === loanTerm)) {
+        setLoanTerm('4'); // Default to 4 weeks
+      }
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -69,7 +101,7 @@ function SendApplicationForm() {
     setGeneratedLink(null);
 
     // Basic validation
-    if (!fullName || !loanAmount || !email || !vehicleYear || !vehicleMake || !vehicleModel || !vehicleVin) {
+    if (!fullName || !loanAmount || !loanTerm || !email || !vehicleYear || !vehicleMake || !vehicleModel || !vehicleVin) {
       setError('All fields are required.');
       setIsSubmitting(false);
       return;
@@ -80,7 +112,7 @@ function SendApplicationForm() {
       const response = await fetch('/api/loans/send-application', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customerName: fullName, loanAmount, customerEmail: email, vehicleYear, vehicleMake, vehicleModel, vehicleVin }),
+        body: JSON.stringify({ customerName: fullName, loanAmount, loanTerm: parseInt(loanTerm), customerEmail: email, vehicleYear, vehicleMake, vehicleModel, vehicleVin }),
       });
 
       if (!response.ok) {
@@ -93,6 +125,7 @@ function SendApplicationForm() {
       setGeneratedLink(applicationUrl); // Save the link for display
       setFullName('');
       setLoanAmount('');
+      setLoanTerm('4');
       setEmail('');
 
     } catch (err: unknown) {
@@ -124,13 +157,88 @@ function SendApplicationForm() {
               { value: '1500', label: '$1,500' },
               { value: '2000', label: '$2,000' },
               { value: '2500', label: '$2,500' },
-              { value: '2988', label: '$2,988' },
+              { value: '2999', label: '$2,999' },
             ]}
             value={loanAmount}
-            onChange={setLoanAmount}
+            onChange={handleLoanAmountChange}
             placeholder="Select a loan amount"
           />
         </div>
+        
+        {/* Loan Term Selection */}
+        {loanAmount && (
+          <div>
+            <label htmlFor="loanTerm" className="block text-sm font-semibold text-gray-700 mb-2">Loan Term</label>
+            <CustomSelect
+              options={availableTerms}
+              value={loanTerm}
+              onChange={setLoanTerm}
+              placeholder="Select loan term"
+            />
+          </div>
+        )}
+        
+        {/* Payment Preview */}
+        {loanCalculation && (
+          <div className="bg-gradient-to-r from-purple-50 to-blue-50 p-6 rounded-2xl border border-purple-200">
+            <div className="flex items-center mb-4">
+              <Calculator className="w-5 h-5 text-purple-600 mr-2" />
+              <h3 className="text-lg font-semibold text-gray-900">Payment Preview</h3>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              <div className="bg-white/60 p-4 rounded-xl">
+                <div className="flex items-center mb-2">
+                  <DollarSign className="w-4 h-4 text-green-600 mr-1" />
+                  <span className="text-sm font-medium text-gray-600">Weekly Payment</span>
+                </div>
+                <p className="text-2xl font-bold text-green-600">${loanCalculation.weeklyPayment.toLocaleString()}</p>
+              </div>
+              <div className="bg-white/60 p-4 rounded-xl">
+                <div className="text-sm font-medium text-gray-600 mb-2">Total Interest</div>
+                <p className="text-xl font-semibold text-orange-600">${loanCalculation.totalInterest.toLocaleString()}</p>
+              </div>
+              <div className="bg-white/60 p-4 rounded-xl">
+                <div className="text-sm font-medium text-gray-600 mb-2">Total Payment</div>
+                <p className="text-xl font-semibold text-blue-600">${loanCalculation.totalPayment.toLocaleString()}</p>
+              </div>
+            </div>
+            
+            {/* Payment Schedule Table */}
+            <div className="bg-white/80 rounded-xl overflow-hidden">
+              <div className="px-4 py-3 bg-gray-50">
+                <h4 className="font-semibold text-gray-900">Payment Schedule ({loanCalculation.termWeeks} weeks)</h4>
+              </div>
+              <div className="max-h-48 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-100 sticky top-0">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-medium text-gray-700">#</th>
+                      <th className="px-3 py-2 text-left font-medium text-gray-700">Due Date</th>
+                      <th className="px-3 py-2 text-right font-medium text-gray-700">Payment</th>
+                      <th className="px-3 py-2 text-right font-medium text-gray-700">Principal</th>
+                      <th className="px-3 py-2 text-right font-medium text-gray-700">Interest</th>
+                      <th className="px-3 py-2 text-right font-medium text-gray-700">Balance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paymentSchedule.map((payment, index) => (
+                      <tr key={index} className="border-t border-gray-100 hover:bg-gray-50">
+                        <td className="px-3 py-2 font-medium">{payment.paymentNumber}</td>
+                        <td className="px-3 py-2">{new Date(payment.dueDate).toLocaleDateString()}</td>
+                        <td className="px-3 py-2 text-right font-medium">${payment.totalPayment.toFixed(2)}</td>
+                        <td className="px-3 py-2 text-right">${payment.principalAmount.toFixed(2)}</td>
+                        <td className="px-3 py-2 text-right">${payment.interestAmount.toFixed(2)}</td>
+                        <td className="px-3 py-2 text-right">${payment.remainingBalance.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+        
         <div>
           <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">Email Address</label>
           <div className="relative">
@@ -203,22 +311,41 @@ function ManualEntryForm() {
 
   const [formData, setFormData] = useState({
     firstName: '', lastName: '', email: '', phone: '', dateOfBirth: '', ssn: '', address: '', city: '', state: '', zipCode: '', employmentStatus: 'employed', annualIncome: '',
-    principalAmount: '', interestRate: '', termMonths: '', purpose: 'personal',
+    principalAmount: '', termWeeks: '4', purpose: 'personal', // Updated to use weeks and 30% fixed rate
   });
+
+  // Calculate available terms and payment details for manual entry
+  const availableTermsManual = useMemo(() => {
+    if (!formData.principalAmount) return [];
+    return getAvailableTerms(parseFloat(formData.principalAmount)).map(term => ({
+      value: term.weeks.toString(),
+      label: term.label
+    }));
+  }, [formData.principalAmount]);
+
+  const loanCalculationManual = useMemo(() => {
+    if (!formData.principalAmount || !formData.termWeeks) return null;
+    return calculateLoanPayment(parseFloat(formData.principalAmount), parseInt(formData.termWeeks));
+  }, [formData.principalAmount, formData.termWeeks]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const calculateMonthlyPayment = () => {
-    const principal = parseFloat(formData.principalAmount);
-    const rate = parseFloat(formData.interestRate) / 100 / 12;
-    const term = parseInt(formData.termMonths);
-    if (principal && rate && term) {
-      return (principal * (rate * Math.pow(1 + rate, term)) / (Math.pow(1 + rate, term) - 1)).toFixed(2);
+  // Handle principal amount change to reset term if invalid
+  const handlePrincipalAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newAmount = e.target.value;
+    const updatedFormData = { ...formData, principalAmount: newAmount };
+    
+    if (newAmount) {
+      const terms = getAvailableTerms(parseFloat(newAmount));
+      if (terms.length > 0 && !terms.some(t => t.weeks.toString() === formData.termWeeks)) {
+        updatedFormData.termWeeks = '4'; // Default to 4 weeks
+      }
     }
-    return '0.00';
+    
+    setFormData(updatedFormData);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -243,7 +370,12 @@ function ManualEntryForm() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          borrower_id: borrower.id, principal_amount: parseFloat(formData.principalAmount), interest_rate: parseFloat(formData.interestRate) / 100, term_months: parseInt(formData.termMonths), monthly_payment: parseFloat(calculateMonthlyPayment()), purpose: formData.purpose,
+          borrower_id: borrower.id, 
+          principal_amount: loanCalculationManual.principalAmount, 
+          interest_rate: loanCalculationManual.annualInterestRate, 
+          term_weeks: loanCalculationManual.termWeeks, 
+          weekly_payment: loanCalculationManual.weeklyPayment, 
+          purpose: formData.purpose,
         }),
       });
       if (!loanResponse.ok) {

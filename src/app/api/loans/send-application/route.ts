@@ -3,11 +3,13 @@ import { createClient } from '@/utils/supabase/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { sendLoanApplicationEmail } from '@/utils/mailer';
+import { calculateLoanPayment, validateLoanTerms } from '@/utils/loan-calculations';
 
 const sendApplicationSchema = z.object({
   customerName: z.string().nonempty(),
   customerEmail: z.string().email(),
   loanAmount: z.string().nonempty(),
+  loanTerm: z.number().int().positive(),
   vehicleYear: z.string().nonempty(),
   vehicleMake: z.string().nonempty(),
   vehicleModel: z.string().nonempty(),
@@ -74,7 +76,22 @@ export async function POST(request: Request) {
     });
   }
 
-  const { customerName, customerEmail, loanAmount, vehicleYear, vehicleMake, vehicleModel, vehicleVin, dealerName } = validation.data;
+  const { customerName, customerEmail, loanAmount, loanTerm, vehicleYear, vehicleMake, vehicleModel, vehicleVin, dealerName } = validation.data;
+
+  // Validate loan amount and term combination
+  const loanAmountNum = parseFloat(loanAmount);
+  if (!validateLoanTerms(loanAmountNum, loanTerm)) {
+    return new NextResponse(JSON.stringify({ 
+      error: 'Invalid loan term', 
+      message: `${loanTerm} weeks is not available for $${loanAmountNum.toLocaleString()} loan amount` 
+    }), { 
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  // Calculate loan payment details
+  const loanCalculation = calculateLoanPayment(loanAmountNum, loanTerm);
 
   try {
     let borrowerId: string;
@@ -132,12 +149,12 @@ export async function POST(request: Request) {
       .insert({
         loan_number: `LOAN-${Date.now()}`,
         borrower_id: borrowerId,
-        principal_amount: parseFloat(loanAmount),
+        principal_amount: loanCalculation.principalAmount,
         status: 'application_sent',
         organization_id: profile.organization_id,
-        interest_rate: 0.3,
-        term_months: 12,
-        monthly_payment: 100,
+        interest_rate: loanCalculation.annualInterestRate,
+        term_weeks: loanCalculation.termWeeks,
+        weekly_payment: loanCalculation.weeklyPayment,
         vehicle_year: vehicleYear,
         vehicle_make: vehicleMake,
         vehicle_model: vehicleModel,
