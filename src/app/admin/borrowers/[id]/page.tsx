@@ -4,6 +4,7 @@ import AdminLayout from '@/components/AdminLayout';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Mail, Phone, MapPin, Briefcase, DollarSign, Shield, Calendar, User, CreditCard } from 'lucide-react';
+import { LoanListItem } from '@/types/loan';
 
 interface BorrowerDetailProps {
   params: Promise<{ id: string }>;
@@ -29,16 +30,7 @@ interface Borrower {
   kyc_verified_at: string;
   created_at: string;
   updated_at: string;
-  loans?: Array<{
-    id: string;
-    loan_number: string;
-    principal_amount: string;
-    status: string;
-    created_at: string;
-    weekly_payment: string;
-    interest_rate: string;
-    term_weeks: number;
-  }>;
+  loans?: Array<LoanListItem>;
 }
 
 export default function BorrowerDetail({ params }: BorrowerDetailProps) {

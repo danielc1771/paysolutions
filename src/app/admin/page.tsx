@@ -5,6 +5,7 @@ import AdminLayout from '@/components/AdminLayout';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { RoleRedirect } from '@/components/auth/RoleRedirect';
+import { AdminLoanListItem } from '@/types/loan';
 
 interface AdminStats {
   totalOrganizations: number;
@@ -17,29 +18,8 @@ interface AdminStats {
   thisMonthLoans: number;
 }
 
-interface Loan {
-  id: string;
-  loan_number: string;
-  principal_amount: string;
-  interest_rate: string;
-  term_weeks: number;
-  weekly_payment: string;
-  status: string;
-  borrower: {
-    first_name: string;
-    last_name: string;
-    email: string;
-    kyc_status: string;
-  };
-  organization: {
-    name: string;
-  };
-  docusign_status: string;
-  created_at: string;
-}
-
 export default function AdminDashboard() {
-  const [loans, setLoans] = useState<Loan[]>([]);
+  const [loans, setLoans] = useState<AdminLoanListItem[]>([]);
   const [stats, setStats] = useState<AdminStats>({
     totalOrganizations: 0,
     totalLoans: 0,
@@ -336,7 +316,7 @@ export default function AdminDashboard() {
             ) : (
               <div className="p-6">
                 <div className="space-y-4">
-                  {loans.slice(0, 5).map((loan: Loan) => {
+                  {loans.slice(0, 5).map((loan: AdminLoanListItem) => {
                     const needsAdminApproval = loan.docusign_status === 'signed' && loan.status !== 'funded';
                     
                     return (

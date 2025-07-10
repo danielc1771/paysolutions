@@ -8,27 +8,7 @@ import Image from 'next/image';
 import CustomSelect from '@/components/CustomSelect';
 import { createClient } from '@/utils/supabase/client';
 import OTPInput from '@/components/OTPInput';
-
-// Define the structure for loan data we expect to fetch
-interface LoanApplicationData {
-  borrower: {
-    first_name: string;
-    last_name: string;
-    email: string | null;
-    phone: string | null;
-  };
-  loan: {
-    principal_amount: number;
-    vehicleYear: string;
-    vehicleMake: string;
-    vehicleModel: string;
-    vehicleVin: string;
-    applicationStep: number;
-    stripeVerificationSessionId?: string;
-  };
-  dealerName: string;
-  loanId: string;
-}
+import { LoanApplicationData } from '@/types/loan';
 
 // Main Page Component
 export default function ApplyPage() {

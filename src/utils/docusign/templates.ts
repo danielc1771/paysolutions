@@ -1,5 +1,6 @@
 import 'server-only';
 import docusign from 'docusign-esign';
+import { LoanForDocuSign } from '@/types/loan';
 
 // Extended interfaces for DocuSign features not in the official types
 interface ExtendedDocument extends Omit<docusign.Document, 'documentBase64' | 'fileExtension'> {
@@ -32,46 +33,6 @@ interface ExtendedDateSigned extends Omit<docusign.DateSigned, 'pageNumber' | 'x
 
 // ExtendedInitialHere interface removed due to TypeScript limitations
 // Initial tabs will be handled separately when needed
-
-export interface LoanData {
-  loanNumber: string;
-  principalAmount: number;
-  interestRate: number;
-  termWeeks: number;
-  weeklyPayment: number;
-  purpose: string;
-  vehicle?: {
-    year: string;
-    make: string;
-    model: string;
-    vin: string;
-  };
-  borrower: {
-    firstName: string;
-    lastName: string;
-    email: string;
-    phone?: string;
-    addressLine1: string;
-    city: string;
-    state: string;
-    zipCode: string;
-    ssn: string;
-    dateOfBirth: string;
-    employmentStatus: string;
-    annualIncome: number;
-    currentEmployerName?: string;
-    timeWithEmployment?: string;
-    reference1Name?: string;
-    reference1Phone?: string;
-    reference1Email?: string;
-    reference2Name?: string;
-    reference2Phone?: string;
-    reference2Email?: string;
-    reference3Name?: string;
-    reference3Phone?: string;
-    reference3Email?: string;
-  };
-}
 
 export interface WeeklyPaymentScheduleItem {
   paymentNumber: number;
@@ -124,8 +85,8 @@ export function calculateWeeklyPaymentSchedule(
   return schedule;
 }
 
-// Generate comprehensive loan agreement document content
-export const generateLoanAgreementHTML = (loanData: LoanData): string => {
+// Generate loan agreement document content
+export const generateLoanAgreementHTML = (loanData: LoanForDocuSign): string => {
   const currentDate = new Date().toLocaleDateString('en-US', {
     month: '2-digit',
     day: '2-digit',
@@ -490,8 +451,8 @@ export const generateLoanAgreementHTML = (loanData: LoanData): string => {
   `;
 };
 
-// Create DocuSign envelope with comprehensive loan agreement using responsive HTML
-export const createLoanAgreementEnvelope = (loanData: LoanData): docusign.EnvelopeDefinition => {
+// Create DocuSign envelope with loan agreement
+export const createLoanAgreementEnvelope = (loanData: LoanForDocuSign): docusign.EnvelopeDefinition => {
   const documentHtml = generateLoanAgreementHTML(loanData);
   
   // Use htmlDefinition for responsive HTML documents (best practice)

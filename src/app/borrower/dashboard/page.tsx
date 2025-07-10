@@ -5,20 +5,7 @@ import BorrowerLayout from '@/components/BorrowerLayout';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { RoleRedirect } from '@/components/auth/RoleRedirect';
-
-interface Loan {
-  id: string;
-  loan_number: string;
-  principal_amount: string;
-  interest_rate: string;
-  term_weeks: number;
-  weekly_payment: string;
-  status: string;
-  docusign_status: string;
-  remaining_balance: string;
-  funding_date: string;
-  created_at: string;
-}
+import { LoanSummary } from '@/types/loan';
 
 interface PaymentSchedule {
   id: string;
@@ -31,7 +18,7 @@ interface PaymentSchedule {
 }
 
 export default function BorrowerDashboard() {
-  const [loan, setLoan] = useState<Loan | null>(null);
+  const [loan, setLoan] = useState<LoanSummary | null>(null);
   const [paymentSchedules, setPaymentSchedules] = useState<PaymentSchedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

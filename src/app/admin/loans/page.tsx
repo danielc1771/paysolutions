@@ -4,29 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import AdminLayout from '@/components/AdminLayout';
 import { RoleRedirect } from '@/components/auth/RoleRedirect';
-
-interface Loan {
-  id: string;
-  loan_number: string;
-  principal_amount: string;
-  interest_rate: string;
-  term_weeks: number;
-  weekly_payment: string;
-  remaining_balance: string;
-  status: string;
-  purpose: string;
-  created_at: string;
-  borrower: {
-    first_name: string;
-    last_name: string;
-    email: string;
-    kyc_status: string;
-  } | null;
-  organization?: {
-    id: string;
-    name: string;
-  };
-}
+import { AdminLoanListItem } from '@/types/loan';
 
 interface Organization {
   id: string;
@@ -34,7 +12,7 @@ interface Organization {
 }
 
 export default function LoansPage() {
-  const [loans, setLoans] = useState<Loan[]>([]);
+  const [loans, setLoans] = useState<AdminLoanListItem[]>([]);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -80,8 +58,8 @@ export default function LoansPage() {
           loan_number,
           principal_amount,
           interest_rate,
-          term_months,
-          monthly_payment,
+          term_weeks,
+          weekly_payment,
           remaining_balance,
           status,
           purpose,
@@ -108,7 +86,7 @@ export default function LoansPage() {
           borrower: Array.isArray(loan.borrower) ? loan.borrower[0] : loan.borrower,
           organization: Array.isArray(loan.organization) ? loan.organization[0] : loan.organization
         })) || [];
-        setLoans(transformedData as Loan[]);
+        setLoans(transformedData as AdminLoanListItem[]);
       }
     } catch {
       setError('Failed to fetch loans');
@@ -273,7 +251,7 @@ export default function LoansPage() {
           ) : (
             <div className="p-6">
               <div className="space-y-4">
-                {filteredLoans.map((loan: Loan) => (
+                {filteredLoans.map((loan: AdminLoanListItem) => (
                   <div 
                     key={loan.id} 
                     className="group relative bg-white/60 backdrop-blur-sm rounded-2xl p-6 shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer hover:-translate-y-1 border border-white/30"

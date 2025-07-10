@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
-import { createLoanAgreementEnvelope, LoanData } from '@/utils/docusign/templates';
+import { createLoanAgreementEnvelope } from '@/utils/docusign/templates';
 import { createEnvelopesApi } from '@/utils/docusign/client';
+import { LoanForDocuSign } from '@/types/loan';
 
 export async function POST(request: NextRequest) {
   try {
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Transform data for DocuSign template
-    const loanData: LoanData = {
+    const loanData: LoanForDocuSign = {
       loanNumber: loan.loan_number,
       principalAmount: parseFloat(loan.principal_amount),
       interestRate: parseFloat(loan.interest_rate),
