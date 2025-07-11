@@ -48,10 +48,17 @@ export async function POST(request: NextRequest) {
   try {
     // Validate environment variables
     if (!accountSid || !authToken || !verifySid) {
-      console.error('❌ Missing Twilio credentials');
+      console.error('❌ Missing Twilio credentials:');
+      console.error('- TWILIO_ACCOUNT_SID:', accountSid ? 'SET' : 'MISSING');
+      console.error('- TWILIO_AUTH_TOKEN:', authToken ? 'SET' : 'MISSING');
+      console.error('- TWILIO_VERIFY_SERVICE_SID:', verifySid ? 'SET' : 'MISSING');
+      
       return NextResponse.json(
-        { error: 'Twilio configuration error' },
-        { status: 500 }
+        { 
+          error: 'Phone verification is not configured. Please contact support.',
+          details: 'Twilio SMS service is not properly configured on the server.' 
+        },
+        { status: 503 } // Service Unavailable
       );
     }
 
