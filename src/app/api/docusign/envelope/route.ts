@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
-import { createLoanAgreementEnvelopeInline, LoanData } from '@/utils/docusign/templates-inline';
+import { createLoanAgreementEnvelopeInline } from '@/utils/docusign/templates-inline';
 import { createEnvelopesApi } from '@/utils/docusign/client';
 import { LoanForDocuSign } from '@/types/loan';
 
