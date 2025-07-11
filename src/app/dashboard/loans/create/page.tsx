@@ -135,8 +135,6 @@ export default function CreateLoan() {
           dealerName: organizationInfo?.name || '',
           dealerEmail: organizationInfo?.email || '',
           dealerPhone: organizationInfo?.phone || '',
-          loanTerm: 12,
-          loanAmount: sendFormData.loanAmount,
         }),
       });
 
