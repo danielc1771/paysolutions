@@ -91,14 +91,20 @@ export async function middleware(request: NextRequest) {
   // For better performance, we'll do role checking in the actual page components
   // rather than in middleware to avoid database queries on every request
 
-  // Handle root path - redirect to admin by default (will be corrected in layout)
+  // Handle root path - redirect based on user role
   if (path === '/') {
-    return NextResponse.redirect(new URL('/admin', request.url))
+    if (!user) {
+      return NextResponse.redirect(new URL('/login', request.url))
+    }
+    // For authenticated users, we'll let the layout handle the redirect
+    // based on their role rather than hardcoding /admin
+    return NextResponse.next()
   }
 
   // Handle login/signup redirects for authenticated users
   if (path === '/login' || path === '/signup') {
-    return NextResponse.redirect(new URL('/admin', request.url))
+    // For authenticated users, let layout handle role-based redirect
+    return NextResponse.redirect(new URL('/', request.url))
   }
 
   // Basic route protection - admin routes require authentication

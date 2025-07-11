@@ -156,7 +156,7 @@ export default function TeamPage() {
   }, [fetchTeamMembers]);
 
   return (
-    <RoleRedirect allowedRoles={['user']}>
+    <RoleRedirect allowedRoles={['user', 'organization_owner']}>
       <UserLayout>
         <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-teal-100">
           <div className="p-8">

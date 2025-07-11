@@ -30,7 +30,8 @@ export default function LoginPage() {
       if (error) {
         setError(error.message);
       } else {
-        router.push('/admin');
+        // Let middleware handle the redirect based on user role
+        window.location.href = '/';
       }
     } catch {
       setError('An unexpected error occurred');
