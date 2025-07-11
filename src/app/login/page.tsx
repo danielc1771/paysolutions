@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
 import { AlertCircle, Shield, Zap, CheckCircle, Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
@@ -12,7 +11,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
   
   const supabase = createClient();
 
