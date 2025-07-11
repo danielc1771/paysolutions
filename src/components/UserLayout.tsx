@@ -71,7 +71,8 @@ export default function UserLayout({ children }: UserLayoutProps) {
     router.push('/login');
   };
 
-  const navigation = [
+  // Navigation items - filtered based on user role
+  const getAllNavigation = () => [
     {
       name: 'Create Loan',
       href: '/dashboard/loans/create',
@@ -96,8 +97,14 @@ export default function UserLayout({ children }: UserLayoutProps) {
       name: 'Team',
       href: '/dashboard/team',
       icon: <UserPlus className="w-5 h-5" />,
+      // Only show for users and organization owners, not team members
+      roles: ['user', 'organization_owner'],
     },
   ];
+
+  const navigation = getAllNavigation().filter(item => 
+    !item.roles || !profile?.role || item.roles.includes(profile.role)
+  );
 
   if (loading) {
     return (

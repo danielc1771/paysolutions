@@ -47,7 +47,11 @@ export function RoleRedirect({
         // Redirect if unauthorized
         if (!hasRequiredRole && redirectIfUnauthorized) {
           const homepage = getHomepageForRole(userProfile.role)
-          router.push(homepage)
+          if (homepage && homepage !== '/login') {
+            router.push(homepage)
+          } else {
+            router.push('/login')
+          }
         }
       } catch (error) {
         console.error('Error checking user role:', error)

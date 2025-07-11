@@ -96,9 +96,17 @@ export const PUBLIC_ROUTES = [
 
 // Route access checking functions
 export function canAccessRoute(userRole: Role, path: string): boolean {
+  if (!userRole || !path) {
+    return false;
+  }
+  
   const allowedRoutes = ROLE_ROUTES[userRole];
+  if (!allowedRoutes) {
+    return false;
+  }
   
   return allowedRoutes.some(route => {
+    if (!route) return false;
     if (route.endsWith('/*')) {
       const basePath = route.slice(0, -2);
       return path.startsWith(basePath);
@@ -108,11 +116,19 @@ export function canAccessRoute(userRole: Role, path: string): boolean {
 }
 
 export function getHomepageForRole(role: Role): string {
+  if (!role || !ROLE_HOMEPAGES[role]) {
+    return '/login';
+  }
   return ROLE_HOMEPAGES[role];
 }
 
 export function isPublicRoute(path: string): boolean {
+  if (!path) {
+    return false;
+  }
+  
   return PUBLIC_ROUTES.some(route => {
+    if (!route) return false;
     if (route.endsWith('/*')) {
       const basePath = route.slice(0, -2);
       return path.startsWith(basePath);

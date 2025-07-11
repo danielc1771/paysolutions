@@ -10,6 +10,7 @@ export async function getClientProfile(): Promise<UserProfile | null> {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError || !user) {
+      console.error('Auth error or no user:', authError);
       return null;
     }
 
@@ -20,6 +21,14 @@ export async function getClientProfile(): Promise<UserProfile | null> {
       .single();
 
     if (profileError || !profile) {
+      console.error('Profile error or no profile:', profileError);
+      return null;
+    }
+
+    // Validate the role is one of the expected values
+    const validRoles: Role[] = ['admin', 'user', 'team_member', 'organization_owner', 'borrower'];
+    if (!profile.role || !validRoles.includes(profile.role as Role)) {
+      console.error('Invalid role:', profile.role);
       return null;
     }
 

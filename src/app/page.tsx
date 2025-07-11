@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/utils/supabase/server';
-import { getHomepageForRole } from '@/lib/auth/roles';
+import { getHomepageForRole, type Role } from '@/lib/auth/roles';
 
 export default async function Home() {
   const supabase = await createClient();
@@ -11,17 +11,25 @@ export default async function Home() {
   }
 
   // Get user profile to determine role
-  const { data: profile } = await supabase
+  const { data: profile, error } = await supabase
     .from('profiles')
     .select('role')
     .eq('id', user.id)
     .single();
 
-  if (!profile) {
+  if (error || !profile || !profile.role) {
+    console.error('Profile fetch error:', error);
+    redirect('/login');
+  }
+
+  // Validate role before using it
+  const validRoles: Role[] = ['admin', 'user', 'team_member', 'organization_owner', 'borrower'];
+  if (!validRoles.includes(profile.role as Role)) {
+    console.error('Invalid role:', profile.role);
     redirect('/login');
   }
 
   // Redirect based on user role
-  const homepage = getHomepageForRole(profile.role as any);
+  const homepage = getHomepageForRole(profile.role as Role);
   redirect(homepage);
 }
