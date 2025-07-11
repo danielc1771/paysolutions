@@ -41,7 +41,7 @@ export async function POST(request: Request) {
   // 3. Use the admin client to invite the user
   const supabaseAdmin = await createAdminClient();
   const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-    redirectTo: 'https://paysolutions.vercel.app/accept-invite',
+    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/accept-invite`,
   });
 
   if (inviteError) {
