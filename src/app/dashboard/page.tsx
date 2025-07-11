@@ -5,26 +5,10 @@ import UserLayout from '@/components/UserLayout';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { RoleRedirect } from '@/components/auth/RoleRedirect';
-
-interface Loan {
-  id: string;
-  loan_number: string;
-  principal_amount: string;
-  interest_rate: string;
-  term_weeks: number;
-  weekly_payment: string;
-  status: string;
-  borrower: {
-    first_name: string;
-    last_name: string;
-    email: string;
-    kyc_status: string;
-  };
-  docusign_status: string;
-}
+import { LoanListItem } from '@/types/loan';
 
 export default function UserDashboard() {
-  const [loans, setLoans] = useState<Loan[]>([]);
+  const [loans, setLoans] = useState<LoanListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

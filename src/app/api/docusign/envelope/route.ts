@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { createLoanAgreementEnvelopeInline, LoanData } from '@/utils/docusign/templates-inline';
 import { createEnvelopesApi } from '@/utils/docusign/client';
+import { LoanForDocuSign } from '@/types/loan';
 
 export async function POST(request: NextRequest) {
   try {
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Transform data for DocuSign template
-    const loanData: LoanData = {
+    const loanData: LoanForDocuSign = {
       loanNumber: loan.loan_number,
       principalAmount: parseFloat(loan.principal_amount),
       interestRate: parseFloat(loan.interest_rate),
@@ -120,7 +121,8 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: unknown) {
-    console.error('❌ DocuSign envelope creation error:', error);
+    console.error('❌ DocuSign envelope creation error:', JSON.stringify(error));
+  
     const errorMessage = error instanceof Error ? error.message : 'Failed to create DocuSign envelope';
     return NextResponse.json(
       { error: errorMessage },

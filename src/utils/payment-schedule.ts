@@ -1,4 +1,5 @@
 import { createClient } from '@/utils/supabase/server';
+import { LoanForSchedule } from '@/types/loan';
 
 export interface PaymentScheduleItem {
   paymentNumber: number;
@@ -8,16 +9,6 @@ export interface PaymentScheduleItem {
   totalPayment: number;
   remainingBalance: number;
   status: 'pending' | 'paid' | 'overdue';
-}
-
-export interface LoanForSchedule {
-  id: string;
-  principal_amount: string;
-  interest_rate: string;
-  term_weeks: string;
-  weekly_payment: string;
-  funding_date?: string;
-  created_at: string;
 }
 
 // Generate payment schedule for a loan

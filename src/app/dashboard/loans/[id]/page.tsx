@@ -6,58 +6,14 @@ import { useState, useEffect } from 'react';
 import { CheckCircle, ExternalLink, ArrowLeft, Send, Clock, FileText } from 'lucide-react';
 import { RoleRedirect } from '@/components/auth/RoleRedirect';
 import { createClient } from '@/utils/supabase/client';
+import { LoanWithBorrower } from '@/types/loan';
 
 interface LoanDetailProps {
   params: Promise<{ id: string }>;
 }
 
-interface Loan {
-  id: string;
-  loan_number: string;
-  borrower: {
-    first_name: string;
-    last_name: string;
-    email: string;
-    phone: string;
-    date_of_birth: string;
-    address_line1: string;
-    city: string;
-    state: string;
-    zip_code: string;
-    employment_status: string;
-    annual_income: string;
-    current_employer_name: string;
-    time_with_employment: string;
-    reference1_name: string;
-    reference1_phone: string;
-    reference1_email: string;
-    reference2_name: string;
-    reference2_phone: string;
-    reference2_email: string;
-    reference3_name: string;
-    reference3_phone: string;
-    reference3_email: string;
-    kyc_status: string;
-  };
-  principal_amount: string;
-  interest_rate: string;
-  term_weeks: string;
-  weekly_payment: string;
-  purpose: string;
-  created_at: string;
-  funding_date: string;
-  status: string;
-  docusign_status: string;
-  docusign_envelope_id: string;
-  remaining_balance: string;
-  vehicle_year: string;
-  vehicle_make: string;
-  vehicle_model: string;
-  vehicle_vin: string;
-}
-
 export default function LoanDetail({ params }: LoanDetailProps) {
-  const [loan, setLoan] = useState<Loan | null>(null);
+  const [loan, setLoan] = useState<LoanWithBorrower | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [docusignLoading, setDocusignLoading] = useState(false);
@@ -379,7 +335,7 @@ export default function LoanDetail({ params }: LoanDetailProps) {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Annual Income</label>
-                      <p className="text-lg text-gray-900">${parseFloat(loan.borrower.annual_income).toLocaleString()}</p>
+                      <p className="text-lg text-gray-900">${parseFloat(loan.borrower.annual_income ?? "0").toLocaleString()}</p>
                     </div>
                   </div>
                 </div>

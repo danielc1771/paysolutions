@@ -4,17 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { Calendar, CreditCard, DollarSign, FileText, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { PaymentScheduleItem } from '@/utils/payment-schedule';
-
-interface LoanSummary {
-  id: string;
-  borrower_name: string;
-  principal_amount: string;
-  interest_rate: string;
-  term_weeks: string;
-  weekly_payment: string;
-  funding_date: string;
-  status: string;
-}
+import { LoanSummary } from '@/types/loan';
 
 export default function PaymentSummaryPage() {
   const params = useParams();

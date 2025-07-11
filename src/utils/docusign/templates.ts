@@ -1,5 +1,6 @@
 import 'server-only';
 import docusign from 'docusign-esign';
+import { LoanForDocuSign } from '@/types/loan';
 
 // Extended interfaces for DocuSign features not in the official types
 interface ExtendedDocument extends Omit<docusign.Document, 'documentBase64' | 'fileExtension'> {
@@ -125,7 +126,7 @@ export function calculateWeeklyPaymentSchedule(
 }
 
 // Generate comprehensive loan agreement document content with inline styles for DocuSign compatibility
-export const generateLoanAgreementHTML = (loanData: LoanData): string => {
+export const generateLoanAgreementHTML = (loanData: LoanForDocuSign): string => {
   const currentDate = new Date().toLocaleDateString('en-US', {
     month: '2-digit',
     day: '2-digit',
@@ -637,8 +638,8 @@ export const generateLoanAgreementHTML = (loanData: LoanData): string => {
   `;
 };
 
-// Create DocuSign envelope with comprehensive loan agreement using responsive HTML
-export const createLoanAgreementEnvelope = (loanData: LoanData): docusign.EnvelopeDefinition => {
+// Create DocuSign envelope with loan agreement
+export const createLoanAgreementEnvelope = (loanData: LoanForDocuSign): docusign.EnvelopeDefinition => {
   const documentHtml = generateLoanAgreementHTML(loanData);
   
   // Use htmlDefinition for responsive HTML documents (best practice)

@@ -4,49 +4,20 @@ import AdminLayout from '@/components/AdminLayout';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { CheckCircle, ExternalLink, CreditCard, Copy, Mail } from 'lucide-react';
+import { LoanWithBorrower } from '@/types/loan';
 
 interface LoanDetailProps {
   params: Promise<{ id: string }>;
 }
 
-interface Loan {
-  id: string;
-  loan_number: string;
-  borrower: {
-    first_name: string;
-    last_name: string;
-    email: string;
-    phone: string;
-    date_of_birth: string;
-    address_line1: string;
-    city: string;
-    state: string;
-    zip_code: string;
-    employment_status: string;
-    annual_income: string;
-    kyc_status: string;
-  };
-  principal_amount: string;
-  interest_rate: string;
-  term_weeks: string;
-  weekly_payment: string;
-  purpose: string;
-  created_at: string;
-  funding_date: string;
-  status: string;
-  docusign_status: string;
-  docusign_envelope_id: string;
-  remaining_balance: string;
-}
-
 // Generate payment schedule
-function generatePaymentSchedule(loan: Loan) {
+function generatePaymentSchedule(loan: LoanWithBorrower) {
   const schedule = [];
   const weeklyPayment = parseFloat(loan.weekly_payment);
   const principalAmount = parseFloat(loan.principal_amount);
   const annualRate = parseFloat(loan.interest_rate);
-  const weeklyRate = annualRate / 52;
-  const termWeeks = parseInt(loan.term_weeks);
+  const weeklyRate = annualRate / 12;
+  const termWeeks = loan.term_weeks;
   
   let remainingBalance = principalAmount;
   const startDate = new Date(loan.funding_date || loan.created_at);
@@ -74,7 +45,7 @@ function generatePaymentSchedule(loan: Loan) {
 }
 
 export default function LoanDetail({ params }: LoanDetailProps) {
-  const [loan, setLoan] = useState<Loan | null>(null);
+  const [loan, setLoan] = useState<LoanWithBorrower | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [docusignLoading, setDocusignLoading] = useState(false);

@@ -134,7 +134,9 @@ export default function CreateLoan() {
           vehicleVin: sendFormData.vehicleVin,
           dealerName: organizationInfo?.name || '',
           dealerEmail: organizationInfo?.email || '',
-          dealerPhone: organizationInfo?.phone || ''
+          dealerPhone: organizationInfo?.phone || '',
+          loanTerm: 12,
+          loanAmount: sendFormData.loanAmount,
         }),
       });
 
