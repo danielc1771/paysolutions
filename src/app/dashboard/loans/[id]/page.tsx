@@ -256,6 +256,11 @@ export default function LoanDetail({ params }: LoanDetailProps) {
             `🎉 Loan funded successfully! First payment of $${result.data.weekly_payment_amount} processed. ` +
             `Weekly payments will continue automatically.`
           );
+        } else if (paymentStatus === 'processing') {
+          setSuccessMessage(
+            `⏳ Loan created and payment is processing. The status will update automatically once the payment completes. ` +
+            `Weekly payments of $${result.data.weekly_payment_amount} are scheduled.`
+          );
         } else {
           setSuccessMessage(
             `⚠️ Loan created but first payment failed. Please check with the customer about their payment method.`

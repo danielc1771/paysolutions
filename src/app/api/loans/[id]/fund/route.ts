@@ -229,44 +229,59 @@ export async function POST(
 
     console.log('✅ Created Stripe subscription:', subscription.id);
 
-    // Step 5: Process the first payment (subscription creates first invoice automatically)
+    // Step 5: Wait for the first payment to complete (subscription creates first invoice automatically)
+    console.log('⏳ Waiting for first payment to complete...');
+    
     const latestInvoice = subscription.latest_invoice as Stripe.Invoice & {
       payment_intent?: Stripe.PaymentIntent | string;
     };
+    
     let firstPaymentStatus = 'pending';
+    let paymentIntentId: string | null = null;
     
     if (latestInvoice && latestInvoice.payment_intent) {
-      // payment_intent can be a string ID or expanded PaymentIntent object
-      const paymentIntentData = latestInvoice.payment_intent;
+      // Get the payment intent ID
+      paymentIntentId = typeof latestInvoice.payment_intent === 'string' 
+        ? latestInvoice.payment_intent 
+        : latestInvoice.payment_intent.id;
       
-      if (typeof paymentIntentData === 'string') {
-        // If it's just an ID, we need to retrieve the full object
-        const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentData);
-        
-        if (paymentIntent.status === 'succeeded') {
-          firstPaymentStatus = 'succeeded';
-          console.log('✅ First payment processed successfully:', paymentIntent.id);
-        } else if (paymentIntent.status === 'requires_action') {
-          console.log('⚠️ First payment requires additional action:', paymentIntent.id);
-          firstPaymentStatus = 'requires_action';
-        } else {
-          console.log('❌ First payment failed:', paymentIntent.status);
-          firstPaymentStatus = 'failed';
+      // Poll for payment completion with timeout
+      const maxAttempts = 30; // 30 seconds max wait
+      let attempts = 0;
+      
+      while (attempts < maxAttempts) {
+        try {
+          const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+          console.log(`🔄 Payment status check ${attempts + 1}/${maxAttempts}:`, paymentIntent.status);
+          
+          if (paymentIntent.status === 'succeeded') {
+            firstPaymentStatus = 'succeeded';
+            console.log('✅ First payment completed successfully:', paymentIntent.id);
+            break;
+          } else if (paymentIntent.status === 'canceled') {
+            firstPaymentStatus = 'failed';
+            console.log('❌ First payment failed:', paymentIntent.status);
+            break;
+          } else if (paymentIntent.status === 'requires_action') {
+            firstPaymentStatus = 'requires_action';
+            console.log('⚠️ First payment requires additional action:', paymentIntent.id);
+            break;
+          }
+          
+          // Wait 1 second before next check
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          attempts++;
+          
+        } catch (error) {
+          console.error('Error checking payment status:', error);
+          break;
         }
-      } else {
-        // It's already an expanded PaymentIntent object
-        const paymentIntent = paymentIntentData as Stripe.PaymentIntent;
-        
-        if (paymentIntent.status === 'succeeded') {
-          firstPaymentStatus = 'succeeded';
-          console.log('✅ First payment processed successfully:', paymentIntent.id);
-        } else if (paymentIntent.status === 'requires_action') {
-          console.log('⚠️ First payment requires additional action:', paymentIntent.id);
-          firstPaymentStatus = 'requires_action';
-        } else {
-          console.log('❌ First payment failed:', paymentIntent.status);
-          firstPaymentStatus = 'failed';
-        }
+      }
+      
+      // If we've exhausted attempts and still pending
+      if (attempts >= maxAttempts && firstPaymentStatus === 'pending') {
+        console.log('⚠️ Payment status check timed out, will rely on webhook updates');
+        firstPaymentStatus = 'processing'; // New intermediate state
       }
     }
 
@@ -277,7 +292,8 @@ export async function POST(
         stripe_subscription_id: subscription.id,
         stripe_product_id: product.id,
         stripe_price_id: price.id,
-        status: firstPaymentStatus === 'succeeded' ? 'funded' : 'payment_failed',
+        status: firstPaymentStatus === 'succeeded' ? 'funded' : 
+               firstPaymentStatus === 'processing' ? 'funding_in_progress' : 'payment_failed',
         funding_date: new Date().toISOString().split('T')[0], // Today's date
         updated_at: new Date().toISOString(),
       })
@@ -319,6 +335,8 @@ export async function POST(
       success: true,
       message: firstPaymentStatus === 'succeeded' ? 
         'Loan funded successfully and first payment processed!' : 
+        firstPaymentStatus === 'processing' ? 
+        'Loan created and payment is processing. Status will update automatically.' :
         'Loan created but first payment failed',
       data: {
         loan_id: loanId,

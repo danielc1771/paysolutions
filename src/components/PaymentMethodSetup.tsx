@@ -166,7 +166,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         {processing ? (
           <>
             <Loader2 className="w-4 h-4 animate-spin" />
-            <span>Setting up payment...</span>
+            <span>Processing payment... (up to 30 seconds)</span>
           </>
         ) : (
           <>
@@ -176,9 +176,10 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         )}
       </button>
 
-      <p className="text-xs text-gray-500 text-center">
-        Your payment information is secure and encrypted. By confirming, you authorize automatic weekly payments.
-      </p>
+      <div className="text-xs text-gray-500 text-center space-y-1">
+        <p>Your payment information is secure and encrypted. By confirming, you authorize automatic weekly payments.</p>
+        <p className="text-amber-600">Processing may take up to 30 seconds. Please do not close this window.</p>
+      </div>
     </form>
   );
 };

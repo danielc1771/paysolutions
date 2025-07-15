@@ -135,25 +135,45 @@ async function handleSubscriptionPayment(invoice: Stripe.Invoice & {
           notes: `Stripe subscription payment - Invoice: ${invoice.id}`
         });
 
-      // Check if this was the last payment
-      const { data: remainingPayments } = await supabase
-        .from('payment_schedules')
-        .select('id')
-        .eq('loan_id', loanId)
-        .eq('status', 'pending');
+      // Check if this was the first payment (loan in funding_in_progress status)
+      const { data: loanData } = await supabase
+        .from('loans')
+        .select('status, stripe_subscription_id')
+        .eq('id', loanId)
+        .single();
 
-      if (!remainingPayments || remainingPayments.length === 0) {
-        // All payments completed - mark loan as closed
+      if (loanData?.status === 'funding_in_progress' && loanData?.stripe_subscription_id === subscriptionId) {
+        // This is the first payment completing - update loan to funded
         await supabase
           .from('loans')
           .update({
-            status: 'closed',
-            remaining_balance: '0.00',
+            status: 'funded',
             updated_at: new Date().toISOString()
           })
           .eq('id', loanId);
 
-        console.log('🎉 Loan fully paid off:', loanId);
+        console.log('🎉 First payment completed - loan now funded:', loanId);
+      } else {
+        // Check if this was the last payment
+        const { data: remainingPayments } = await supabase
+          .from('payment_schedules')
+          .select('id')
+          .eq('loan_id', loanId)
+          .eq('status', 'pending');
+
+        if (!remainingPayments || remainingPayments.length === 0) {
+          // All payments completed - mark loan as closed
+          await supabase
+            .from('loans')
+            .update({
+              status: 'closed',
+              remaining_balance: '0.00',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', loanId);
+
+          console.log('🎉 Loan fully paid off:', loanId);
+        }
       }
 
       console.log('✅ Payment recorded successfully:', {
