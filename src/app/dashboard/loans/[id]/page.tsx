@@ -4,6 +4,7 @@ import UserLayout from '@/components/UserLayout';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { CheckCircle, ExternalLink, ArrowLeft, Send, Clock, FileText, DollarSign } from 'lucide-react';
+import PaymentMethodSetup from '@/components/PaymentMethodSetup';
 import { RoleRedirect } from '@/components/auth/RoleRedirect';
 import { createClient } from '@/utils/supabase/client';
 import { LoanWithBorrower } from '@/types/loan';
@@ -20,6 +21,17 @@ export default function LoanDetail({ params }: LoanDetailProps) {
   const [fundingLoading, setFundingLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [showPaymentSetup, setShowPaymentSetup] = useState(false);
+  const [setupIntentData, setSetupIntentData] = useState<{
+    client_secret: string;
+    id: string;
+    loan_details: {
+      loan_number: string;
+      weekly_payment: number;
+      total_payments: number;
+      borrower_name: string;
+    };
+  } | null>(null);
 
   const supabase = createClient();
 
@@ -168,20 +180,144 @@ export default function LoanDetail({ params }: LoanDetailProps) {
 
     setFundingLoading(true);
     try {
-      // TODO: Implement Stripe integration to fund loan and charge customer
-      // This will:
-      // 1. Create Stripe invoices based on payment schedule
-      // 2. Charge first payment immediately 
-      // 3. Schedule remaining payments
-      // 4. Update loan status to 'funded'
+      console.log('🚀 Initiating loan funding for:', loan.id);
       
-      setSuccessMessage('Loan funding will be implemented in the next step.');
-      setShowSuccessModal(true);
+      const response = await fetch(`/api/loans/${loan.id}/fund`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to fund loan');
+      }
+
+      if (result.requires_payment_method) {
+        // Show payment method setup modal
+        setSetupIntentData({
+          client_secret: result.setup_intent.client_secret,
+          id: result.setup_intent.id,
+          loan_details: result.loan_details,
+        });
+        setShowPaymentSetup(true);
+      } else if (result.success) {
+        setSuccessMessage(
+          `Loan funded successfully! Stripe subscription created for weekly payments of $${result.data.weekly_payment_amount}. ` +
+          `Customer will be charged automatically starting ${result.data.next_payment_date}.`
+        );
+        setShowSuccessModal(true);
+        
+        // Refresh loan data to show updated status
+        await refreshLoanData();
+      } else {
+        throw new Error(result.error || 'Unknown error occurred');
+      }
     } catch (error) {
       console.error('Error funding loan:', error);
-      alert('Failed to fund loan');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to fund loan';
+      alert(`Error: ${errorMessage}`);
     } finally {
       setFundingLoading(false);
+    }
+  };
+
+  const handlePaymentMethodSuccess = async (setupIntentId: string) => {
+    if (!loan) return;
+
+    setFundingLoading(true);
+    try {
+      console.log('✅ Payment method confirmed, completing funding...');
+      
+      const response = await fetch(`/api/loans/${loan.id}/fund`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          setup_intent_id: setupIntentId,
+          confirm_funding: true,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to complete funding');
+      }
+
+      if (result.success) {
+        const paymentStatus = result.data.first_payment_status;
+        
+        if (paymentStatus === 'succeeded') {
+          setSuccessMessage(
+            `🎉 Loan funded successfully! First payment of $${result.data.weekly_payment_amount} processed. ` +
+            `Weekly payments will continue automatically.`
+          );
+        } else {
+          setSuccessMessage(
+            `⚠️ Loan created but first payment failed. Please check with the customer about their payment method.`
+          );
+        }
+        
+        setShowSuccessModal(true);
+        setShowPaymentSetup(false);
+        setSetupIntentData(null);
+        
+        // Refresh loan data to show updated status
+        await refreshLoanData();
+      } else {
+        throw new Error(result.error || 'Unknown error occurred');
+      }
+    } catch (error) {
+      console.error('Error completing funding:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to complete funding';
+      alert(`Error: ${errorMessage}`);
+    } finally {
+      setFundingLoading(false);
+    }
+  };
+
+  const refreshLoanData = async () => {
+    if (!loan) return;
+    
+    const { data: updatedLoan } = await supabase
+      .from('loans')
+      .select(`
+        *,
+        borrower:borrowers(
+          first_name,
+          last_name,
+          email,
+          phone,
+          date_of_birth,
+          address_line1,
+          city,
+          state,
+          zip_code,
+          employment_status,
+          annual_income,
+          current_employer_name,
+          time_with_employment,
+          reference1_name,
+          reference1_phone,
+          reference1_email,
+          reference2_name,
+          reference2_phone,
+          reference2_email,
+          reference3_name,
+          reference3_phone,
+          reference3_email,
+          kyc_status
+        )
+      `)
+      .eq('id', loan.id)
+      .single();
+    
+    if (updatedLoan) {
+      setLoan(updatedLoan);
     }
   };
 
@@ -670,6 +806,21 @@ export default function LoanDetail({ params }: LoanDetailProps) {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Payment Method Setup Modal */}
+        {showPaymentSetup && setupIntentData && (
+          <PaymentMethodSetup
+            isOpen={showPaymentSetup}
+            onClose={() => {
+              setShowPaymentSetup(false);
+              setSetupIntentData(null);
+              setFundingLoading(false);
+            }}
+            onSuccess={handlePaymentMethodSuccess}
+            setupIntentClientSecret={setupIntentData.client_secret}
+            loanDetails={setupIntentData.loan_details}
+          />
         )}
       </UserLayout>
     </RoleRedirect>

@@ -69,6 +69,7 @@ export const borrowers = pgTable("borrowers", {
 	reference3Phone: varchar("reference3_phone", { length: 20 }),
 	reference3Email: varchar("reference3_email", { length: 255 }),
 	communicationConsent: text("communication_consent"), // JSON field for consent preferences
+	stripeCustomerId: varchar("stripe_customer_id", { length: 255 }), // Stripe customer ID for billing
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	organizationId: uuid('organization_id').references(() => organization.id),
@@ -158,6 +159,9 @@ export const loans = pgTable("loans", { // Added vehicle fields
 	phoneVerificationSessionId: varchar("phone_verification_session_id", { length: 255 }),
 	phoneVerificationStatus: phoneVerificationStatusEnum('phone_verification_status').default('pending'),
 	verifiedPhoneNumber: varchar("verified_phone_number", { length: 20 }),
+	stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }), // Stripe subscription for recurring payments
+	stripeProductId: varchar("stripe_product_id", { length: 255 }), // Stripe product for the loan
+	stripePriceId: varchar("stripe_price_id", { length: 255 }), // Stripe price for weekly payments
 }, (table) => [
 	index("idx_loans_borrower_id").using("btree", table.borrowerId.asc().nullsLast().op("uuid_ops")),
 	index("idx_loans_docusign_envelope_id").using("btree", table.docusignEnvelopeId.asc().nullsLast().op("text_ops")),
