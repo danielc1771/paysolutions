@@ -91,8 +91,8 @@ async function handleSubscriptionPayment(invoice: Stripe.Invoice & {
       return;
     }
 
-    // Get current payment schedule entry
-    const { data: paymentSchedules } = await supabase
+    // Get current payment schedule entry (try pending first, then any status)
+    let { data: paymentSchedules } = await supabase
       .from('payment_schedules')
       .select('*')
       .eq('loan_id', loanId)
@@ -100,10 +100,22 @@ async function handleSubscriptionPayment(invoice: Stripe.Invoice & {
       .order('payment_number')
       .limit(1);
 
+    // If no pending payment found, get the first payment (regardless of status)
+    if (!paymentSchedules || paymentSchedules.length === 0) {
+      const { data: firstPayment } = await supabase
+        .from('payment_schedules')
+        .select('*')
+        .eq('loan_id', loanId)
+        .eq('payment_number', 1)
+        .limit(1);
+      
+      paymentSchedules = firstPayment;
+    }
+
     const currentPayment = paymentSchedules?.[0];
     
     if (!currentPayment) {
-      console.log('⚠️ No pending payment found for loan:', loanId);
+      console.log('⚠️ No payment schedule found for loan:', loanId);
       return;
     }
 

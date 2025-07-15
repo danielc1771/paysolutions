@@ -240,15 +240,18 @@ export async function POST(
 
     console.log('✅ Created Stripe subscription:', subscription.id);
 
-    // Step 4.5: Update payment intent with loan metadata for webhook processing
+    // Step 4.5: Get payment intent and update metadata for webhook processing
     const latestInvoice = subscription.latest_invoice as Stripe.Invoice & {
       payment_intent?: Stripe.PaymentIntent | string;
     };
     
+    let paymentIntentId: string | null = null;
     if (latestInvoice && latestInvoice.payment_intent) {
-      const paymentIntentId = typeof latestInvoice.payment_intent === 'string' 
+      paymentIntentId = typeof latestInvoice.payment_intent === 'string' 
         ? latestInvoice.payment_intent 
         : latestInvoice.payment_intent.id;
+      
+      console.log('💳 Found payment intent:', paymentIntentId);
       
       try {
         await stripe.paymentIntents.update(paymentIntentId, {
@@ -260,97 +263,40 @@ export async function POST(
             subscription_id: subscription.id,
           },
         });
-        console.log('✅ Updated payment intent metadata:', paymentIntentId);
+        console.log('✅ Updated payment intent metadata successfully');
       } catch (error) {
-        console.error('⚠️ Failed to update payment intent metadata:', error);
-      }
-    }
-
-    // Step 5: Wait for the first payment to complete (subscription creates first invoice automatically)
-    console.log('⏳ Waiting for first payment to complete...');
-    console.log('📋 Subscription created with latest_invoice:', subscription.latest_invoice);
-    
-    let firstPaymentStatus = 'pending';
-    let paymentIntentId: string | null = null;
-    
-    if (latestInvoice && latestInvoice.payment_intent) {
-      // Get the payment intent ID
-      paymentIntentId = typeof latestInvoice.payment_intent === 'string' 
-        ? latestInvoice.payment_intent 
-        : latestInvoice.payment_intent.id;
-      
-      console.log('💳 Payment Intent ID to monitor:', paymentIntentId);
-      
-      // Poll for payment completion with timeout
-      const maxAttempts = 30; // 30 seconds max wait
-      let attempts = 0;
-      
-      while (attempts < maxAttempts) {
-        try {
-          const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-          console.log(`🔄 Payment status check ${attempts + 1}/${maxAttempts}:`, {
-            id: paymentIntent.id,
-            status: paymentIntent.status,
-            amount: paymentIntent.amount,
-            currency: paymentIntent.currency,
-            client_secret: paymentIntent.client_secret?.slice(-10) + '...',
-            created: new Date(paymentIntent.created * 1000).toISOString(),
-            last_payment_error: paymentIntent.last_payment_error?.message || null
-          });
-          
-          if (paymentIntent.status === 'succeeded') {
-            firstPaymentStatus = 'succeeded';
-            console.log('✅ First payment completed successfully:', paymentIntent.id);
-            break;
-          } else if (paymentIntent.status === 'canceled' || paymentIntent.status === 'requires_payment_method') {
-            firstPaymentStatus = 'failed';
-            console.log('❌ First payment failed:', paymentIntent.status);
-            break;
-          } else if (paymentIntent.status === 'requires_action' || paymentIntent.status === 'requires_confirmation') {
-            firstPaymentStatus = 'requires_action';
-            console.log('⚠️ First payment requires additional action:', paymentIntent.id);
-            break;
-          } else if (paymentIntent.status === 'processing') {
-            console.log('⏳ Payment is processing, continuing to wait...');
-          } else {
-            console.log('🔄 Payment status:', paymentIntent.status, '- continuing to wait...');
-          }
-          
-          // Wait 1 second before next check
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          attempts++;
-          
-        } catch (error) {
-          console.error('❌ Error checking payment status:', error);
-          // Don't break immediately - try a few more times in case of network issues
-          if (attempts > 3) {
-            break;
-          }
-        }
-      }
-      
-      // If we've exhausted attempts and still pending, check database for webhook updates
-      if (attempts >= maxAttempts && firstPaymentStatus === 'pending') {
-        console.log('⚠️ Payment status check timed out, checking database for webhook updates...');
-        
-        // Check if webhook already processed the payment
-        const { data: existingPayment } = await supabase
-          .from('payments')
-          .select('status')
-          .eq('loan_id', loanId)
-          .eq('stripe_payment_intent_id', paymentIntentId)
-          .single();
-        
-        if (existingPayment?.status === 'completed') {
-          console.log('✅ Webhook already processed payment successfully');
-          firstPaymentStatus = 'succeeded';
-        } else {
-          console.log('⏳ Setting status to processing - webhook will update when payment completes');
-          firstPaymentStatus = 'processing';
-        }
+        console.error('❌ Failed to update payment intent metadata:', error);
       }
     } else {
-      console.log('❌ No payment intent found in latest invoice');
+      console.log('⚠️ No payment intent found in subscription invoice');
+    }
+
+    // Step 5: Wait for webhook to process payment (simplified approach)
+    console.log('⏳ Waiting for webhook to process payment...');
+    
+    let firstPaymentStatus = 'succeeded'; // Assume success since Stripe created subscription
+    
+    // Wait 3 seconds for webhook to process
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    
+    // Check if webhook processed the payment
+    if (paymentIntentId) {
+      const { data: existingPayment } = await supabase
+        .from('payments')
+        .select('status')
+        .eq('loan_id', loanId)
+        .eq('stripe_payment_intent_id', paymentIntentId)
+        .single();
+      
+      if (existingPayment?.status === 'completed') {
+        console.log('✅ Webhook processed payment successfully');
+        firstPaymentStatus = 'succeeded';
+      } else {
+        console.log('⏳ Webhook still processing - loan will be updated automatically');
+        firstPaymentStatus = 'processing';
+      }
+    } else {
+      console.log('⚠️ No payment intent to track - assuming success');
     }
 
     // Step 6: Update loan record with Stripe information
