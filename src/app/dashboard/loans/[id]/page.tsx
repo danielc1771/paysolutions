@@ -3,7 +3,7 @@
 import UserLayout from '@/components/UserLayout';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { CheckCircle, ExternalLink, ArrowLeft, Send, Clock, FileText } from 'lucide-react';
+import { CheckCircle, ExternalLink, ArrowLeft, Send, Clock, FileText, DollarSign } from 'lucide-react';
 import { RoleRedirect } from '@/components/auth/RoleRedirect';
 import { createClient } from '@/utils/supabase/client';
 import { LoanWithBorrower } from '@/types/loan';
@@ -17,6 +17,7 @@ export default function LoanDetail({ params }: LoanDetailProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [docusignLoading, setDocusignLoading] = useState(false);
+  const [fundingLoading, setFundingLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
@@ -159,6 +160,28 @@ export default function LoanDetail({ params }: LoanDetailProps) {
       alert('Failed to send DocuSign agreement');
     } finally {
       setDocusignLoading(false);
+    }
+  };
+
+  const handleFundLoan = async () => {
+    if (!loan) return;
+
+    setFundingLoading(true);
+    try {
+      // TODO: Implement Stripe integration to fund loan and charge customer
+      // This will:
+      // 1. Create Stripe invoices based on payment schedule
+      // 2. Charge first payment immediately 
+      // 3. Schedule remaining payments
+      // 4. Update loan status to 'funded'
+      
+      setSuccessMessage('Loan funding will be implemented in the next step.');
+      setShowSuccessModal(true);
+    } catch (error) {
+      console.error('Error funding loan:', error);
+      alert('Failed to fund loan');
+    } finally {
+      setFundingLoading(false);
     }
   };
 
@@ -500,6 +523,84 @@ export default function LoanDetail({ params }: LoanDetailProps) {
                           <span>View in DocuSign</span>
                         </a>
                       )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Loan Funding */}
+                <div className="bg-white/70 backdrop-blur-sm rounded-3xl shadow-xl border border-white/20 p-6">
+                  <h3 className="text-xl font-bold text-gray-900 mb-4">Loan Funding</h3>
+                  
+                  {loan.docusign_status === 'signed' && loan.status !== 'funded' && (
+                    <div className="space-y-4">
+                      <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                        <div className="flex items-center space-x-2 text-green-700 mb-2">
+                          <CheckCircle className="w-4 h-4" />
+                          <span className="text-sm font-medium">Ready to fund</span>
+                        </div>
+                        <p className="text-sm text-green-600">
+                          Document has been signed. You can now fund this loan and charge the customer.
+                        </p>
+                      </div>
+                      
+                      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                        <h4 className="font-semibold text-blue-900 mb-2">Funding Details:</h4>
+                        <ul className="text-sm text-blue-700 space-y-1">
+                          <li>• Customer will be charged ${parseFloat(loan.weekly_payment).toLocaleString()} weekly</li>
+                          <li>• First payment will be processed immediately</li>
+                          <li>• Remaining {loan.term_weeks - 1} payments will be scheduled</li>
+                          <li>• Total loan amount: ${parseFloat(loan.principal_amount).toLocaleString()}</li>
+                        </ul>
+                      </div>
+
+                      <button
+                        onClick={handleFundLoan}
+                        disabled={fundingLoading}
+                        className="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-3 rounded-2xl font-semibold hover:from-green-600 hover:to-emerald-600 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                      >
+                        {fundingLoading ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                            <span>Processing...</span>
+                          </>
+                        ) : (
+                          <>
+                            <DollarSign className="w-4 h-4" />
+                            <span>Fund Loan & Charge Customer</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+
+                  {loan.docusign_status !== 'signed' && (
+                    <div className="space-y-4">
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                        <p className="text-sm text-amber-700">
+                          Document must be signed before funding can proceed.
+                        </p>
+                      </div>
+                      <button
+                        disabled
+                        className="w-full bg-gray-300 text-gray-500 px-6 py-3 rounded-2xl font-semibold cursor-not-allowed flex items-center justify-center space-x-2"
+                      >
+                        <DollarSign className="w-4 h-4" />
+                        <span>Fund Loan & Charge Customer</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {loan.status === 'funded' && (
+                    <div className="space-y-4">
+                      <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                        <div className="flex items-center space-x-2 text-green-700 mb-2">
+                          <CheckCircle className="w-4 h-4" />
+                          <span className="text-sm font-medium">Loan funded</span>
+                        </div>
+                        <p className="text-sm text-green-600">
+                          This loan has been successfully funded and customer billing is active.
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>

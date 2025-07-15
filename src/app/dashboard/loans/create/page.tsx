@@ -388,7 +388,7 @@ export default function CreateLoan() {
                         <div className="px-4 py-3 bg-gray-50">
                           <h4 className="font-semibold text-gray-900">Payment Schedule ({loanCalculation.termWeeks} weeks)</h4>
                         </div>
-                        <div className="max-h-48 overflow-y-auto">
+                        <div>
                           <table className="w-full text-sm">
                             <thead className="bg-gray-100 sticky top-0">
                               <tr>
