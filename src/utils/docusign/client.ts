@@ -2,7 +2,7 @@ import 'server-only';
 import docusign from 'docusign-esign';
 
 // DocuSign configuration
-const DOCUSIGN_BASE_PATH = process.env.DOCUSIGN_BASE_PATH || 'https://demo.docusign.net/restapi';
+const DOCUSIGN_BASE_PATH = process.env.DOCUSIGN_BASE_PATH;
 const DOCUSIGN_INTEGRATION_KEY = process.env.DOCUSIGN_INTEGRATION_KEY;
 const DOCUSIGN_USER_ID = process.env.DOCUSIGN_USER_ID;
 const DOCUSIGN_ACCOUNT_ID = process.env.DOCUSIGN_ACCOUNT_ID;
@@ -10,7 +10,7 @@ const DOCUSIGN_PRIVATE_KEY = process.env.DOCUSIGN_PRIVATE_KEY;
 
 // Create DocuSign API client
 export const createDocuSignClient = () => {
-  if (!DOCUSIGN_INTEGRATION_KEY || !DOCUSIGN_USER_ID || !DOCUSIGN_PRIVATE_KEY) {
+  if (!DOCUSIGN_INTEGRATION_KEY || !DOCUSIGN_USER_ID || !DOCUSIGN_PRIVATE_KEY || !DOCUSIGN_BASE_PATH) {
     throw new Error('DocuSign environment variables are not configured');
   }
 
@@ -40,7 +40,7 @@ export const authenticateWithJWT = async (): Promise<string> => {
     }
 
     const apiClient = new docusign.ApiClient();
-    apiClient.setBasePath(DOCUSIGN_BASE_PATH);
+    apiClient.setBasePath(DOCUSIGN_BASE_PATH!);
 
     // Convert private key string to Buffer
     const privateKey = Buffer.from(privateKeyString.replace(/\\n/g, '\n'));
@@ -79,29 +79,20 @@ export const authenticateWithJWT = async (): Promise<string> => {
   }
 };
 
-// Get account ID if not provided
-const getAccountId = async (apiClient: docusign.ApiClient): Promise<string> => {
-  const accountsApi = new docusign.AccountsApi(apiClient);
-  const accounts = await accountsApi.listAccounts();
-  
-  if (!accounts.accounts || accounts.accounts.length === 0) {
-    throw new Error('No DocuSign accounts found');
-  }
-  
-  return accounts.accounts[0].accountId!;
-};
 
 // Create EnvelopesApi instance
 export const createEnvelopesApi = async () => {
   const accessToken = await authenticateWithJWT();
   const apiClient = createDocuSignClient();
   apiClient.addDefaultHeader('Authorization', `Bearer ${accessToken}`);
-  
-  const accountId = DOCUSIGN_ACCOUNT_ID || await getAccountId(apiClient);
+
+  if (!DOCUSIGN_ACCOUNT_ID) {
+    throw new Error('DocuSign account ID is not configured');
+  }
   
   return {
     envelopesApi: new docusign.EnvelopesApi(apiClient),
     apiClient: apiClient,
-    accountId
+    accountId: DOCUSIGN_ACCOUNT_ID
   };
 };

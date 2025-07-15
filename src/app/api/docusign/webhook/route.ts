@@ -48,50 +48,81 @@ export async function POST(request: NextRequest) {
     
     // DocuSign webhook can have different structures, handle both formats
     let envelopeId: string;
-    let status: string;
+    let status: string | undefined;
+    let eventType: string | undefined;
     let completedDateTime: string | undefined;
     let statusChangedDateTime: string | undefined;
 
     // Handle different webhook payload structures
     let customFields: Record<string, string> = {};
     
-    if (webhookData.data && typeof webhookData.data === 'object' && webhookData.data !== null && 'envelopeId' in webhookData.data) {
-      // Format 1: { event, data: { envelopeId, envelopeSummary: { status } } }
+    // Check if this is an event-based webhook
+    if (webhookData.event && webhookData.data) {
+      // Event-based webhook format (e.g., recipient-completed)
+      eventType = webhookData.event as string;
       const data = webhookData.data as Record<string, unknown>;
       envelopeId = data.envelopeId as string;
-      const envelopeSummary = data.envelopeSummary as Record<string, unknown> | undefined;
-      status = (envelopeSummary?.status as string) || (data.status as string);
-      completedDateTime = envelopeSummary?.completedDateTime as string | undefined;
-      statusChangedDateTime = envelopeSummary?.statusChangedDateTime as string | undefined;
       
-      // Extract custom fields if present
-      if (data.customFields) {
-        customFields = data.customFields as Record<string, string>;
+      console.log(`📌 Event-based webhook received: ${eventType}`);
+      
+      // Map events to status
+      switch (eventType) {
+        case 'recipient-completed':
+          status = 'completed';
+          completedDateTime = webhookData.generatedDateTime as string | undefined;
+          break;
+        case 'envelope-completed':
+          status = 'completed';
+          completedDateTime = webhookData.generatedDateTime as string | undefined;
+          break;
+        case 'envelope-declined':
+          status = 'declined';
+          statusChangedDateTime = webhookData.generatedDateTime as string | undefined;
+          break;
+        case 'envelope-voided':
+          status = 'voided';
+          statusChangedDateTime = webhookData.generatedDateTime as string | undefined;
+          break;
+        case 'envelope-sent':
+          status = 'sent';
+          statusChangedDateTime = webhookData.generatedDateTime as string | undefined;
+          break;
+        case 'envelope-delivered':
+          status = 'delivered';
+          statusChangedDateTime = webhookData.generatedDateTime as string | undefined;
+          break;
+        default:
+          console.log(`ℹ️ Unhandled event type: ${eventType}`);
+          // For unhandled events, we'll still process but won't update status
       }
-    } else if ('envelopeId' in webhookData) {
-      // Format 2: Direct envelope data
-      envelopeId = webhookData.envelopeId as string;
-      status = (webhookData.status as string) || (webhookData.envelopeStatus as string);
-      completedDateTime = webhookData.completedDateTime as string | undefined;
-      statusChangedDateTime = webhookData.statusChangedDateTime as string | undefined;
       
-      // Extract custom fields if present
-      if (webhookData.customFields) {
-        customFields = webhookData.customFields as Record<string, string>;
+      // Extract custom fields if present in the envelope summary
+      if (data.envelopeSummary && typeof data.envelopeSummary === 'object') {
+        const envelopeSummary = data.envelopeSummary as Record<string, unknown>;
+        if (envelopeSummary.customFields) {
+          customFields = envelopeSummary.customFields as Record<string, string>;
+        }
       }
     } else {
       console.error('❌ Unknown webhook payload format:', webhookData);
       return NextResponse.json({ error: 'Invalid webhook payload format' }, { status: 400 });
     }
 
-    if (!envelopeId || !status) {
-      console.error('❌ Missing required webhook data:', { envelopeId, status });
-      return NextResponse.json({ error: 'Missing envelope ID or status' }, { status: 400 });
+    if (!envelopeId) {
+      console.error('❌ Missing envelope ID in webhook data');
+      return NextResponse.json({ error: 'Missing envelope ID' }, { status: 400 });
+    }
+    
+    // For event-based webhooks without status, we might not update the status
+    if (!status && !eventType) {
+      console.error('❌ Missing status or event type in webhook data');
+      return NextResponse.json({ error: 'Missing status or event type' }, { status: 400 });
     }
 
     console.log('📋 Processed webhook data:', { 
       envelopeId, 
-      status, 
+      status,
+      eventType,
       completedDateTime, 
       statusChangedDateTime,
       customFields
@@ -136,34 +167,46 @@ export async function POST(request: NextRequest) {
 
     // Determine new loan status based on DocuSign status
     let newLoanStatus = loan.status;
-    let docusignStatus = status.toLowerCase();
+    let docusignStatus: string | undefined;
+    
+    // Only process status updates if we have a status
+    if (status) {
+      docusignStatus = status.toLowerCase();
 
-    switch (docusignStatus) {
-      case 'completed':
-      case 'signed':
-        newLoanStatus = 'signed'; // Document is signed, ready for funding
-        docusignStatus = 'signed'; // Normalize to 'signed' for our UI
-        console.log('✅ Document completed/signed - updating loan status to signed');
-        break;
-      case 'declined':
-      case 'voided':
-        newLoanStatus = 'review'; // Back to review if declined/voided
-        console.log('⚠️ Document declined/voided - updating loan status to review');
-        break;
-      case 'sent':
-      case 'delivered':
-        // Document sent/delivered, no loan status change needed
-        console.log('📤 Document sent/delivered - no loan status change');
-        break;
-      default:
-        console.log('ℹ️ Unknown DocuSign status:', docusignStatus);
+      switch (docusignStatus) {
+        case 'completed':
+        case 'signed':
+          newLoanStatus = 'signed'; // Document is signed, ready for funding
+          docusignStatus = 'signed'; // Normalize to 'signed' for our UI
+          console.log('✅ Document completed/signed - updating loan status to signed');
+          break;
+        case 'declined':
+        case 'voided':
+          newLoanStatus = 'review'; // Back to review if declined/voided
+          console.log('⚠️ Document declined/voided - updating loan status to review');
+          break;
+        case 'sent':
+        case 'delivered':
+          // Document sent/delivered, no loan status change needed
+          console.log('📤 Document sent/delivered - no loan status change');
+          break;
+        default:
+          console.log('ℹ️ Unknown DocuSign status:', docusignStatus);
+      }
+    } else if (eventType) {
+      // For event-only webhooks without mapped status, just log
+      console.log(`📌 Processing event-only webhook: ${eventType} - no status update`);
     }
 
     // Update loan record
     const updateData: Record<string, unknown> = {
-      docusign_status: docusignStatus,
       docusign_status_updated: new Date().toISOString()
     };
+    
+    // Only update docusign_status if we have a status
+    if (docusignStatus) {
+      updateData.docusign_status = docusignStatus;
+    }
 
     if (newLoanStatus !== loan.status) {
       updateData.status = newLoanStatus;
