@@ -225,16 +225,50 @@ export async function POST(
       collection_method: 'charge_automatically',
       description: `Weekly payments for loan ${loan.loan_number}`,
       expand: ['latest_invoice.payment_intent'],
+      payment_settings: {
+        payment_method_options: {
+          card: {
+            request_three_d_secure: 'automatic',
+          },
+        },
+      },
+      // Add metadata to the first invoice/payment intent
+      automatic_tax: {
+        enabled: false,
+      },
     });
 
     console.log('✅ Created Stripe subscription:', subscription.id);
 
-    // Step 5: Wait for the first payment to complete (subscription creates first invoice automatically)
-    console.log('⏳ Waiting for first payment to complete...');
-    
+    // Step 4.5: Update payment intent with loan metadata for webhook processing
     const latestInvoice = subscription.latest_invoice as Stripe.Invoice & {
       payment_intent?: Stripe.PaymentIntent | string;
     };
+    
+    if (latestInvoice && latestInvoice.payment_intent) {
+      const paymentIntentId = typeof latestInvoice.payment_intent === 'string' 
+        ? latestInvoice.payment_intent 
+        : latestInvoice.payment_intent.id;
+      
+      try {
+        await stripe.paymentIntents.update(paymentIntentId, {
+          metadata: {
+            loan_id: loanId,
+            loan_number: loan.loan_number,
+            borrower_id: borrower.id,
+            payment_type: 'first_payment',
+            subscription_id: subscription.id,
+          },
+        });
+        console.log('✅ Updated payment intent metadata:', paymentIntentId);
+      } catch (error) {
+        console.error('⚠️ Failed to update payment intent metadata:', error);
+      }
+    }
+
+    // Step 5: Wait for the first payment to complete (subscription creates first invoice automatically)
+    console.log('⏳ Waiting for first payment to complete...');
+    console.log('📋 Subscription created with latest_invoice:', subscription.latest_invoice);
     
     let firstPaymentStatus = 'pending';
     let paymentIntentId: string | null = null;
@@ -245,6 +279,8 @@ export async function POST(
         ? latestInvoice.payment_intent 
         : latestInvoice.payment_intent.id;
       
+      console.log('💳 Payment Intent ID to monitor:', paymentIntentId);
+      
       // Poll for payment completion with timeout
       const maxAttempts = 30; // 30 seconds max wait
       let attempts = 0;
@@ -252,20 +288,32 @@ export async function POST(
       while (attempts < maxAttempts) {
         try {
           const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-          console.log(`🔄 Payment status check ${attempts + 1}/${maxAttempts}:`, paymentIntent.status);
+          console.log(`🔄 Payment status check ${attempts + 1}/${maxAttempts}:`, {
+            id: paymentIntent.id,
+            status: paymentIntent.status,
+            amount: paymentIntent.amount,
+            currency: paymentIntent.currency,
+            client_secret: paymentIntent.client_secret?.slice(-10) + '...',
+            created: new Date(paymentIntent.created * 1000).toISOString(),
+            last_payment_error: paymentIntent.last_payment_error?.message || null
+          });
           
           if (paymentIntent.status === 'succeeded') {
             firstPaymentStatus = 'succeeded';
             console.log('✅ First payment completed successfully:', paymentIntent.id);
             break;
-          } else if (paymentIntent.status === 'canceled') {
+          } else if (paymentIntent.status === 'canceled' || paymentIntent.status === 'requires_payment_method') {
             firstPaymentStatus = 'failed';
             console.log('❌ First payment failed:', paymentIntent.status);
             break;
-          } else if (paymentIntent.status === 'requires_action') {
+          } else if (paymentIntent.status === 'requires_action' || paymentIntent.status === 'requires_confirmation') {
             firstPaymentStatus = 'requires_action';
             console.log('⚠️ First payment requires additional action:', paymentIntent.id);
             break;
+          } else if (paymentIntent.status === 'processing') {
+            console.log('⏳ Payment is processing, continuing to wait...');
+          } else {
+            console.log('🔄 Payment status:', paymentIntent.status, '- continuing to wait...');
           }
           
           // Wait 1 second before next check
@@ -273,16 +321,36 @@ export async function POST(
           attempts++;
           
         } catch (error) {
-          console.error('Error checking payment status:', error);
-          break;
+          console.error('❌ Error checking payment status:', error);
+          // Don't break immediately - try a few more times in case of network issues
+          if (attempts > 3) {
+            break;
+          }
         }
       }
       
-      // If we've exhausted attempts and still pending
+      // If we've exhausted attempts and still pending, check database for webhook updates
       if (attempts >= maxAttempts && firstPaymentStatus === 'pending') {
-        console.log('⚠️ Payment status check timed out, will rely on webhook updates');
-        firstPaymentStatus = 'processing'; // New intermediate state
+        console.log('⚠️ Payment status check timed out, checking database for webhook updates...');
+        
+        // Check if webhook already processed the payment
+        const { data: existingPayment } = await supabase
+          .from('payments')
+          .select('status')
+          .eq('loan_id', loanId)
+          .eq('stripe_payment_intent_id', paymentIntentId)
+          .single();
+        
+        if (existingPayment?.status === 'completed') {
+          console.log('✅ Webhook already processed payment successfully');
+          firstPaymentStatus = 'succeeded';
+        } else {
+          console.log('⏳ Setting status to processing - webhook will update when payment completes');
+          firstPaymentStatus = 'processing';
+        }
       }
+    } else {
+      console.log('❌ No payment intent found in latest invoice');
     }
 
     // Step 6: Update loan record with Stripe information

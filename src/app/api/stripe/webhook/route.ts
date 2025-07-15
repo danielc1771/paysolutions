@@ -269,6 +269,25 @@ async function handlePaymentIntent(paymentIntent: Stripe.PaymentIntent, status: 
             notes: 'First payment via Stripe Payment Intent'
           });
 
+        // If this is the first payment, update loan to funded status
+        const { data: loanData } = await supabase
+          .from('loans')
+          .select('status')
+          .eq('id', loanId)
+          .single();
+
+        if (loanData?.status === 'funding_in_progress') {
+          await supabase
+            .from('loans')
+            .update({
+              status: 'funded',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', loanId);
+
+          console.log('🎉 First payment completed via payment intent - loan now funded:', loanId);
+        }
+
         console.log('✅ First payment recorded successfully:', {
           loanId,
           amount: paymentIntent.amount / 100
