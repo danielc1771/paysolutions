@@ -4,10 +4,10 @@ import UserLayout from '@/components/UserLayout';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { CheckCircle, ExternalLink, ArrowLeft, Send, Clock, FileText, DollarSign } from 'lucide-react';
-import PaymentMethodSetup from '@/components/PaymentMethodSetup';
 import { RoleRedirect } from '@/components/auth/RoleRedirect';
 import { createClient } from '@/utils/supabase/client';
 import { LoanWithBorrower } from '@/types/loan';
+import { Invoice } from '@/app/api/loans/[id]/invoices/route';
 
 interface LoanDetailProps {
   params: Promise<{ id: string }>;
@@ -21,17 +21,8 @@ export default function LoanDetail({ params }: LoanDetailProps) {
   const [fundingLoading, setFundingLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-  const [showPaymentSetup, setShowPaymentSetup] = useState(false);
-  const [setupIntentData, setSetupIntentData] = useState<{
-    client_secret: string;
-    id: string;
-    loan_details: {
-      loan_number: string;
-      weekly_payment: number;
-      total_payments: number;
-      borrower_name: string;
-    };
-  } | null>(null);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [invoicesLoading, setInvoicesLoading] = useState(false);
 
   const supabase = createClient();
 
@@ -108,6 +99,28 @@ export default function LoanDetail({ params }: LoanDetailProps) {
     fetchLoan();
   }, [params, supabase]);
 
+  useEffect(() => {
+    const fetchInvoices = async () => {
+      if (!loan || loan.status !== 'funded') return;
+      
+      setInvoicesLoading(true);
+      try {
+        const response = await fetch(`/api/loans/${loan.id}/invoices`);
+        const data = await response.json();
+        
+        if (data.success) {
+          setInvoices(data.invoices);
+        }
+      } catch (error) {
+        console.error('Error fetching invoices:', error);
+      } finally {
+        setInvoicesLoading(false);
+      }
+    };
+
+    fetchInvoices();
+  }, [loan]);
+
   const handleSendDocuSign = async () => {
     if (!loan) return;
 
@@ -180,149 +193,65 @@ export default function LoanDetail({ params }: LoanDetailProps) {
 
     setFundingLoading(true);
     try {
-      console.log('🚀 Initiating loan funding for:', loan.id);
-      
       const response = await fetch(`/api/loans/${loan.id}/fund`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({}),
       });
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to fund loan');
-      }
-
-      if (result.requires_payment_method) {
-        // Show payment method setup modal
-        setSetupIntentData({
-          client_secret: result.setup_intent.client_secret,
-          id: result.setup_intent.id,
-          loan_details: result.loan_details,
-        });
-        setShowPaymentSetup(true);
-      } else if (result.success) {
-        setSuccessMessage(
-          `Loan funded successfully! Stripe subscription created for weekly payments of $${result.data.weekly_payment_amount}. ` +
-          `Customer will be charged automatically starting ${result.data.next_payment_date}.`
-        );
+      const data = await response.json();
+      
+      if (data.success) {
+        setSuccessMessage(data.message || 'Loan funded successfully! The borrower will receive an email invoice for their first payment.');
         setShowSuccessModal(true);
         
-        // Refresh loan data to show updated status
-        await refreshLoanData();
+        // Refresh loan data
+        const { data: updatedLoan } = await supabase
+          .from('loans')
+          .select(`
+            *,
+            borrower:borrowers(
+              first_name,
+              last_name,
+              email,
+              phone,
+              date_of_birth,
+              address_line1,
+              city,
+              state,
+              zip_code,
+              employment_status,
+              annual_income,
+              current_employer_name,
+              time_with_employment,
+              reference1_name,
+              reference1_phone,
+              reference1_email,
+              reference2_name,
+              reference2_phone,
+              reference2_email,
+              reference3_name,
+              reference3_phone,
+              reference3_email,
+              kyc_status
+            )
+          `)
+          .eq('id', loan.id)
+          .single();
+        
+        if (updatedLoan) {
+          setLoan(updatedLoan);
+        }
       } else {
-        throw new Error(result.error || 'Unknown error occurred');
+        alert('Failed to fund loan: ' + (data.error || 'Unknown error'));
       }
     } catch (error) {
       console.error('Error funding loan:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to fund loan';
-      alert(`Error: ${errorMessage}`);
+      alert('Failed to fund loan. Please try again.');
     } finally {
       setFundingLoading(false);
-    }
-  };
-
-  const handlePaymentMethodSuccess = async (setupIntentId: string) => {
-    if (!loan) return;
-
-    setFundingLoading(true);
-    try {
-      console.log('✅ Payment method confirmed, completing funding...');
-      
-      const response = await fetch(`/api/loans/${loan.id}/fund`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          setup_intent_id: setupIntentId,
-          confirm_funding: true,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to complete funding');
-      }
-
-      if (result.success) {
-        const paymentStatus = result.data.first_payment_status;
-        
-        if (paymentStatus === 'succeeded') {
-          setSuccessMessage(
-            `🎉 Loan funded successfully! First payment of $${result.data.weekly_payment_amount} processed. ` +
-            `Weekly payments will continue automatically.`
-          );
-        } else if (paymentStatus === 'processing') {
-          setSuccessMessage(
-            `⏳ Loan created and payment is processing. The status will update automatically once the payment completes. ` +
-            `Weekly payments of $${result.data.weekly_payment_amount} are scheduled.`
-          );
-        } else {
-          setSuccessMessage(
-            `⚠️ Loan created but first payment failed. Please check with the customer about their payment method.`
-          );
-        }
-        
-        setShowSuccessModal(true);
-        setShowPaymentSetup(false);
-        setSetupIntentData(null);
-        
-        // Refresh loan data to show updated status
-        await refreshLoanData();
-      } else {
-        throw new Error(result.error || 'Unknown error occurred');
-      }
-    } catch (error) {
-      console.error('Error completing funding:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to complete funding';
-      alert(`Error: ${errorMessage}`);
-    } finally {
-      setFundingLoading(false);
-    }
-  };
-
-  const refreshLoanData = async () => {
-    if (!loan) return;
-    
-    const { data: updatedLoan } = await supabase
-      .from('loans')
-      .select(`
-        *,
-        borrower:borrowers(
-          first_name,
-          last_name,
-          email,
-          phone,
-          date_of_birth,
-          address_line1,
-          city,
-          state,
-          zip_code,
-          employment_status,
-          annual_income,
-          current_employer_name,
-          time_with_employment,
-          reference1_name,
-          reference1_phone,
-          reference1_email,
-          reference2_name,
-          reference2_phone,
-          reference2_email,
-          reference3_name,
-          reference3_phone,
-          reference3_email,
-          kyc_status
-        )
-      `)
-      .eq('id', loan.id)
-      .single();
-    
-    if (updatedLoan) {
-      setLoan(updatedLoan);
     }
   };
 
@@ -787,6 +716,106 @@ export default function LoanDetail({ params }: LoanDetailProps) {
                     )}
                   </div>
                 </div>
+                
+                {/* Payment History */}
+                {loan.status === 'funded' && (
+                  <div className="bg-white/70 backdrop-blur-sm rounded-3xl shadow-xl border border-white/20 p-6">
+                    <h3 className="text-xl font-bold text-gray-900 mb-4">Payment History</h3>
+                    
+                    {invoicesLoading ? (
+                      <div className="text-center py-4">
+                        <div className="animate-spin rounded-full h-8 w-8 border-2 border-green-500 border-t-transparent mx-auto"></div>
+                        <p className="text-sm text-gray-600 mt-2">Loading payment history...</p>
+                      </div>
+                    ) : invoices.length === 0 ? (
+                      <p className="text-sm text-gray-600">No payments yet.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-4">
+                          <p className="text-sm text-blue-900">
+                            <strong>{invoices.filter(inv => inv.status === 'paid').length}</strong> of <strong>{loan.term_weeks}</strong> payments completed
+                          </p>
+                          <div className="mt-2 bg-blue-100 rounded-full h-2 overflow-hidden">
+                            <div 
+                              className="bg-blue-600 h-full transition-all duration-500"
+                              style={{ width: `${(invoices.filter(inv => inv.status === 'paid').length / loan.term_weeks) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                        
+                        {invoices.slice(0, 5).map((invoice) => (
+                          <div key={invoice.id} className="border border-gray-200 rounded-lg p-3">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <div className="space-y-1">
+                                  <p className="text-sm font-medium text-gray-900">
+                                    ${invoice.base_amount?.toFixed(2) || invoice.amount_due.toFixed(2)}
+                                  </p>
+                                  {invoice.has_late_fee && (
+                                    <p className="text-xs font-medium text-red-600">
+                                      + ${invoice.late_fee_amount?.toFixed(2)} late fee
+                                    </p>
+                                  )}
+                                  {invoice.has_late_fee && (
+                                    <p className="text-xs font-semibold text-gray-900">
+                                      Total: ${invoice.amount_due.toFixed(2)}
+                                    </p>
+                                  )}
+                                </div>
+                                <p className="text-xs text-gray-500">
+                                  Due: {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : 'N/A'}
+                                </p>
+                                {invoice.is_late_fee_invoice && (
+                                  <p className="text-xs text-orange-600 font-medium">
+                                    ⚠️ Includes late fee
+                                  </p>
+                                )}
+                              </div>
+                              <div className="text-right">
+                                {invoice.status === 'paid' ? (
+                                  <div>
+                                    <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
+                                      Paid
+                                    </span>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                      {invoice.paid_at ? new Date(invoice.paid_at).toLocaleDateString() : ''}
+                                    </p>
+                                  </div>
+                                ) : invoice.status === 'open' ? (
+                                  <div>
+                                    <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
+                                      Open
+                                    </span>
+                                    {invoice.hosted_invoice_url && (
+                                      <a
+                                        href={invoice.hosted_invoice_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="block text-xs text-blue-600 hover:text-blue-800 mt-1"
+                                      >
+                                        View Invoice →
+                                      </a>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
+                                    {invoice.status}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        
+                        {invoices.length > 5 && (
+                          <p className="text-sm text-gray-600 text-center pt-2">
+                            Showing 5 of {invoices.length} payments
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -813,20 +842,7 @@ export default function LoanDetail({ params }: LoanDetailProps) {
           </div>
         )}
 
-        {/* Payment Method Setup Modal */}
-        {showPaymentSetup && setupIntentData && (
-          <PaymentMethodSetup
-            isOpen={showPaymentSetup}
-            onClose={() => {
-              setShowPaymentSetup(false);
-              setSetupIntentData(null);
-              setFundingLoading(false);
-            }}
-            onSuccess={handlePaymentMethodSuccess}
-            setupIntentClientSecret={setupIntentData.client_secret}
-            loanDetails={setupIntentData.loan_details}
-          />
-        )}
+
       </UserLayout>
     </RoleRedirect>
   );

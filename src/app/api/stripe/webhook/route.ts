@@ -54,6 +54,169 @@ async function handleIdentityVerification(verificationSession: Stripe.Identity.V
 }
 
 /**
+ * Get or Create Late Fee Product and Price
+ * Ensures we have a reusable late fee product in Stripe
+ */
+async function getOrCreateLateFeePrice(): Promise<string> {
+  try {
+    // Search for existing late fee product
+    const products = await stripe.products.search({
+      query: 'name:"Late Fee"',
+    });
+
+    let product: Stripe.Product;
+    
+    if (products.data.length > 0) {
+      product = products.data[0];
+      console.log('✅ Found existing late fee product:', product.id);
+    } else {
+      // Create new late fee product
+      product = await stripe.products.create({
+        name: 'Late Fee',
+        description: 'Late payment fee for overdue invoices',
+        metadata: {
+          type: 'late_fee',
+        },
+      });
+      console.log('✅ Created late fee product:', product.id);
+    }
+
+    // Search for existing price
+    const prices = await stripe.prices.list({
+      product: product.id,
+      active: true,
+    });
+
+    if (prices.data.length > 0) {
+      const existingPrice = prices.data.find(p => p.unit_amount === 1500); // $15.00
+      if (existingPrice) {
+        console.log('✅ Found existing late fee price:', existingPrice.id);
+        return existingPrice.id;
+      }
+    }
+
+    // Create new price
+    const price = await stripe.prices.create({
+      product: product.id,
+      unit_amount: 1500, // $15.00
+      currency: 'usd',
+      metadata: {
+        type: 'late_fee',
+      },
+    });
+
+    console.log('✅ Created late fee price:', price.id);
+    return price.id;
+
+  } catch (error) {
+    console.error('❌ Error getting/creating late fee price:', error);
+    throw error;
+  }
+}
+
+/**
+ * Handle Overdue Invoice Events
+ * Voids the original invoice and creates a new one with late fee
+ */
+async function handleOverdueInvoice(invoice: Stripe.Invoice) {
+  try {
+    // Get subscription ID from the first subscription line item
+    const subscriptionLineItem = invoice.lines.data.find(line => line.subscription);
+    const subscriptionId = subscriptionLineItem?.subscription as string;
+
+    console.log('⏰ Processing overdue invoice:', {
+      invoiceId: invoice.id,
+      customerId: invoice.customer,
+      subscriptionId: subscriptionId,
+      amount: invoice.amount_due / 100,
+    });
+
+    // Check if this is already a late fee invoice
+    if (invoice.metadata?.is_late_fee_invoice === 'true') {
+      console.log('ℹ️ Skipping late fee for invoice that already includes late fees');
+      return;
+    }
+
+    // Check if late fee was already applied
+    if (invoice.metadata?.has_late_fee_applied === 'true') {
+      console.log('ℹ️ Late fee already applied to this invoice');
+      return;
+    }
+
+    // Skip if no subscription found (not a subscription invoice)
+    if (!subscriptionId) {
+      console.log('ℹ️ No subscription found for invoice, skipping late fee');
+      return;
+    }
+
+    // Get late fee price
+    const lateFeePrice = await getOrCreateLateFeePrice();
+
+    if (!invoice.id) {
+      console.error('❌ No invoice ID found in invoice object');
+      return;
+    }
+
+    // Mark original invoice with metadata before voiding
+    await stripe.invoices.update(invoice.id, {
+      metadata: {
+        ...invoice.metadata,
+        has_late_fee_applied: 'true',
+      },
+    });
+
+    // Void the original invoice
+    await stripe.invoices.voidInvoice(invoice.id);
+    console.log('✅ Voided original invoice:', invoice.id);
+
+    // Create new invoice with original items plus late fee
+    const newInvoice = await stripe.invoices.create({
+      customer: invoice.customer as string
+    });
+
+    // Add all original line items
+    for (const line of invoice.lines.data) {
+      if (line.subscription) {
+        // For subscription items, use the subscription_item property
+        await stripe.invoiceItems.create({
+          customer: invoice.customer as string,
+          invoice: newInvoice.id,
+          subscription: line.subscription as string,
+          quantity: line.quantity || 1,
+          description: line.description || undefined,
+        });
+      }
+    }
+
+    // Add late fee
+    await stripe.invoiceItems.create({
+      customer: invoice.customer as string,
+      invoice: newInvoice.id,
+      pricing :{
+        price: lateFeePrice,
+      },
+      description: `Late fee for overdue invoice ${invoice.number || invoice.id}`,
+    });
+
+    // Finalize and send the new invoice
+    await stripe.invoices.finalizeInvoice(newInvoice.id as string);
+    
+    // Send the invoice to customer
+    await stripe.invoices.sendInvoice(newInvoice.id as string);
+
+    console.log('✅ Created and sent new invoice with late fee:', {
+      newInvoiceId: newInvoice.id,
+      originalInvoiceId: invoice.id,
+      totalAmount: newInvoice.amount_due / 100,
+    });
+
+  } catch (error) {
+    console.error('❌ Error handling overdue invoice:', error);
+    throw error;
+  }
+}
+
+/**
  * Handle Subscription Payment Events
  * Updates payment records and loan status based on subscription events
  */
@@ -366,7 +529,14 @@ export async function POST(request: NextRequest) {
         break;
 
       case 'invoice.payment_failed':
-        console.log('📄 Invoice payment failed:', event.data.object.id);
+        const failedInvoice = event.data.object as Stripe.Invoice;
+        console.log('📄 Invoice payment failed:', {
+          invoiceId: failedInvoice.id,
+          customerId: failedInvoice.customer,
+          amount: failedInvoice.amount_due / 100,
+          attemptCount: failedInvoice.attempt_count,
+          nextPaymentAttempt: failedInvoice.next_payment_attempt ? new Date(failedInvoice.next_payment_attempt * 1000).toISOString() : null,
+        });
         await handleSubscriptionPayment(event.data.object, 'failed');
         break;
 
@@ -380,6 +550,30 @@ export async function POST(request: NextRequest) {
 
       case 'customer.subscription.deleted':
         console.log('🗑️ Subscription deleted:', event.data.object.id);
+        break;
+      
+      case 'invoice.sent':
+        const sentInvoice = event.data.object as Stripe.Invoice;
+        console.log('📧 Invoice sent to customer:', {
+          invoiceId: sentInvoice.id,
+          customerEmail: sentInvoice.customer_email,
+          hostedInvoiceUrl: sentInvoice.hosted_invoice_url,
+          amountDue: sentInvoice.amount_due / 100,
+          dueDate: sentInvoice.due_date ? new Date(sentInvoice.due_date * 1000).toISOString() : null,
+        });
+        break;
+      
+      case 'invoice.created':
+        console.log('🆕 Invoice created:', event.data.object.id);
+        break;
+      
+      case 'invoice.finalized':
+        console.log('✅ Invoice finalized:', event.data.object.id);
+        break;
+      
+      case 'invoice.overdue':
+        console.log('⏰ Invoice overdue:', event.data.object.id);
+        await handleOverdueInvoice(event.data.object);
         break;
 
       case 'identity.verification_session.verified':

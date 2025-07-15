@@ -82,64 +82,6 @@ export default function LoanDetail({ params }: LoanDetailProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Remove fetchLoanData dependency to prevent infinite loop
 
-  // Optimized polling effect for DocuSign status updates
-  useEffect(() => {
-    let intervalId: NodeJS.Timeout;
-    let pollCount = 0;
-    const maxPolls = 20; // Stop polling after 5 minutes (20 * 15s)
-
-    // Only poll when DocuSign status is 'sent' (awaiting signature)
-    if (loan?.docusign_status === 'sent' && loan?.docusign_envelope_id) {
-      console.log('🔄 Starting DocuSign status polling for envelope:', loan.docusign_envelope_id);
-      
-      intervalId = setInterval(async () => {
-        try {
-          pollCount++;
-          console.log(`📡 Polling DocuSign status... (${pollCount}/${maxPolls})`);
-          
-          // Use the new DocuSign status API endpoint
-          const response = await fetch(`/api/docusign/status/${loan.docusign_envelope_id}`);
-          
-          if (response.ok) {
-            const statusData = await response.json();
-            console.log('📋 DocuSign status response:', statusData);
-            
-            // If status changed, refetch the loan data
-            if (statusData.statusChanged) {
-              console.log('✅ Status changed! Refetching loan data...');
-              fetchLoanData();
-              // Stop polling once status changes
-              if (intervalId) {
-                clearInterval(intervalId);
-                console.log('🛑 Status changed - stopping polling');
-              }
-            }
-            
-            // Stop polling after max attempts to avoid infinite polling
-            if (pollCount >= maxPolls) {
-              console.log('🛑 Max polling attempts reached - stopping');
-              if (intervalId) {
-                clearInterval(intervalId);
-              }
-            }
-          } else {
-            console.error('❌ Failed to check DocuSign status:', response.status);
-          }
-        } catch (error) {
-          console.error('❌ Error polling DocuSign status:', error);
-        }
-      }, 15000); // Poll every 15 seconds
-    }
-
-    return () => {
-      if (intervalId) {
-        console.log('🛑 Stopping DocuSign status polling');
-        clearInterval(intervalId);
-      }
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loan?.docusign_status, loan?.docusign_envelope_id]);
-
   const handleSendDocuSign = async () => {
     if (!loan) return;
 

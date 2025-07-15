@@ -71,10 +71,6 @@ export async function POST(
 
     console.log('✅ Loan validation passed, proceeding with Stripe setup');
 
-    // Check if this is a setup intent confirmation or initial funding request
-    const body = await request.json().catch(() => ({}));
-    const { setup_intent_id, confirm_funding } = body;
-
     // Step 1: Create or get Stripe customer with full billing information
     let stripeCustomer;
     
@@ -118,65 +114,6 @@ export async function POST(
         .eq('id', borrower.id);
     }
 
-    // If this is not a confirmation request, create setup intent for payment method collection
-    if (!confirm_funding) {
-      console.log('🔧 Creating setup intent for payment method collection');
-      
-      const setupIntent = await stripe.setupIntents.create({
-        customer: stripeCustomer.id,
-        payment_method_types: ['card'],
-        usage: 'off_session',
-        metadata: {
-          loan_id: loanId,
-          loan_number: loan.loan_number,
-          borrower_id: borrower.id,
-          purpose: 'loan_funding_setup',
-        },
-      });
-
-      console.log('✅ Setup intent created:', setupIntent.id);
-
-      return NextResponse.json({
-        requires_payment_method: true,
-        setup_intent: {
-          id: setupIntent.id,
-          client_secret: setupIntent.client_secret,
-        },
-        customer_id: stripeCustomer.id,
-        loan_details: {
-          loan_number: loan.loan_number,
-          weekly_payment: parseFloat(loan.weekly_payment),
-          total_payments: loan.term_weeks,
-          borrower_name: `${borrower.first_name} ${borrower.last_name}`,
-        },
-      });
-    }
-
-    // Continue with funding process after payment method is confirmed
-    console.log('✅ Payment method confirmed, proceeding with loan funding');
-
-    // Verify setup intent was successful
-    if (setup_intent_id) {
-      const setupIntent = await stripe.setupIntents.retrieve(setup_intent_id);
-      
-      if (setupIntent.status !== 'succeeded') {
-        return NextResponse.json(
-          { error: 'Payment method setup failed' },
-          { status: 400 }
-        );
-      }
-
-      // Set the payment method as default for the customer
-      if (setupIntent.payment_method) {
-        await stripe.customers.update(stripeCustomer.id, {
-          invoice_settings: {
-            default_payment_method: setupIntent.payment_method as string,
-          },
-        });
-        console.log('✅ Default payment method set for customer');
-      }
-    }
-
     // Step 2: Create Stripe product for this loan
     const product = await stripe.products.create({
       name: `Loan ${loan.loan_number} - Weekly Payment`,
@@ -207,12 +144,32 @@ export async function POST(
 
     console.log('✅ Created Stripe price:', price.id);
 
-    // Step 4: Create Stripe subscription with immediate billing
-    const subscription = await stripe.subscriptions.create({
+    // Step 4: Create Stripe subscription schedule for better control
+    const startDate = Math.floor(Date.now() / 1000);
+    // TODO: Change to 1 week from now for production: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60)
+    
+    const subscriptionSchedule = await stripe.subscriptionSchedules.create({
       customer: stripeCustomer.id,
-      items: [
+      start_date: startDate,
+      end_behavior: 'cancel', // Automatically cancel after all phases complete
+      phases: [
         {
-          price: price.id,
+          items: [
+            {
+              price: price.id,
+              quantity: 1,
+            },
+          ],
+          iterations: loan.term_weeks, // Number of weekly payments
+          metadata: {
+            loan_id: loanId,
+            loan_number: loan.loan_number,
+            borrower_id: borrower.id,
+          },
+          collection_method: 'send_invoice',
+          invoice_settings: {
+            days_until_due: 5,
+          },
         },
       ],
       metadata: {
@@ -221,93 +178,23 @@ export async function POST(
         borrower_id: borrower.id,
         total_payments: loan.term_weeks.toString(),
       },
-      // Start billing immediately, then weekly
-      collection_method: 'charge_automatically',
-      description: `Weekly payments for loan ${loan.loan_number}`,
-      expand: ['latest_invoice.payment_intent'],
-      payment_settings: {
-        payment_method_options: {
-          card: {
-            request_three_d_secure: 'automatic',
-          },
-        },
-      },
-      // Add metadata to the first invoice/payment intent
-      automatic_tax: {
-        enabled: false,
-      },
     });
 
-    console.log('✅ Created Stripe subscription:', subscription.id);
+    console.log('✅ Created Stripe subscription schedule:', subscriptionSchedule.id);
 
-    // Step 4.5: Get payment intent and update metadata for webhook processing
-    const latestInvoice = subscription.latest_invoice as Stripe.Invoice & {
-      payment_intent?: Stripe.PaymentIntent | string;
-    };
-    
-    let paymentIntentId: string | null = null;
-    if (latestInvoice && latestInvoice.payment_intent) {
-      paymentIntentId = typeof latestInvoice.payment_intent === 'string' 
-        ? latestInvoice.payment_intent 
-        : latestInvoice.payment_intent.id;
-      
-      console.log('💳 Found payment intent:', paymentIntentId);
-      
-      try {
-        await stripe.paymentIntents.update(paymentIntentId, {
-          metadata: {
-            loan_id: loanId,
-            loan_number: loan.loan_number,
-            borrower_id: borrower.id,
-            payment_type: 'first_payment',
-            subscription_id: subscription.id,
-          },
-        });
-        console.log('✅ Updated payment intent metadata successfully');
-      } catch (error) {
-        console.error('❌ Failed to update payment intent metadata:', error);
-      }
-    } else {
-      console.log('⚠️ No payment intent found in subscription invoice');
-    }
+    // Get the subscription ID from the schedule
+    const subscription = subscriptionSchedule.subscription as string;
 
-    // Step 5: Wait for webhook to process payment (simplified approach)
-    console.log('⏳ Waiting for webhook to process payment...');
-    
-    let firstPaymentStatus = 'succeeded'; // Assume success since Stripe created subscription
-    
-    // Wait 3 seconds for webhook to process
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    
-    // Check if webhook processed the payment
-    if (paymentIntentId) {
-      const { data: existingPayment } = await supabase
-        .from('payments')
-        .select('status')
-        .eq('loan_id', loanId)
-        .eq('stripe_payment_intent_id', paymentIntentId)
-        .single();
-      
-      if (existingPayment?.status === 'completed') {
-        console.log('✅ Webhook processed payment successfully');
-        firstPaymentStatus = 'succeeded';
-      } else {
-        console.log('⏳ Webhook still processing - loan will be updated automatically');
-        firstPaymentStatus = 'processing';
-      }
-    } else {
-      console.log('⚠️ No payment intent to track - assuming success');
-    }
+    console.log('✅ Enabled invoice emails for customer');
 
     // Step 6: Update loan record with Stripe information
     const { error: updateError } = await supabase
       .from('loans')
       .update({
-        stripe_subscription_id: subscription.id,
+        stripe_subscription_id: subscription || subscriptionSchedule.id,
         stripe_product_id: product.id,
         stripe_price_id: price.id,
-        status: firstPaymentStatus === 'succeeded' ? 'funded' : 
-               firstPaymentStatus === 'processing' ? 'funding_in_progress' : 'payment_failed',
+        status: 'funded',
         funding_date: new Date().toISOString().split('T')[0], // Today's date
         updated_at: new Date().toISOString(),
       })
@@ -322,47 +209,16 @@ export async function POST(
       );
     }
 
-    // Step 7: Get payment schedule to sync with our database
-    const { data: paymentSchedules } = await supabase
-      .from('payment_schedules')
-      .select('*')
-      .eq('loan_id', loanId)
-      .order('payment_number');
-
-    const firstPaymentId = latestInvoice?.payment_intent ? 
-      (typeof latestInvoice.payment_intent === 'string' ? 
-        latestInvoice.payment_intent : 
-        (latestInvoice.payment_intent as Stripe.PaymentIntent).id
-      ) : 
-      null;
-
-    console.log('✅ Loan funding completed successfully', {
-      loanId,
-      customerId: stripeCustomer.id,
-      subscriptionId: subscription.id,
-      firstPaymentId,
-      firstPaymentStatus,
-      scheduledPayments: paymentSchedules?.length || 0,
-    });
-
     return NextResponse.json({
       success: true,
-      message: firstPaymentStatus === 'succeeded' ? 
-        'Loan funded successfully and first payment processed!' : 
-        firstPaymentStatus === 'processing' ? 
-        'Loan created and payment is processing. Status will update automatically.' :
-        'Loan created but first payment failed',
+      message: 'Loan funded successfully! The borrower will receive an email invoice for their first payment.',
       data: {
         loan_id: loanId,
         stripe_customer_id: stripeCustomer.id,
-        stripe_subscription_id: subscription.id,
+        stripe_subscription_schedule_id: subscriptionSchedule.id,
+        stripe_subscription_id: subscription,
         stripe_product_id: product.id,
         stripe_price_id: price.id,
-        first_payment_intent_id: firstPaymentId,
-        first_payment_status: firstPaymentStatus,
-        weekly_payment_amount: parseFloat(loan.weekly_payment),
-        total_payments: loan.term_weeks,
-        next_payment_date: new Date(Date.now() + (7 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0],
       },
     });
 
