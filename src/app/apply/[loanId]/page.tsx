@@ -15,8 +15,7 @@ export default function ApplyPage() {
   const params = useParams();
   const loanId = params.loanId as string;
 
-  const [step, setStep] = useState(0); // 0: loading, 1: welcome, 2-4: form, 5: success, -1: error
-  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [step, setStep] = useState(0); // 0: loading, 1: welcome, 2-8: form steps, 9: success, -1: error
   const [formData, setFormData] = useState<Record<string, unknown>>({
     // Phone verification
     phoneNumber: '',
@@ -228,8 +227,8 @@ export default function ApplyPage() {
           }
 
           // Check for application completion
-          if (newRecord.status === 'application_completed' && !showSuccessDialog) {
-            setShowSuccessDialog(true);
+          if (newRecord.status === 'application_completed' && step !== 9) {
+            setStep(9);
           }
         }
       )
@@ -249,7 +248,7 @@ export default function ApplyPage() {
       console.log('Cleaning up realtime subscription');
       supabase.removeChannel(channel);
     };
-  }, [loanId, showSuccessDialog]);
+  }, [loanId, step]);
 
   const saveProgress = async (currentStep: number, data: Record<string, unknown>) => {
     try {
@@ -288,8 +287,8 @@ export default function ApplyPage() {
         throw new Error(err.message || 'Failed to submit application.');
       }
       
-      // Show success dialog instead of moving to step 8
-      setShowSuccessDialog(true);
+      // Go directly to congratulations page (step 9)
+      setStep(9);
       
       // Update the loan status in realtime (will be handled by server response)
       console.log('🎉 Application submitted successfully!');
@@ -319,13 +318,13 @@ export default function ApplyPage() {
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 flex flex-col items-center justify-center p-4 font-sans">
       <div className="w-full max-w-4xl">
         {/* Header and Step Indicator */}
-        {step > 1 && step <= 9 && (
+        {step > 1 && step <= 8 && (
           <div className="mb-8">
-            <p className="text-sm font-semibold text-purple-600">Step {step - 1} of {steps.length -1}</p>
+            <p className="text-sm font-semibold text-purple-600">Step {step - 1} of {steps.length}</p>
             <div className="mt-2 w-full bg-gray-200 rounded-full h-1.5">
               <div
                 className="bg-gradient-to-r from-purple-500 to-blue-500 h-1.5 rounded-full transition-all duration-500 ease-out"
-                style={{ width: `${((step - 1) / (steps.length - 1)) * 100}%` }}
+                style={{ width: `${((step - 1) / steps.length) * 100}%` }}
               ></div>
             </div>
           </div>
@@ -357,44 +356,6 @@ export default function ApplyPage() {
             )}
 
             {step === 9 && <SuccessMessage />}
-            
-            {/* Success Dialog Modal */}
-            {showSuccessDialog && (
-              <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-8 w-full max-w-lg mx-auto border border-white/20">
-                  <div className="text-center">
-                    <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                      <Check className="w-10 h-10 text-green-500" />
-                    </div>
-                    <h2 className="text-3xl font-bold text-gray-900 mb-4">Application Submitted!</h2>
-                    <p className="text-gray-600 mb-8 text-lg">
-                      Your loan application has been successfully submitted and is now under review. 
-                      We&apos;ll contact you within 2-3 business days with the next steps.
-                    </p>
-                    <div className="space-y-4">
-                      <button
-                        className="w-full bg-gradient-to-r from-green-500 to-teal-500 text-white font-bold py-4 px-8 rounded-2xl hover:from-green-600 hover:to-teal-600 transition-all duration-300 shadow-lg hover:shadow-xl"
-                        onClick={() => {
-                          setShowSuccessDialog(false);
-                          setStep(9); // Show the detailed success page
-                        }}
-                      >
-                        View Details
-                      </button>
-                      <button
-                        className="w-full bg-gray-200 text-gray-900 font-semibold py-4 px-8 rounded-2xl hover:bg-gray-300 transition-all duration-300 shadow-sm hover:shadow-md"
-                        onClick={() => {
-                          setShowSuccessDialog(false);
-                          // Could redirect to a different page or close the application
-                        }}
-                      >
-                        Close
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
           </motion.div>
         </AnimatePresence>
       </div>
