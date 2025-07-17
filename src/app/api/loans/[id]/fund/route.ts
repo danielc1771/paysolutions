@@ -145,7 +145,7 @@ export async function POST(
     console.log('✅ Created Stripe price:', price.id);
 
     // Step 4: Create Stripe subscription schedule for better control
-    const startDate = Math.floor(Date.now() / 1000) - (7 * 24 * 60 * 60);
+    const startDate = Math.floor(Date.now() / 1000);
     // TODO: Change to 1 week from now for production: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60)
     
     const subscriptionSchedule = await stripe.subscriptionSchedules.create({
