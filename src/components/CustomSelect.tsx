@@ -15,13 +15,15 @@ interface CustomSelectProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  className?: string;
 }
 
-export default function CustomSelect({ options, value, onChange, placeholder }: CustomSelectProps) {
+export default function CustomSelect({ options, value, onChange, placeholder, className }: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
   const selectRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLUListElement>(null);
 
   const selectedOption = options.find(option => option.value === value);
 
@@ -38,7 +40,8 @@ export default function CustomSelect({ options, value, onChange, placeholder }: 
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (selectRef.current && !selectRef.current.contains(event.target as Node)) {
+      if (selectRef.current && !selectRef.current.contains(event.target as Node) && 
+          dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
     };
@@ -83,7 +86,7 @@ export default function CustomSelect({ options, value, onChange, placeholder }: 
       <button
         ref={buttonRef}
         type="button"
-        className="w-full px-4 py-3 rounded-2xl border-0 bg-white/60 backdrop-blur-sm shadow-sm focus:ring-2 focus:ring-green-500 focus:outline-none text-sm text-gray-900 transition-all duration-300 flex items-center justify-between"
+        className={className || "w-full px-4 py-3 rounded-2xl border-0 bg-white/60 backdrop-blur-sm shadow-sm focus:ring-2 focus:ring-green-500 focus:outline-none text-sm text-gray-900 transition-all duration-300 flex items-center justify-between"}
         onClick={handleToggle}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
@@ -94,6 +97,7 @@ export default function CustomSelect({ options, value, onChange, placeholder }: 
 
       {isOpen && typeof window !== 'undefined' && createPortal(
         <ul
+          ref={dropdownRef}
           className="fixed bg-white border border-gray-200 rounded-2xl shadow-xl max-h-60 overflow-auto focus:outline-none"
           style={{
             top: dropdownPosition.top,

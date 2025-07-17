@@ -7,6 +7,7 @@ import { RoleRedirect } from '@/components/auth/RoleRedirect';
 import { createClient } from '@/utils/supabase/client';
 import { getAvailableTerms, calculateLoanPayment, generateWeeklyPaymentSchedule } from '@/utils/loan-calculations';
 import { Calculator, DollarSign } from 'lucide-react';
+import CustomSelect from '@/components/CustomSelect';
 
 export default function CreateLoan() {
   const router = useRouter();
@@ -238,33 +239,29 @@ export default function CreateLoan() {
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Loan Amount *</label>
-                        <select
-                          required
+                        <CustomSelect
+                          options={loanAmountOptions.map(amount => ({
+                            value: amount,
+                            label: `$${parseInt(amount).toLocaleString()}`
+                          }))}
                           value={sendFormData.loanAmount}
-                          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleLoanAmountChange(e.target.value)}
-                          className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
-                        >
-                          <option value="">Select loan amount</option>
-                          {loanAmountOptions.map(amount => (
-                            <option key={amount} value={amount}>${parseInt(amount).toLocaleString()}</option>
-                          ))}
-                        </select>
+                          onChange={(value) => handleLoanAmountChange(value)}
+                          placeholder="Select loan amount"
+                          className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white transition-all duration-300 flex items-center justify-between"
+                        />
                       </div>
                       
                       {/* Loan Term Selection */}
                       {sendFormData.loanAmount && (
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">Loan Term *</label>
-                          <select
-                            required
+                          <CustomSelect
+                            options={availableTerms}
                             value={sendFormData.loanTerm}
-                            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSendFormData(prev => ({ ...prev, loanTerm: e.target.value }))}
-                            className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
-                          >
-                            {availableTerms.map(option => (
-                              <option key={option.value} value={option.value}>{option.label}</option>
-                            ))}
-                          </select>
+                            onChange={(value) => setSendFormData(prev => ({ ...prev, loanTerm: value }))}
+                            placeholder="Select loan term"
+                            className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white transition-all duration-300 flex items-center justify-between"
+                          />
                         </div>
                       )}
                     </div>
