@@ -387,94 +387,6 @@ async function handleSubscriptionPayment(invoice: Stripe.Invoice & {
   }
 }
 
-/**
- * Handle Payment Intent Events
- * For one-time payments like the first payment
- */
-async function handlePaymentIntent(paymentIntent: Stripe.PaymentIntent, status: 'succeeded' | 'failed') {
-  try {
-    console.log('💰 Processing payment intent:', {
-      paymentIntentId: paymentIntent.id,
-      status,
-      amount: paymentIntent.amount,
-      metadata: paymentIntent.metadata
-    });
-
-    const supabase = await createClient();
-    const loanId = paymentIntent.metadata?.loan_id;
-    const paymentType = paymentIntent.metadata?.payment_type;
-
-    if (!loanId) {
-      console.error('❌ No loan_id found in payment intent metadata');
-      return;
-    }
-
-    if (paymentType === 'first_payment' && status === 'succeeded') {
-      // Record the first payment
-      const { data: firstPayment } = await supabase
-        .from('payment_schedules')
-        .select('*')
-        .eq('loan_id', loanId)
-        .eq('payment_number', 1)
-        .single();
-
-      if (firstPayment) {
-        // Update first payment as paid
-        await supabase
-          .from('payment_schedules')
-          .update({
-            status: 'paid',
-            paid_date: new Date().toISOString().split('T')[0],
-            paid_amount: (paymentIntent.amount / 100).toString(),
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', firstPayment.id);
-
-        // Create payment record
-        await supabase
-          .from('payments')
-          .insert({
-            loan_id: loanId,
-            payment_schedule_id: firstPayment.id,
-            amount: (paymentIntent.amount / 100).toString(),
-            payment_date: new Date().toISOString().split('T')[0],
-            payment_method: 'stripe_payment_intent',
-            stripe_payment_intent_id: paymentIntent.id,
-            status: 'completed',
-            notes: 'First payment via Stripe Payment Intent'
-          });
-
-        // If this is the first payment, update loan to funded status
-        const { data: loanData } = await supabase
-          .from('loans')
-          .select('status')
-          .eq('id', loanId)
-          .single();
-
-        if (loanData?.status === 'funding_in_progress') {
-          await supabase
-            .from('loans')
-            .update({
-              status: 'funded',
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', loanId);
-
-          console.log('🎉 First payment completed via payment intent - loan now funded:', loanId);
-        }
-
-        console.log('✅ First payment recorded successfully:', {
-          loanId,
-          amount: paymentIntent.amount / 100
-        });
-      }
-    }
-
-  } catch (error) {
-    console.error('❌ Error in handlePaymentIntent:', error);
-    throw error;
-  }
-}
 
 /**
  * Stripe Webhook Handler
@@ -507,22 +419,6 @@ export async function POST(request: NextRequest) {
 
     // Handle different event types
     switch (event.type) {
-      case 'payment_intent.succeeded':
-        console.log('💳 Payment succeeded:', event.data.object.id);
-        await handlePaymentIntent(event.data.object, 'succeeded');
-        break;
-
-      case 'payment_intent.payment_failed':
-        console.log('❌ Payment failed:', event.data.object.id);
-        await handlePaymentIntent(event.data.object, 'failed');
-        break;
-
-      case 'setup_intent.succeeded':
-        console.log('🔧 Setup intent succeeded:', event.data.object.id);
-        // Payment method has been set up successfully
-        // The actual funding completion happens via API call after frontend confirmation
-        break;
-
       case 'invoice.payment_succeeded':
         console.log('📄 Invoice payment succeeded:', event.data.object.id);
         await handleSubscriptionPayment(event.data.object, 'succeeded');
@@ -540,17 +436,6 @@ export async function POST(request: NextRequest) {
         await handleSubscriptionPayment(event.data.object, 'failed');
         break;
 
-      case 'customer.subscription.created':
-        console.log('🔄 Subscription created:', event.data.object.id);
-        break;
-
-      case 'customer.subscription.updated':
-        console.log('🔄 Subscription updated:', event.data.object.id);
-        break;
-
-      case 'customer.subscription.deleted':
-        console.log('🗑️ Subscription deleted:', event.data.object.id);
-        break;
       
       case 'invoice.sent':
         const sentInvoice = event.data.object as Stripe.Invoice;
@@ -561,14 +446,6 @@ export async function POST(request: NextRequest) {
           amountDue: sentInvoice.amount_due / 100,
           dueDate: sentInvoice.due_date ? new Date(sentInvoice.due_date * 1000).toISOString() : null,
         });
-        break;
-      
-      case 'invoice.created':
-        console.log('🆕 Invoice created:', event.data.object.id);
-        break;
-      
-      case 'invoice.finalized':
-        console.log('✅ Invoice finalized:', event.data.object.id);
         break;
       
       case 'invoice.overdue':
@@ -594,14 +471,6 @@ export async function POST(request: NextRequest) {
       case 'identity.verification_session.canceled':
         console.log('❌ Identity verification canceled:', event.data.object.id);
         await handleIdentityVerification(event.data.object, 'canceled');
-        break;
-
-      case 'customer.created':
-        console.log('👤 Customer created:', event.data.object.id);
-        break;
-
-      case 'customer.updated':
-        console.log('👤 Customer updated:', event.data.object.id);
         break;
 
       default:
