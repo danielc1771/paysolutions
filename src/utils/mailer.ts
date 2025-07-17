@@ -22,9 +22,9 @@ export const sendLoanApplicationEmail = async ({
 }: LoanApplicationEmailData) => {
   try {
     const { data, error } = await resend.emails.send({
-      from: 'PaySolutions <onboarding@resend.dev>',
+      from: 'iPayUS <noreply@mail.ipayus.net>',
       to: [to],
-      subject: 'Complete Your Loan Application - PaySolutions',
+      subject: 'Complete Your Loan Application - iPayUS',
       react: LoanApplicationTemplate({
         firstName,
         applicationUrl,
