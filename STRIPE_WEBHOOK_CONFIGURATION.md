@@ -1,9 +1,9 @@
 # Stripe Webhook Configuration Guide
 
 ## Current Status
-- **Production Domain**: `https://paysolutions.vercel.app`
-- **Webhook Endpoint**: `https://paysolutions.vercel.app/api/stripe/webhook`
-- **Current Webhook Secret**: `we_1Rj0rzQkbOB6oeg3ZTVU3CBF`
+- **Production Domain**: Use your production domain (e.g., `https://your-domain.com`)
+- **Webhook Endpoint**: `https://your-domain.com/api/stripe/webhook`
+- **Webhook Secret**: Configure in Stripe Dashboard (starts with `whsec_`)
 
 ## Step-by-Step Configuration
 
@@ -27,8 +27,8 @@
 
 1. **Create New Webhook**
    - Click "Add endpoint"
-   - Enter URL: `https://paysolutions.vercel.app/api/stripe/webhook`
-   - Description: "PaySolutions Production Webhook"
+   - Enter URL: `https://your-domain.com/api/stripe/webhook`
+   - Description: "iPayUS Production Webhook"
 
 2. **Select Events to Listen For**
    ```
@@ -74,7 +74,7 @@
 stripe login
 
 # Test webhook endpoint
-stripe listen --forward-to https://paysolutions.vercel.app/api/stripe/webhook
+stripe listen --forward-to https://your-domain.com/api/stripe/webhook
 
 # In another terminal, trigger test events
 stripe trigger identity.verification_session.verified
@@ -108,12 +108,12 @@ vercel logs --follow
 **Check these items:**
 
 1. **SSL Certificate**
-   - Visit https://paysolutions.vercel.app
+   - Visit https://your-domain.com
    - Ensure the padlock icon shows secure connection
    - Certificate should be valid and not self-signed
 
 2. **Endpoint Accessibility**
-   - Test: `curl -X POST https://paysolutions.vercel.app/api/stripe/webhook`
+   - Test: `curl -X POST https://your-domain.com/api/stripe/webhook`
    - Should return 400 (signature verification failed) - this is expected
 
 3. **Environment Variables**

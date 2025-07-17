@@ -101,8 +101,8 @@ export default function OTPInput({ value, onChange, numDigits = 6, disabled = fa
           disabled={disabled}
           className={`
             w-14 h-16 text-2xl font-bold text-center rounded-xl border-2 
-            transition-all duration-200 outline-none
-            ${digit ? 'border-purple-500 bg-purple-50' : 'border-gray-300 bg-white'}
+            transition-all duration-200 outline-none text-gray-900
+            ${digit ? 'border-purple-500 bg-purple-50 text-purple-900' : 'border-gray-300 bg-white text-gray-900'}
             ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-purple-400 focus:border-purple-600 focus:ring-2 focus:ring-purple-200'}
           `}
         />
