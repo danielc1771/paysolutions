@@ -454,8 +454,14 @@ export default function CreateLoan() {
 
         {/* Success Modal */}
         {showSuccessModal && (
-          <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm flex items-center justify-center z-50">
-            <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-8 w-96 border border-white/20">
+          <div 
+            className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm flex items-center justify-center z-50"
+            onClick={() => setShowSuccessModal(false)}
+          >
+            <div 
+              className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-8 w-96 border border-white/20"
+              onClick={(e) => e.stopPropagation()}
+            >
               <div className="text-center">
                 <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
