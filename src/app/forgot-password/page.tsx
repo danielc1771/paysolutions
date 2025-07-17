@@ -52,7 +52,7 @@ export default function ForgotPasswordPage() {
           <div className="flex items-center justify-center mb-2">
             <Image 
               src="/logoMain.png" 
-              alt="PaySolutions Logo" 
+              alt="iPayUS Logo" 
               width={200} 
               height={200}
               className="rounded-2xl shadow-lg"

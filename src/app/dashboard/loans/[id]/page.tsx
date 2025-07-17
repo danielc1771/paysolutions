@@ -286,7 +286,7 @@ export default function LoanDetail({ params }: LoanDetailProps) {
 
   if (loading) {
     return (
-      <RoleRedirect allowedRoles={['user']}>
+      <RoleRedirect allowedRoles={['admin', 'user', 'organization_owner']}>
         <UserLayout>
           <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-teal-100 flex items-center justify-center">
             <div className="text-center">
@@ -301,7 +301,7 @@ export default function LoanDetail({ params }: LoanDetailProps) {
 
   if (error || !loan) {
     return (
-      <RoleRedirect allowedRoles={['user']}>
+      <RoleRedirect allowedRoles={['admin', 'user', 'organization_owner']}>
         <UserLayout>
           <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-teal-100 flex items-center justify-center">
             <div className="text-center">
@@ -326,7 +326,7 @@ export default function LoanDetail({ params }: LoanDetailProps) {
   }
 
   return (
-    <RoleRedirect allowedRoles={['user']}>
+    <RoleRedirect allowedRoles={['admin', 'user', 'organization_owner']}>
       <UserLayout>
         <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-teal-100">
           <div className="p-8">

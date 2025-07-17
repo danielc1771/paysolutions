@@ -26,7 +26,7 @@ export function LoanApplicationTemplate({
     <html>
       <body style={{
         margin: 0,
-        padding: 0,
+        padding: '40px 0',
         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
       }}>
@@ -54,18 +54,18 @@ export function LoanApplicationTemplate({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
+              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+              overflow: 'hidden'
             }}>
-              <div style={{
-                fontSize: '32px',
-                fontWeight: 'bold',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                WebkitBackgroundClip: 'text',
-                backgroundClip: 'text',
-                color: 'transparent'
-              }}>
-                PS
-              </div>
+              <img 
+                src={`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/logoMain.png`}
+                alt="iPayUS Logo" 
+                style={{
+                  width: '60px',
+                  height: '60px',
+                  objectFit: 'contain'
+                }}
+              />
             </div>
             <h1 style={{
               color: 'white',
@@ -74,7 +74,7 @@ export function LoanApplicationTemplate({
               fontWeight: '700',
               letterSpacing: '-0.025em'
             }}>
-              PaySolutions
+              iPayUS
             </h1>
             <p style={{
               color: 'rgba(255, 255, 255, 0.9)',
@@ -102,7 +102,7 @@ export function LoanApplicationTemplate({
               fontSize: '16px',
               lineHeight: '1.6'
             }}>
-              Thank you for your interest in a loan with PaySolutions. We&apos;re excited to help you with your financing needs. 
+              Thank you for your interest in a loan with iPayUS. We&apos;re excited to help you with your financing needs. 
               Your personalized application is ready and waiting for you to complete.
             </p>
 
@@ -263,7 +263,7 @@ export function LoanApplicationTemplate({
               fontWeight: '600',
               fontSize: '16px'
             }}>
-              The PaySolutions Team
+              The iPayUS Team
             </p>
             <p style={{
               color: '#6b7280',
@@ -283,7 +283,7 @@ export function LoanApplicationTemplate({
                 margin: 0,
                 fontSize: '12px'
               }}>
-                © 2024 PaySolutions. All rights reserved.
+                © 2024 iPayUS. All rights reserved.
               </p>
             </div>
           </div>

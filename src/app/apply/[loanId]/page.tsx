@@ -699,7 +699,7 @@ function WelcomeStep({ initialData, handleNext }: { initialData: LoanApplication
             <div className="text-center mb-8">
                 <Image 
                   src="/logoMain.png" 
-                  alt="PaySolutions Logo" 
+                  alt="iPayUS Logo" 
                   width={150} 
                   height={150}
                   className="rounded-2xl shadow-lg mx-auto"
@@ -1705,7 +1705,7 @@ function ConsentStep({ formData, setFormData, handleNext, handlePrev }: {
                 className="mt-1 w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
               />
               <div>
-                <span className="text-gray-900 font-semibold">I consent to be contacted by PaySolutions regarding my loan</span>
+                <span className="text-gray-900 font-semibold">I consent to be contacted by iPayUS regarding my loan</span>
                 <p className="text-sm text-gray-600 mt-1">
                   This includes loan updates, payment notifications, account information, and customer service communications.
                 </p>

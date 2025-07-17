@@ -12,6 +12,35 @@ interface UserLayoutProps {
   children: React.ReactNode;
 }
 
+// Color theme options with their gradient values
+const COLOR_THEMES: Record<string, { gradient: string, bgGradient: string, shadow: string }> = {
+  default: {
+    gradient: 'from-green-500 to-teal-500',
+    bgGradient: 'from-green-50 via-blue-50 to-teal-100',
+    shadow: 'shadow-green-500/25'
+  },
+  blue: {
+    gradient: 'from-blue-500 to-cyan-500',
+    bgGradient: 'from-blue-50 via-cyan-50 to-blue-100',
+    shadow: 'shadow-blue-500/25'
+  },
+  purple: {
+    gradient: 'from-purple-500 to-indigo-500',
+    bgGradient: 'from-purple-50 via-indigo-50 to-purple-100',
+    shadow: 'shadow-purple-500/25'
+  },
+  amber: {
+    gradient: 'from-amber-500 to-orange-500',
+    bgGradient: 'from-amber-50 via-yellow-50 to-orange-100',
+    shadow: 'shadow-amber-500/25'
+  },
+  rose: {
+    gradient: 'from-rose-500 to-pink-500',
+    bgGradient: 'from-rose-50 via-pink-50 to-rose-100',
+    shadow: 'shadow-rose-500/25'
+  }
+};
+
 export default function UserLayout({ children }: UserLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -19,8 +48,10 @@ export default function UserLayout({ children }: UserLayoutProps) {
   const [showNotifications, setShowNotifications] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [user, setUser] = useState<any>(null);
-  const [] = useState<Record<string, unknown>[]>([]);
-  const [unreadCount] = useState(0);
+  // Removed unused notification state variables
+  // orgSettings is used for fetching but not directly rendered
+  const [logoUrl, setLogoUrl] = useState('/logoMain.png'); // Default logo
+  const [colorTheme, setColorTheme] = useState('default'); // Default theme
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
@@ -28,7 +59,7 @@ export default function UserLayout({ children }: UserLayoutProps) {
   // Use the new role system
   const { profile, loading } = useUserProfile();
 
-  // Get user on mount
+  // Get user on mount and fetch organization settings
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -48,6 +79,45 @@ export default function UserLayout({ children }: UserLayoutProps) {
 
     return () => subscription.unsubscribe();
   }, [supabase.auth, router]);
+  
+  // Fetch organization settings
+  useEffect(() => {
+    const fetchOrgSettings = async () => {
+      if (!profile?.organizationId) return;
+      
+      try {
+        // Fetch organization settings
+        const { data, error } = await supabase
+          .from('organization_settings')
+          .select('*')
+          .eq('organization_id', profile.organizationId)
+          .single();
+        
+        if (error && error.code !== 'PGRST116') {
+          console.error('Error fetching organization settings:', error);
+          // Continue with defaults on error
+          return;
+        }
+        
+        if (data) {
+          // Set logo if available, otherwise keep default
+          if (data.logo_url) {
+            setLogoUrl(data.logo_url);
+          }
+          
+          // Set color theme if available, otherwise keep default
+          if (data.color_theme && COLOR_THEMES[data.color_theme]) {
+            setColorTheme(data.color_theme);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching organization settings:', error);
+        // Keep defaults on error - no additional action needed
+      }
+    };
+    
+    fetchOrgSettings();
+  }, [profile, supabase]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -97,8 +167,8 @@ export default function UserLayout({ children }: UserLayoutProps) {
       name: 'Team',
       href: '/dashboard/team',
       icon: <UserPlus className="w-5 h-5" />,
-      // Only show for users and organization owners, not team members
-      roles: ['user', 'organization_owner'],
+      // Only show for admins, users and organization owners, not team members
+      roles: ['admin', 'user', 'organization_owner'],
     },
   ];
 
@@ -122,15 +192,18 @@ export default function UserLayout({ children }: UserLayoutProps) {
     );
   }
 
+  // Get current theme colors
+  const currentTheme = COLOR_THEMES[colorTheme] || COLOR_THEMES.default;
+  
   return (
-    <div className="flex h-screen bg-gradient-to-br from-green-50 via-blue-50 to-teal-100">
+    <div className={`flex h-screen bg-gradient-to-br ${currentTheme.bgGradient}`}>
       {/* Sidebar */}
       <div className="w-72 bg-white/20 backdrop-blur-xl border-r border-white/30 flex flex-col">
         {/* Logo */}
-        <div className="flex items-center justify-center h-24 border-b border-white/20">
+        <div className="flex items-center justify-center h-24 pt-6 border-b border-white/20">
           <Image 
-            src="/logoMain.png" 
-            alt="PaySolutions Logo" 
+            src={logoUrl} 
+            alt="Organization Logo" 
             width={200} 
             height={200}
             className="rounded-xl shadow-lg"
@@ -148,7 +221,7 @@ export default function UserLayout({ children }: UserLayoutProps) {
                 href={item.href}
                 className={`group flex items-center px-4 py-4 text-sm font-semibold rounded-2xl transition-all duration-300 ${
                   isActive
-                    ? 'bg-gradient-to-r from-green-500 to-teal-500 text-white shadow-lg shadow-green-500/25'
+                    ? `bg-gradient-to-r ${currentTheme.gradient} text-white shadow-lg ${currentTheme.shadow}`
                     : 'text-gray-700 hover:bg-white/60 hover:backdrop-blur-sm hover:shadow-lg'
                 }`}
               >
@@ -220,11 +293,7 @@ export default function UserLayout({ children }: UserLayoutProps) {
                     className="p-2 text-gray-600 hover:text-gray-800 bg-white/60 backdrop-blur-sm rounded-xl hover:bg-white/80 transition-all duration-300 relative"
                   >
                     <Bell className="w-5 h-5" />
-                    {unreadCount > 0 && (
-                      <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
-                        {unreadCount > 9 ? '9+' : unreadCount}
-                      </div>
-                    )}
+                    {/* Notification count will be implemented later */}
                   </button>
                 </div>
 
@@ -276,13 +345,15 @@ export default function UserLayout({ children }: UserLayoutProps) {
                           </svg>
                           Profile Settings
                         </button>
-                        <button className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-100/50 rounded-xl transition-colors">
-                          <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                          Organization Settings
-                        </button>
+                        {(profile?.role === 'admin' || profile?.role === 'user' || profile?.role === 'organization_owner') && (
+                          <Link href="/dashboard/settings/organization" className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-100/50 rounded-xl transition-colors">
+                            <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            Organization Settings
+                          </Link>
+                        )}
                         <hr className="my-2 border-gray-200/50" />
                         <button 
                           onClick={handleSignOut}

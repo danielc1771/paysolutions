@@ -142,7 +142,7 @@ export default function AcceptInvitePage() {
         <div className="text-center mb-4">
           <Image 
             src="/logoMain.png" 
-            alt="PaySolutions Logo" 
+            alt="iPayUS Logo" 
             width={200} 
             height={200}
             className="rounded-2xl shadow-lg mx-auto"

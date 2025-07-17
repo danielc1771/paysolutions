@@ -188,6 +188,8 @@ export const organizationSettings = pgTable("organization_settings", {
 	requireDocuSignForAllLoans: boolean("require_docusign_for_all_loans").default(true),
 	allowExtraPayments: boolean("allow_extra_payments").default(true),
 	notificationsEnabled: boolean("notifications_enabled").default(true),
+	logoUrl: varchar("logo_url", { length: 255 }),
+	colorTheme: varchar("color_theme", { length: 50 }).default('default'),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 }, (table) => [
