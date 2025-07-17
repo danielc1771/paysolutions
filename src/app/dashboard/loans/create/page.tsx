@@ -18,6 +18,7 @@ export default function CreateLoan() {
   const [createdLoanId, setCreatedLoanId] = useState<string | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [organizationInfo, setOrganizationInfo] = useState<any>(null);
+  const [validationErrors, setValidationErrors] = useState<{[key: string]: boolean}>({});
   const supabase = createClient();
 
   // Send Application Form State
@@ -71,10 +72,81 @@ export default function CreateLoan() {
     fetchOrganizationInfo();
   }, [supabase]);
 
+  // Validation function
+  const validateForm = () => {
+    const errors: {[key: string]: boolean} = {};
+    let isValid = true;
+
+    // Required field validation
+    if (!sendFormData.customerName.trim()) {
+      errors.customerName = true;
+      isValid = false;
+    }
+    if (!sendFormData.customerEmail.trim()) {
+      errors.customerEmail = true;
+      isValid = false;
+    }
+    if (!sendFormData.loanAmount) {
+      errors.loanAmount = true;
+      isValid = false;
+    }
+    if (!sendFormData.loanTerm) {
+      errors.loanTerm = true;
+      isValid = false;
+    }
+    if (!sendFormData.vehicleYear.trim()) {
+      errors.vehicleYear = true;
+      isValid = false;
+    }
+    if (!sendFormData.vehicleMake.trim()) {
+      errors.vehicleMake = true;
+      isValid = false;
+    }
+    if (!sendFormData.vehicleModel.trim()) {
+      errors.vehicleModel = true;
+      isValid = false;
+    }
+    if (!sendFormData.vehicleVin.trim()) {
+      errors.vehicleVin = true;
+      isValid = false;
+    }
+
+    // Email format validation
+    if (sendFormData.customerEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sendFormData.customerEmail)) {
+      errors.customerEmail = true;
+      isValid = false;
+    }
+
+    setValidationErrors(errors);
+    return isValid;
+  };
+
+  // Scroll to error message
+  const scrollToError = () => {
+    const errorElement = document.querySelector('[data-error-message]');
+    if (errorElement) {
+      errorElement.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'start',
+        inline: 'nearest'
+      });
+    }
+  };
+
   const handleSendApplication = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setValidationErrors({});
+
+    // Validate form before submission
+    if (!validateForm()) {
+      setError('Please fill in all required fields correctly.');
+      setLoading(false);
+      // Scroll to error message after a brief delay to ensure state update
+      setTimeout(scrollToError, 100);
+      return;
+    }
 
     try {
       const response = await fetch('/api/loans/send-application', {
@@ -130,6 +202,8 @@ export default function CreateLoan() {
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
+      // Scroll to error message when server error occurs
+      setTimeout(scrollToError, 100);
     } finally {
       setLoading(false);
     }
@@ -185,7 +259,7 @@ export default function CreateLoan() {
             <div className="bg-white/70 backdrop-blur-sm rounded-3xl shadow-xl border border-white/20 overflow-hidden">
               {/* Status Messages */}
               {error && (
-                <div className="p-6 bg-red-50 border-b border-red-200">
+                <div className="p-6 bg-red-50 border-b border-red-200" data-error-message>
                   <div className="flex items-center">
                     <svg className="w-5 h-5 text-red-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -220,7 +294,7 @@ export default function CreateLoan() {
                           required
                           value={sendFormData.customerName}
                           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSendFormData(prev => ({ ...prev, customerName: e.target.value }))}
-                          className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
+                          className={`w-full px-4 py-3 rounded-2xl border ${validationErrors.customerName ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'} focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white`}
                           placeholder="John Doe"
                         />
                       </div>
@@ -232,7 +306,7 @@ export default function CreateLoan() {
                           required
                           value={sendFormData.customerEmail}
                           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSendFormData(prev => ({ ...prev, customerEmail: e.target.value }))}
-                          className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
+                          className={`w-full px-4 py-3 rounded-2xl border ${validationErrors.customerEmail ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'} focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white`}
                           placeholder="john@example.com"
                         />
                       </div>
@@ -247,7 +321,7 @@ export default function CreateLoan() {
                           value={sendFormData.loanAmount}
                           onChange={(value) => handleLoanAmountChange(value)}
                           placeholder="Select loan amount"
-                          className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white transition-all duration-300 flex items-center justify-between"
+                          className={`w-full px-4 py-3 rounded-2xl border ${validationErrors.loanAmount ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'} focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white transition-all duration-300 flex items-center justify-between`}
                         />
                       </div>
                       
@@ -260,7 +334,7 @@ export default function CreateLoan() {
                             value={sendFormData.loanTerm}
                             onChange={(value) => setSendFormData(prev => ({ ...prev, loanTerm: value }))}
                             placeholder="Select loan term"
-                            className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white transition-all duration-300 flex items-center justify-between"
+                            className={`w-full px-4 py-3 rounded-2xl border ${validationErrors.loanTerm ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'} focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white transition-all duration-300 flex items-center justify-between`}
                           />
                         </div>
                       )}
@@ -277,7 +351,7 @@ export default function CreateLoan() {
                           required
                           value={sendFormData.vehicleYear}
                           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSendFormData(prev => ({ ...prev, vehicleYear: e.target.value }))}
-                          className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
+                          className={`w-full px-4 py-3 rounded-2xl border ${validationErrors.vehicleYear ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'} focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white`}
                           placeholder="2020"
                         />
                       </div>
@@ -289,7 +363,7 @@ export default function CreateLoan() {
                           required
                           value={sendFormData.vehicleMake}
                           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSendFormData(prev => ({ ...prev, vehicleMake: e.target.value }))}
-                          className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
+                          className={`w-full px-4 py-3 rounded-2xl border ${validationErrors.vehicleMake ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'} focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white`}
                           placeholder="Honda"
                         />
                       </div>
@@ -301,7 +375,7 @@ export default function CreateLoan() {
                           required
                           value={sendFormData.vehicleModel}
                           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSendFormData(prev => ({ ...prev, vehicleModel: e.target.value }))}
-                          className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
+                          className={`w-full px-4 py-3 rounded-2xl border ${validationErrors.vehicleModel ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'} focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white`}
                           placeholder="Civic"
                         />
                       </div>
@@ -313,7 +387,7 @@ export default function CreateLoan() {
                           required
                           value={sendFormData.vehicleVin}
                           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSendFormData(prev => ({ ...prev, vehicleVin: e.target.value }))}
-                          className="w-full px-4 py-3 rounded-2xl border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
+                          className={`w-full px-4 py-3 rounded-2xl border ${validationErrors.vehicleVin ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'} focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white`}
                           placeholder="1HGBH41JXMN109186"
                         />
                       </div>
