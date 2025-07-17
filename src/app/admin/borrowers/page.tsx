@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/client';
 import AdminLayout from '@/components/AdminLayout';
 import React, { useEffect, useState, useCallback } from 'react';
 import { RoleRedirect } from '@/components/auth/RoleRedirect';
+import CustomSelect from '@/components/CustomSelect';
 
 interface Borrower {
   id: string;
@@ -203,18 +204,16 @@ export default function BorrowersPage() {
               <p className="text-gray-600 text-sm">View borrowers from specific organizations</p>
             </div>
             <div className="w-72">
-              <select
+              <CustomSelect
+                options={[
+                  { value: 'all', label: 'All Organizations' },
+                  ...organizations.map(org => ({ value: org.id, label: org.name }))
+                ]}
                 value={selectedOrganization}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedOrganization(e.target.value)}
-                className="w-full px-4 py-3 rounded-2xl border-0 bg-white/80 backdrop-blur-sm shadow-sm focus:ring-2 focus:ring-purple-500 focus:outline-none text-sm text-gray-900"
-              >
-                <option value="all">All Organizations</option>
-                {organizations.map(org => (
-                  <option key={org.id} value={org.id}>
-                    {org.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(value) => setSelectedOrganization(value)}
+                placeholder="Select organization"
+                className="w-full px-4 py-3 rounded-2xl border-0 bg-white/80 backdrop-blur-sm shadow-sm focus:ring-2 focus:ring-purple-500 focus:outline-none text-sm text-gray-900 transition-all duration-300 flex items-center justify-between"
+              />
             </div>
           </div>
         </div>

@@ -136,7 +136,7 @@ export default function CreateLoan() {
   };
 
 
-  const loanAmountOptions = ['1000', '1500', '2000', '2500', '2999'];
+  const loanAmountOptions = ['1000', '1500', '2000', '2500', '2998'];
 
   // Calculate available terms and payment details for send application
   const availableTerms = useMemo(() => {

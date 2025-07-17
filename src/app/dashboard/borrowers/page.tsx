@@ -5,6 +5,7 @@ import UserLayout from '@/components/UserLayout';
 import Link from 'next/link';
 import React, { useEffect, useState } from 'react';
 import { RoleRedirect } from '@/components/auth/RoleRedirect';
+import CustomSelect from '@/components/CustomSelect';
 
 interface Borrower {
   id: string;
@@ -243,17 +244,13 @@ export default function UserBorrowers() {
                   </div>
                 </div>
                 <div className="w-full sm:w-64">
-                  <select
+                  <CustomSelect
+                    options={kycOptions}
                     value={filterKyc}
-                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFilterKyc(e.target.value)}
-                    className="w-full px-4 py-3 rounded-2xl border-0 bg-white/60 backdrop-blur-sm shadow-sm focus:ring-2 focus:ring-green-500 focus:outline-none text-sm text-gray-900"
-                  >
-                    {kycOptions.map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(value) => setFilterKyc(value)}
+                    placeholder="Filter by KYC status"
+                    className="w-full px-4 py-3 rounded-2xl border-0 bg-white/60 backdrop-blur-sm shadow-sm focus:ring-2 focus:ring-green-500 focus:outline-none text-sm text-gray-900 transition-all duration-300 flex items-center justify-between"
+                  />
                 </div>
               </div>
             </div>

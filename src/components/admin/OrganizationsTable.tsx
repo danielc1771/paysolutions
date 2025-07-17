@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { Building2, Users, DollarSign, Calendar, Edit, Trash2, Eye } from 'lucide-react';
+import CustomSelect from '@/components/CustomSelect';
 
 interface Organization {
   id: string;
@@ -158,17 +159,13 @@ export default function OrganizationsTable() {
             </div>
           </div>
           <div className="w-full sm:w-64">
-            <select
+            <CustomSelect
+              options={statusOptions}
               value={filterStatus}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFilterStatus(e.target.value)}
-              className="w-full px-4 py-3 rounded-2xl border-0 bg-white/60 backdrop-blur-sm shadow-sm focus:ring-2 focus:ring-green-500 focus:outline-none text-sm text-gray-900"
-            >
-              {statusOptions.map(option => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => setFilterStatus(value)}
+              placeholder="Filter by status"
+              className="w-full px-4 py-3 rounded-2xl border-0 bg-white/60 backdrop-blur-sm shadow-sm focus:ring-2 focus:ring-green-500 focus:outline-none text-sm text-gray-900 transition-all duration-300 flex items-center justify-between"
+            />
           </div>
         </div>
       </div>
