@@ -1,1 +1,0 @@
-When making database schema changes, always update the Drizzle schema file (`src/drizzle/schema/schema.ts`). Do not create or modify raw SQL migration files directly. I will handle running `drizzle-kit` to generate and apply migrations.

@@ -157,6 +157,6 @@ NEXTAUTH_SECRET=
 
 ### Testing Setup
 Reference the setup guides for comprehensive testing:
-- `ROLE_SETUP_GUIDE.md` - Role-based access testing with predefined accounts
-- `STRIPE_SETUP.md` - Payment integration and identity verification testing
-- `DOCUSIGN_SETUP.md` - Document signing and template testing
+- `docs/setup-guides/ROLE_SETUP_GUIDE.md` - Role-based access testing with predefined accounts
+- `docs/setup-guides/STRIPE_SETUP.md` - Payment integration and identity verification testing
+- `docs/setup-guides/DOCUSIGN_SETUP.md` - Document signing and template testing
