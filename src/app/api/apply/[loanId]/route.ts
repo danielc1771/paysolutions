@@ -51,6 +51,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ loan
         vehicle_make,
         vehicle_model,
         vehicle_vin,
+        customer_first_name,
+        customer_last_name,
         application_step,
         stripe_verification_session_id,
         stripe_verification_status,
@@ -59,30 +61,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ loan
         verified_phone_number,
         borrowers(
           id,
-          first_name,
-          last_name,
           email,
-          phone,
-          date_of_birth,
-          address_line1,
-          city,
-          state,
-          zip_code,
-          employment_status,
-          annual_income,
-          current_employer_name,
-          time_with_employment,
-          reference1_name,
-          reference1_phone,
-          reference1_email,
-          reference2_name,
-          reference2_phone,
-          reference2_email,
-          reference3_name,
-          reference3_phone,
-          reference3_email,
-          kyc_status,
-          communication_consent
+          kyc_status
         ),
         organizations(name)
       `)
@@ -113,7 +93,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ loan
         phoneVerificationStatus: loan.phone_verification_status,
         verifiedPhoneNumber: loan.verified_phone_number,
       },
-      borrower: loan.borrowers,
+      borrower: {
+        ...loan.borrowers,
+        first_name: loan.customer_first_name,
+        last_name: loan.customer_last_name,
+      },
       dealerName: (loan.organizations as unknown as Record<string, unknown>)?.name,
     });
 

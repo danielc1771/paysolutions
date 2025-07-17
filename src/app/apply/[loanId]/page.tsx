@@ -52,6 +52,42 @@ export default function ApplyPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // SessionStorage helper functions
+  const getSessionKey = useCallback(() => `loan_application_${loanId}`, [loanId]);
+
+  const saveToSession = useCallback((data: Record<string, unknown>) => {
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.setItem(getSessionKey(), JSON.stringify(data));
+      } catch (error) {
+        console.warn('Failed to save to sessionStorage:', error);
+      }
+    }
+  }, [getSessionKey]);
+
+  const loadFromSession = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = sessionStorage.getItem(getSessionKey());
+        return saved ? JSON.parse(saved) : null;
+      } catch (error) {
+        console.warn('Failed to load from sessionStorage:', error);
+        return null;
+      }
+    }
+    return null;
+  }, [getSessionKey]);
+
+  const clearSession = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.removeItem(getSessionKey());
+      } catch (error) {
+        console.warn('Failed to clear sessionStorage:', error);
+      }
+    }
+  }, [getSessionKey]);
+
   useEffect(() => {
     if (!loanId) return;
 
@@ -65,75 +101,41 @@ export default function ApplyPage() {
         const data = await response.json();
         setInitialData({...data, loanId});
         
-        // Helper function to convert null values to empty strings
-        const sanitizeData = (obj: Record<string, unknown>) => {
-          const sanitized: Record<string, unknown> = {};
-          for (const key in obj) {
-            sanitized[key] = obj[key] ?? '';
-          }
-          return sanitized;
-        };
-        
         // Map database verification status to UI status consistently
         const mapVerificationStatus = (dbStatus: string) => {
           if (dbStatus === 'verified') return 'completed';
           return dbStatus;
         };
 
-        // Parse communication consent if available
-        let consentData = {
-          consentToContact: false,
-          consentToText: false,
-          consentToCall: false,
-          communicationPreferences: 'email'
-        };
+        // Check for saved session data first
+        const sessionData = loadFromSession();
         
-        if (data.borrower.communication_consent) {
-          try {
-            consentData = JSON.parse(data.borrower.communication_consent);
-          } catch (error) {
-            console.warn('Failed to parse communication consent:', error);
-          }
+        if (sessionData) {
+          // Restore from session but update verification statuses from server
+          setFormData(prev => ({
+            ...prev,
+            ...sessionData,
+            // Always get latest verification statuses from server
+            phoneNumber: data.loan.verifiedPhoneNumber || sessionData.phoneNumber || '',
+            phoneVerificationStatus: data.loan.phoneVerificationStatus || 'pending',
+            stripeVerificationSessionId: data.loan.stripeVerificationSessionId ?? '',
+            stripeVerificationStatus: mapVerificationStatus(data.loan.stripeVerificationStatus || 'pending'),
+          }));
+          setStep(sessionData.currentStep || data.loan.applicationStep || 1);
+        } else {
+          // Clean application state - only prefill basic identity and loan data
+          setFormData(prev => ({
+            ...prev,
+            // Only basic identity (no personal details, employment, references)
+            // Phone verification (only if already verified for this loan)
+            phoneNumber: data.loan.verifiedPhoneNumber || '',
+            phoneVerificationStatus: data.loan.phoneVerificationStatus || 'pending',
+            // Stripe verification
+            stripeVerificationSessionId: data.loan.stripeVerificationSessionId ?? '',
+            stripeVerificationStatus: mapVerificationStatus(data.loan.stripeVerificationStatus || 'pending'),
+          }));
+          setStep(data.loan.applicationStep || 1);
         }
-
-        setFormData(prev => ({
-          ...prev,
-          // Basic borrower info
-          ...sanitizeData(data.borrower),
-          // Phone verification
-          phoneNumber: data.loan.verifiedPhoneNumber || data.borrower.phone || '',
-          phoneVerificationStatus: data.loan.phoneVerificationStatus || 'pending',
-          // Personal information (using database field names mapped to form field names)
-          dateOfBirth: data.borrower.date_of_birth || '',
-          address: data.borrower.address_line1 || '',
-          city: data.borrower.city || '',
-          state: data.borrower.state || '',
-          zipCode: data.borrower.zip_code || '',
-          // Employment details
-          employmentStatus: data.borrower.employment_status || 'employed',
-          annualIncome: data.borrower.annual_income || '',
-          currentEmployerName: data.borrower.current_employer_name || '',
-          timeWithEmployment: data.borrower.time_with_employment || '',
-          // References
-          reference1Name: data.borrower.reference1_name || '',
-          reference1Phone: data.borrower.reference1_phone || '',
-          reference1Email: data.borrower.reference1_email || '',
-          reference2Name: data.borrower.reference2_name || '',
-          reference2Phone: data.borrower.reference2_phone || '',
-          reference2Email: data.borrower.reference2_email || '',
-          reference3Name: data.borrower.reference3_name || '',
-          reference3Phone: data.borrower.reference3_phone || '',
-          reference3Email: data.borrower.reference3_email || '',
-          // Communication consent
-          consentToContact: consentData.consentToContact || false,
-          consentToText: consentData.consentToText || false,
-          consentToCall: consentData.consentToCall || false,
-          communicationPreferences: consentData.communicationPreferences || 'email',
-          // Stripe verification
-          stripeVerificationSessionId: data.loan.stripeVerificationSessionId ?? '',
-          stripeVerificationStatus: mapVerificationStatus(data.loan.stripeVerificationStatus || 'pending'),
-        }));
-        setStep(data.loan.applicationStep || 1); // Move to the saved step or first step
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
         setError(errorMessage);
@@ -144,7 +146,18 @@ export default function ApplyPage() {
     };
 
     fetchApplicationData();
-  }, [loanId]);
+  }, [loanId, loadFromSession]);
+
+  // Auto-save form data to sessionStorage when it changes
+  useEffect(() => {
+    if (step > 0 && step < 9) { // Only save during active form steps
+      const timeoutId = setTimeout(() => {
+        saveToSession({ ...formData, currentStep: step });
+      }, 500); // Debounce for 500ms
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [formData, step, saveToSession]);
 
   // Real-time status updates using Supabase Realtime
   useEffect(() => {
@@ -253,6 +266,12 @@ export default function ApplyPage() {
   const saveProgress = async (currentStep: number, data: Record<string, unknown>) => {
     try {
       console.log({ data, currentStep });
+      
+      // Save to sessionStorage for immediate persistence
+      const sessionData = { ...data, currentStep };
+      saveToSession(sessionData);
+      
+      // Also save to database for staff visibility
       await fetch(`/api/apply/${loanId}/save-progress`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -269,7 +288,12 @@ export default function ApplyPage() {
     setStep(nextStep);
   };
 
-  const handlePrev = () => setStep(prev => prev - 1);
+  const handlePrev = () => {
+    const prevStep = step - 1;
+    // Save current form data when going back
+    saveToSession({ ...formData, currentStep: prevStep });
+    setStep(prevStep);
+  };
 
   const handleSubmit = async () => {
     setLoading(true);
@@ -286,6 +310,9 @@ export default function ApplyPage() {
         const err = await response.json();
         throw new Error(err.message || 'Failed to submit application.');
       }
+      
+      // Clear sessionStorage on successful submission
+      clearSession();
       
       // Go directly to congratulations page (step 9)
       setStep(9);
@@ -666,8 +693,8 @@ function WelcomeStep({ initialData, handleNext }: { initialData: LoanApplication
                   className="rounded-2xl shadow-lg mx-auto"
                 />
             </div>
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">Hello, {initialData?.borrower.first_name}!</h1>
-            <p className="text-gray-600 text-base md:text-lg max-w-md mx-auto mb-8">You&apos;re just a few steps away from completing your loan application. Let&apos;s get started.</p>
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">Welcome, {initialData?.borrower.first_name}!</h1>
+            <p className="text-gray-600 text-base md:text-lg max-w-md mx-auto mb-8">Thank you for choosing iPayUS. You&apos;re just a few steps away from completing your loan application. Let&apos;s get started.</p>
             <button onClick={handleNext} className="w-full md:w-auto md:mx-auto px-10 py-5 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-2xl font-semibold hover:from-purple-600 hover:to-blue-600 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center text-lg">
                 Get Started <ArrowRight className="w-6 h-6 ml-3" />
             </button>

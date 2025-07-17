@@ -144,6 +144,10 @@ export async function POST(request: Request) {
       throw new Error(`A loan application already exists for this customer and vehicle (VIN: ${vehicleVin}). Loan number: ${existingLoan.loan_number}`);
     }
 
+    // Parse customer name for this specific loan
+    const [customerFirstName, ...lastNameParts] = customerName.split(' ');
+    const customerLastName = lastNameParts.join(' ') || '';
+
     const { data: loan, error: loanError } = await supabase
       .from('loans')
       .insert({
@@ -159,6 +163,8 @@ export async function POST(request: Request) {
         vehicle_make: vehicleMake,
         vehicle_model: vehicleModel,
         vehicle_vin: vehicleVin,
+        customer_first_name: customerFirstName,
+        customer_last_name: customerLastName,
       })
       .select('id')
       .single();
