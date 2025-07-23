@@ -216,7 +216,9 @@ export default function ApplyPage() {
   useEffect(() => {
     if (!loanId) return;
 
+    let isMounted = true;
     const supabase = createClient();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
     
     // Map database verification status to UI status consistently
     const mapVerificationStatus = (dbStatus: string) => {
@@ -234,87 +236,108 @@ export default function ApplyPage() {
       return newIndex >= currentIndex || newStatus === 'requires_action' || newStatus === 'failed';
     };
 
-    // Set up real-time subscription for loan updates
-    const channel = supabase
-      .channel(`loan-updates-${loanId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'loans',
-          filter: `id=eq.${loanId}`
-        },
-        (payload) => {
-          console.log('Received loan update:', payload);
-          const newRecord = payload.new as {
-            phone_verification_status: string;
-            verified_phone_number: string;
-            stripe_verification_status: string;
-            status: string;
-          };
+    const setupSubscription = async () => {
+      // Clean up any existing channel first
+      const existingChannels = supabase.getChannels();
+      const existingChannel = existingChannels.find(ch => ch.topic === `loan-updates-${loanId}`);
+      if (existingChannel) {
+        console.log('🧹 Removing existing channel before creating new one');
+        await supabase.removeChannel(existingChannel);
+      }
+
+      if (!isMounted) return;
+
+      // Set up real-time subscription for loan updates
+      channel = supabase
+        .channel(`loan-updates-${loanId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'loans',
+            filter: `id=eq.${loanId}`
+          },
+          (payload) => {
+            if (!isMounted) return;
+            
+            console.log('Received loan update:', payload);
+            const newRecord = payload.new as {
+              phone_verification_status: string;
+              verified_phone_number: string;
+              stripe_verification_status: string;
+              status: string;
+            };
+            
+            // Update phone verification status and verified phone number
+            if (newRecord.phone_verification_status || newRecord.verified_phone_number) {
+              const phoneStatus = newRecord.phone_verification_status;
+              const verifiedPhone = newRecord.verified_phone_number;
+              console.log('📱 Phone verification update:', { phoneStatus, verifiedPhone });
+              
+              setFormData((prev) => {
+                const updates: Record<string, unknown> = {};
+                
+                if (phoneStatus && String(prev.phoneVerificationStatus) !== phoneStatus) {
+                  updates.phoneVerificationStatus = phoneStatus;
+                }
+                
+                if (verifiedPhone && String(prev.phoneNumber) !== verifiedPhone) {
+                  updates.phoneNumber = verifiedPhone;
+                }
+                
+                if (Object.keys(updates).length > 0) {
+                  return { ...prev, ...updates };
+                }
+                return prev;
+              });
+            }
+
+            // Update stripe verification status
+            if (newRecord.stripe_verification_status) {
+              const dbStatus = newRecord.stripe_verification_status;
+              const uiStatus = mapVerificationStatus(dbStatus);
+              
+              setFormData((prev) => {
+                const currentStatus = String(prev.stripeVerificationStatus || 'pending');
+                if (canTransitionTo(currentStatus, uiStatus) && currentStatus !== uiStatus) {
+                  return { ...prev, stripeVerificationStatus: uiStatus };
+                }
+                return prev;
+              });
+            }
+
+            // Check for application completion
+            if (newRecord.status === 'application_completed' && step !== 9) {
+              setStep(9);
+            }
+          }
+        )
+        .subscribe((status) => {
+          if (!isMounted) return;
           
-          // Update phone verification status and verified phone number
-          if (newRecord.phone_verification_status || newRecord.verified_phone_number) {
-            const phoneStatus = newRecord.phone_verification_status;
-            const verifiedPhone = newRecord.verified_phone_number;
-            console.log('📱 Phone verification update:', { phoneStatus, verifiedPhone });
-            
-            setFormData((prev) => {
-              const updates: Record<string, unknown> = {};
-              
-              if (phoneStatus && String(prev.phoneVerificationStatus) !== phoneStatus) {
-                updates.phoneVerificationStatus = phoneStatus;
-              }
-              
-              if (verifiedPhone && String(prev.phoneNumber) !== verifiedPhone) {
-                updates.phoneNumber = verifiedPhone;
-              }
-              
-              if (Object.keys(updates).length > 0) {
-                return { ...prev, ...updates };
-              }
-              return prev;
-            });
+          console.log('Realtime subscription status:', status);
+          if (status === 'SUBSCRIBED') {
+            console.log('✅ Successfully subscribed to loan updates');
+          } else if (status === 'CHANNEL_ERROR') {
+            console.error('❌ Realtime subscription error');
+          } else if (status === 'TIMED_OUT') {
+            console.error('⏰ Realtime subscription timed out');
           }
+        });
+    };
 
-          // Update stripe verification status
-          if (newRecord.stripe_verification_status) {
-            const dbStatus = newRecord.stripe_verification_status;
-            const uiStatus = mapVerificationStatus(dbStatus);
-            
-            setFormData((prev) => {
-              const currentStatus = String(prev.stripeVerificationStatus || 'pending');
-              if (canTransitionTo(currentStatus, uiStatus) && currentStatus !== uiStatus) {
-                return { ...prev, stripeVerificationStatus: uiStatus };
-              }
-              return prev;
-            });
-          }
-
-          // Check for application completion
-          if (newRecord.status === 'application_completed' && step !== 9) {
-            setStep(9);
-          }
-        }
-      )
-      .subscribe((status) => {
-        console.log('Realtime subscription status:', status);
-        if (status === 'SUBSCRIBED') {
-          console.log('✅ Successfully subscribed to loan updates');
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error('❌ Realtime subscription error');
-        } else if (status === 'TIMED_OUT') {
-          console.error('⏰ Realtime subscription timed out');
-        }
-      });
+    setupSubscription();
 
     // Cleanup subscription on unmount
     return () => {
-      console.log('Cleaning up realtime subscription');
-      supabase.removeChannel(channel);
+      isMounted = false;
+      if (channel) {
+        console.log('Cleaning up realtime subscription');
+        supabase.removeChannel(channel);
+      }
     };
-  }, [loanId, step]);
+  }, [loanId]);
 
   const saveProgress = async (currentStep: number, data: Record<string, unknown>) => {
     try {

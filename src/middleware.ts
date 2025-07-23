@@ -64,10 +64,7 @@ export async function middleware(request: NextRequest) {
     '/apply/',
     '/payment-setup',
     '/payment-collection/',
-    '/payment-summary/',
-    '/api/stripe/webhook',
-    '/api/docusign/webhook',
-    '/api/twilio/webhook'
+    '/payment-summary/'
   ]
   
   const isPublic = publicRoutes.some(route => {
