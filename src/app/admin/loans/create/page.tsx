@@ -66,7 +66,7 @@ function SendApplicationForm() {
   // Calculate available terms and payment details
   const availableTerms = useMemo(() => {
     if (!loanAmount) return [];
-    return getAvailableTerms(parseFloat(loanAmount)).map(term => ({
+    return getAvailableTerms().map(term => ({
       value: term.weeks.toString(),
       label: term.label
     }));
@@ -86,7 +86,7 @@ function SendApplicationForm() {
   const handleLoanAmountChange = (newAmount: string) => {
     setLoanAmount(newAmount);
     if (newAmount) {
-      const terms = getAvailableTerms(parseFloat(newAmount));
+      const terms = getAvailableTerms();
       if (terms.length > 0 && !terms.some(t => t.weeks.toString() === loanTerm)) {
         setLoanTerm('4'); // Default to 4 weeks
       }
@@ -317,7 +317,7 @@ function ManualEntryForm() {
   // Calculate available terms and payment details for manual entry
   const availableTermsManual = useMemo(() => {
     if (!formData.principalAmount) return [];
-    return getAvailableTerms(parseFloat(formData.principalAmount)).map(term => ({
+    return getAvailableTerms().map(term => ({
       value: term.weeks.toString(),
       label: term.label
     }));
@@ -339,7 +339,7 @@ function ManualEntryForm() {
     const updatedFormData = { ...formData, principalAmount: newAmount };
     
     if (newAmount) {
-      const terms = getAvailableTerms(parseFloat(newAmount));
+      const terms = getAvailableTerms();
       if (terms.length > 0 && !terms.some(t => t.weeks.toString() === formData.termWeeks)) {
         updatedFormData.termWeeks = '4'; // Default to 4 weeks
       }

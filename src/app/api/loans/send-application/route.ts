@@ -78,12 +78,12 @@ export async function POST(request: Request) {
 
   const { customerName, customerEmail, loanAmount, loanTerm, vehicleYear, vehicleMake, vehicleModel, vehicleVin, dealerName } = validation.data;
 
-  // Validate loan amount and term combination
+  // Validate loan term (now universal for all amounts)
   const loanAmountNum = parseFloat(loanAmount);
-  if (!validateLoanTerms(loanAmountNum, loanTerm)) {
+  if (!validateLoanTerms(loanTerm)) {
     return new NextResponse(JSON.stringify({ 
       error: 'Invalid loan term', 
-      message: `${loanTerm} weeks is not available for $${loanAmountNum.toLocaleString()} loan amount` 
+      message: `${loanTerm} weeks is not a valid loan term. Valid terms are: 4, 6, 8, 12, 16 weeks` 
     }), { 
       status: 400,
       headers: { 'Content-Type': 'application/json' }

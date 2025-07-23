@@ -215,7 +215,7 @@ export default function CreateLoan() {
   // Calculate available terms and payment details for send application
   const availableTerms = useMemo(() => {
     if (!sendFormData.loanAmount) return [];
-    return getAvailableTerms(parseFloat(sendFormData.loanAmount)).map(term => ({
+    return getAvailableTerms().map(term => ({
       value: term.weeks.toString(),
       label: term.label
     }));
@@ -235,7 +235,7 @@ export default function CreateLoan() {
   const handleLoanAmountChange = (newAmount: string) => {
     setSendFormData(prev => ({ ...prev, loanAmount: newAmount }));
     if (newAmount) {
-      const terms = getAvailableTerms(parseFloat(newAmount));
+      const terms = getAvailableTerms();
       if (terms.length > 0 && !terms.some(t => t.weeks.toString() === sendFormData.loanTerm)) {
         setSendFormData(prev => ({ ...prev, loanTerm: '4' })); // Default to 4 weeks
       }

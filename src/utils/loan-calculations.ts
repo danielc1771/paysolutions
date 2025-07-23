@@ -18,33 +18,20 @@ export interface LoanCalculation {
 }
 
 /**
- * Get available loan term options based on loan amount
+ * Get available loan term options - universal 16-week cap for all loan amounts
  * Rules:
- * - $1,000: max 6 weeks (4, 6 weeks)
- * - $2,000: max 12 weeks (4, 8, 12 weeks)
- * - $2,999: max 16 weeks (4, 8, 12, 16 weeks)
+ * - All loan amounts: 4, 6, 8, 12, 16 weeks available
+ * - Maximum 16 weeks for any loan amount
  */
-export function getAvailableTerms(loanAmount: number): LoanTermOption[] {
-  const baseTerms: LoanTermOption[] = [
-    { weeks: 4, label: '4 weeks' }
+export function getAvailableTerms(): LoanTermOption[] {
+  // All loan amounts now get the same term options - parameter no longer needed
+  return [
+    { weeks: 4, label: '4 weeks' },
+    { weeks: 6, label: '6 weeks' },
+    { weeks: 8, label: '8 weeks' },
+    { weeks: 12, label: '12 weeks' },
+    { weeks: 16, label: '16 weeks' }
   ];
-
-  if (loanAmount >= 1000) {
-    baseTerms.push({ weeks: 6, label: '6 weeks' });
-  }
-
-  if (loanAmount >= 2000) {
-    baseTerms.push(
-      { weeks: 8, label: '8 weeks' },
-      { weeks: 12, label: '12 weeks' }
-    );
-  }
-
-  if (loanAmount >= 2999) {
-    baseTerms.push({ weeks: 16, label: '16 weeks' });
-  }
-
-  return baseTerms;
 }
 
 /**
@@ -119,9 +106,10 @@ export function generateWeeklyPaymentSchedule(
 }
 
 /**
- * Validate loan amount and term combination
+ * Validate loan term - universal validation for all loan amounts
  */
-export function validateLoanTerms(loanAmount: number, termWeeks: number): boolean {
-  const availableTerms = getAvailableTerms(loanAmount);
-  return availableTerms.some(term => term.weeks === termWeeks);
+export function validateLoanTerms(termWeeks: number): boolean {
+  // Valid terms are now universal: 4, 6, 8, 12, 16 weeks for any amount
+  const validTerms = [4, 6, 8, 12, 16];
+  return validTerms.includes(termWeeks);
 }

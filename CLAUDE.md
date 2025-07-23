@@ -118,45 +118,86 @@ Five roles defined in `src/lib/auth/roles.ts`:
 - **Server-only**: Server-only modules for secure integrations
 
 ### Environment Variables Required
+Copy `env.template` to `.env.local` and configure the required variables:
+
 ```bash
 # Core Database & Auth
 DATABASE_URL=postgresql://...
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
 
 # Payment Processing
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=
 
-# Document Signing
+# Document Signing (DocuSign)
 DOCUSIGN_INTEGRATION_KEY=
 DOCUSIGN_USER_ID=
+DOCUSIGN_ACCOUNT_ID=
 DOCUSIGN_PRIVATE_KEY=
 DOCUSIGN_BASE_PATH=https://demo.docusign.net/restapi
 
 # Communication
 TWILIO_ACCOUNT_SID=
 TWILIO_AUTH_TOKEN=
+TWILIO_VERIFY_SERVICE_SID=
 EMAIL_SERVER_USER=
 EMAIL_SERVER_PASSWORD=
 
 # Application
 NEXT_PUBLIC_SITE_URL=
 NEXTAUTH_SECRET=
+NEXTAUTH_URL=
 ```
 
 ### Development Guidelines
 - Database schema changes require migration via `npm run db:generate`
 - Role-based access should use utilities from `src/lib/auth/roles.ts`
 - Always lint code before committing with `npm run lint`
-- API routes should implement proper authorization checks
-- Use organization-scoped data access patterns for multi-tenancy
-- Server-only modules must be properly configured in webpack for DocuSign SDK
-- Test with predefined role accounts for comprehensive coverage
+- API routes should implement proper authorization checks using role validation patterns
+- Use organization-scoped data access patterns for multi-tenancy via RLS policies
+- Server-only modules must use `'server-only'` imports for DocuSign SDK and sensitive integrations
+- Use Supabase admin client (`src/utils/supabase/admin.ts`) for service role operations
+- Follow resource-based API structure: `/api/[resource]/[id]/[action]` with role-based auth
+- Test with predefined role accounts for comprehensive coverage (see setup guides)
+
+### Key Architectural Patterns
+- **Multi-tenant RLS policies**: All data access is organization-scoped via Row Level Security
+- **Server-only modules**: DocuSign SDK and sensitive integrations use `'server-only'` imports
+- **Type-safe database operations**: Drizzle ORM with auto-generated types from schema
+- **Modular auth protection**: Middleware + client-side + server-side role checks
+- **Resource-based API structure**: `/api/[resource]/[id]/[action]` pattern with role-based auth
+- **Template-based integrations**: DocuSign templates and email templates for consistent workflows
 
 ### Testing Setup
 Reference the setup guides for comprehensive testing:
 - `docs/setup-guides/ROLE_SETUP_GUIDE.md` - Role-based access testing with predefined accounts
 - `docs/setup-guides/STRIPE_SETUP.md` - Payment integration and identity verification testing
 - `docs/setup-guides/DOCUSIGN_SETUP.md` - Document signing and template testing
+
+**Note**: No formal testing framework is currently configured. Consider adding Jest/Vitest for unit tests and Playwright/Cypress for E2E testing.
+
+### Common Development Patterns
+
+#### API Route Structure
+```typescript
+// Pattern: Role validation + organization scoping + error handling
+export async function POST(request: NextRequest) {
+  const user = await getUser();
+  if (!user || !hasRequiredRole(user, 'admin')) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  // Handle request with proper validation and error responses
+}
+```
+
+#### Database Access Patterns
+```typescript
+// Use admin client for service role operations
+import { supabaseAdmin } from '@/utils/supabase/admin';
+
+// Use server client for user-scoped operations (RLS applies)
+import { createClient } from '@/utils/supabase/server';
+```
