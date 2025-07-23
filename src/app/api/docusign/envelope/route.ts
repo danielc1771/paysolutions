@@ -3,6 +3,7 @@ import { createClient } from '@/utils/supabase/server';
 import { createLoanAgreementEnvelopeInline } from '@/utils/docusign/templates-inline';
 import { createEnvelopesApi } from '@/utils/docusign/client';
 import { LoanForDocuSign } from '@/types/loan';
+import { Language } from '@/utils/translations';
 
 export async function POST(request: NextRequest) {
   try {
@@ -84,9 +85,13 @@ export async function POST(request: NextRequest) {
       borrowerName: `${loanData.borrower.firstName} ${loanData.borrower.lastName}`
     });
 
-    // Create DocuSign envelope
+    // Get borrower's preferred language
+    const borrowerLanguage: Language = (loan.borrower.preferred_language as Language) || 'en';
+    console.log('🌍 Using language for document:', borrowerLanguage);
+
+    // Create DocuSign envelope with language preference
     const { envelopesApi, accountId } = await createEnvelopesApi();
-    const envelopeDefinition = createLoanAgreementEnvelopeInline(loanData);
+    const envelopeDefinition = createLoanAgreementEnvelopeInline(loanData, borrowerLanguage);
 
     console.log('📤 Sending envelope to DocuSign...');
     const result = await envelopesApi.createEnvelope(accountId, {

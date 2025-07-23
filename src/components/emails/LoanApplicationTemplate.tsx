@@ -57,12 +57,13 @@ export function LoanApplicationTemplate({
               boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
               overflow: 'hidden'
             }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img 
-                src={`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/logoMain.png`}
+                src="https://iPayUs.net/logoMain.png"
                 alt="iPayUS Logo" 
+                width="60"
+                height="60"
                 style={{
-                  width: '60px',
-                  height: '60px',
                   objectFit: 'contain'
                 }}
               />

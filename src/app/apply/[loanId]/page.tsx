@@ -3,19 +3,21 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowRight, Check, DollarSign, User, Mail, Phone, Loader2, AlertCircle, Calendar, Lock, MessageSquare } from 'lucide-react';
+import { ArrowRight, Check, DollarSign, User, Mail, Phone, Loader2, AlertCircle, Calendar, Lock, MessageSquare, Globe } from 'lucide-react';
 import Image from 'next/image';
 import CustomSelect from '@/components/CustomSelect';
 import { createClient } from '@/utils/supabase/client';
 import OTPInput from '@/components/OTPInput';
 import { LoanApplicationData } from '@/types/loan';
+import { getTranslations, interpolate, Language } from '@/utils/translations';
 
 // Main Page Component
 export default function ApplyPage() {
   const params = useParams();
   const loanId = params.loanId as string;
 
-  const [step, setStep] = useState(0); // 0: loading, 1: welcome, 2-8: form steps, 9: success, -1: error
+  const [step, setStep] = useState(0); // 0: loading, 1: language, 2: welcome, 3-9: form steps, 10: success, -1: error
+  const [selectedLanguage, setSelectedLanguage] = useState<Language>('en');
   const [formData, setFormData] = useState<Record<string, unknown>>({
     // Phone verification
     phoneNumber: '',
@@ -138,15 +140,66 @@ export default function ApplyPage() {
         }
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-        setError(errorMessage);
-        setStep(-1); // Move to an error step
+        
+        // If loan/borrower data is missing or corrupted, reset to fresh state
+        if (errorMessage.includes('Loan not found') || errorMessage.includes('404') || 
+            errorMessage.includes('already been submitted') || errorMessage.includes('invalid')) {
+          console.log('🔄 Loan/borrower data missing or invalid, resetting application state...');
+          // Clear session storage
+          clearSession();
+          // Reset form data to initial state
+          setFormData({
+            // Phone verification
+            phoneNumber: '',
+            verificationCode: '',
+            phoneVerificationStatus: 'pending',
+            // Personal details
+            dateOfBirth: '',
+            address: '',
+            city: '',
+            state: '',
+            zipCode: '',
+            // Employment details
+            employmentStatus: '',
+            annualIncome: '',
+            currentEmployerName: '',
+            timeWithEmployment: '',
+            // References
+            reference1Name: '',
+            reference1Phone: '',
+            reference1Email: '',
+            reference2Name: '',
+            reference2Phone: '',
+            reference2Email: '',
+            reference3Name: '',
+            reference3Phone: '',
+            reference3Email: '',
+            // Stripe verification
+            stripeVerificationSessionId: '',
+            stripeVerificationStatus: 'not_started',
+            // Consent preferences
+            consentToContact: false,
+            consentToText: false,
+            consentToCall: false,
+            communicationPreferences: 'email',
+          });
+          // Reset to language selection step
+          setStep(1);
+          setError(null);
+          // Clear initial data
+          setInitialData(null);
+        } else {
+          // For other errors, show error state
+          setError(errorMessage);
+          setStep(-1); // Move to an error step
+        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchApplicationData();
-  }, [loanId, loadFromSession]);
+  }, [loanId, loadFromSession, clearSession]);
 
   // Auto-save form data to sessionStorage when it changes
   useEffect(() => {
@@ -295,6 +348,26 @@ export default function ApplyPage() {
     setStep(prevStep);
   };
 
+  const handleLanguageSelection = async (language: Language) => {
+    setSelectedLanguage(language);
+    
+    try {
+      // Save language preference to borrower record
+      await fetch(`/api/apply/${loanId}/language`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ language }),
+      });
+      
+      // Move to welcome step
+      handleNext();
+    } catch (err) {
+      console.error('Failed to save language preference:', err);
+      // Continue anyway - don't block the application
+      handleNext();
+    }
+  };
+
   const handleSubmit = async () => {
     setLoading(true);
     setError(null);
@@ -314,29 +387,81 @@ export default function ApplyPage() {
       // Clear sessionStorage on successful submission
       clearSession();
       
-      // Go directly to congratulations page (step 9)
-      setStep(9);
+      // Go directly to congratulations page (step 10)
+      setStep(10);
       
       // Update the loan status in realtime (will be handled by server response)
       console.log('🎉 Application submitted successfully!');
       
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-      setError(errorMessage);
+      
+      // If submission fails due to loan status or missing data, reset to fresh state
+      if (errorMessage.includes('already been completed') || errorMessage.includes('Loan not found') || 
+          errorMessage.includes('invalid') || errorMessage.includes('404')) {
+        console.log('🔄 Submission failed due to invalid loan state, resetting application...');
+        // Clear session storage
+        clearSession();
+        // Reset form data to initial state
+        setFormData({
+          // Phone verification
+          phoneNumber: '',
+          verificationCode: '',
+          phoneVerificationStatus: 'pending',
+          // Personal details
+          dateOfBirth: '',
+          address: '',
+          city: '',
+          state: '',
+          zipCode: '',
+          // Employment details
+          employmentStatus: '',
+          annualIncome: '',
+          currentEmployerName: '',
+          timeWithEmployment: '',
+          // References
+          reference1Name: '',
+          reference1Phone: '',
+          reference1Email: '',
+          reference2Name: '',
+          reference2Phone: '',
+          reference2Email: '',
+          reference3Name: '',
+          reference3Phone: '',
+          reference3Email: '',
+          // Stripe verification
+          stripeVerificationSessionId: '',
+          stripeVerificationStatus: 'not_started',
+          // Consent preferences
+          consentToContact: false,
+          consentToText: false,
+          consentToCall: false,
+          communicationPreferences: 'email',
+        });
+        // Reset to language selection step
+        setStep(1);
+        setError(null);
+        // Clear initial data
+        setInitialData(null);
+      } else {
+        // For other errors, show the error but stay in current state
+        setError(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const steps = [
-    { id: 1, name: 'Welcome', component: WelcomeStep },
-    { id: 2, name: 'Phone Verification', component: PhoneVerificationStep },
-    { id: 3, name: 'Personal Information', component: PersonalDetailsStep },
-    { id: 4, name: 'Employment Details', component: EmploymentDetailsStep },
-    { id: 5, name: 'References', component: ReferencesStep },
-    { id: 6, name: 'Identity Verification', component: StripeVerificationStep },
-    { id: 7, name: 'Consent & Preferences', component: ConsentStep },
-    { id: 8, name: 'Review & Submit', component: ReviewStep },
+    { id: 1, name: 'Language Selection', component: LanguageSelectionStepInternal },
+    { id: 2, name: 'Welcome', component: WelcomeStep },
+    { id: 3, name: 'Phone Verification', component: PhoneVerificationStep },
+    { id: 4, name: 'Personal Information', component: PersonalDetailsStep },
+    { id: 5, name: 'Employment Details', component: EmploymentDetailsStep },
+    { id: 6, name: 'References', component: ReferencesStep },
+    { id: 7, name: 'Identity Verification', component: StripeVerificationStep },
+    { id: 8, name: 'Consent & Preferences', component: ConsentStep },
+    { id: 9, name: 'Review & Submit', component: ReviewStep },
   ];
 
   const CurrentStepComponent = steps.find(s => s.id === step)?.component;
@@ -345,13 +470,13 @@ export default function ApplyPage() {
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 flex flex-col items-center justify-center p-4 font-sans">
       <div className="w-full max-w-4xl">
         {/* Header and Step Indicator */}
-        {step > 1 && step <= 8 && (
+        {step > 1 && step <= 9 && (
           <div className="mb-8">
-            <p className="text-sm font-semibold text-purple-600">Step {step - 1} of {steps.length}</p>
+            <p className="text-sm font-semibold text-purple-600">Step {step - 1} of {steps.length - 1}</p>
             <div className="mt-2 w-full bg-gray-200 rounded-full h-1.5">
               <div
                 className="bg-gradient-to-r from-purple-500 to-blue-500 h-1.5 rounded-full transition-all duration-500 ease-out"
-                style={{ width: `${((step - 1) / steps.length) * 100}%` }}
+                style={{ width: `${((step - 1) / (steps.length - 1)) * 100}%` }}
               ></div>
             </div>
           </div>
@@ -366,8 +491,8 @@ export default function ApplyPage() {
             transition={{ duration: 0.3 }}
             className="bg-white/70 backdrop-blur-sm rounded-3xl shadow-xl border border-white/30 p-6 md:p-8 w-full"
           >
-            {loading && step === 0 && <Loader text="Loading Application..." />}
-            {error && step === -1 && <ErrorMessage error={error} />}
+            {loading && step === 0 && <Loader text={getTranslations(selectedLanguage).loading.application} />}
+            {error && step === -1 && <ErrorMessage error={error} selectedLanguage={selectedLanguage} />}
             
             {CurrentStepComponent && (
               <CurrentStepComponent
@@ -377,12 +502,14 @@ export default function ApplyPage() {
                 handleNext={handleNext}
                 handlePrev={handlePrev}
                 handleSubmit={handleSubmit}
+                handleLanguageSelection={handleLanguageSelection}
+                selectedLanguage={selectedLanguage}
                 loading={loading}
                 saveProgress={saveProgress}
               />
             )}
 
-            {step === 9 && <SuccessMessage />}
+            {step === 10 && <SuccessMessage selectedLanguage={selectedLanguage} />}
           </motion.div>
         </AnimatePresence>
       </div>
@@ -391,12 +518,13 @@ export default function ApplyPage() {
 }
 
 // Step 2: Phone Verification
-function PhoneVerificationStep({ formData, setFormData, initialData, handleNext, handlePrev }: { 
+function PhoneVerificationStep({ formData, setFormData, initialData, handleNext, handlePrev, selectedLanguage }: { 
   formData: Record<string, unknown>; 
   setFormData: React.Dispatch<React.SetStateAction<Record<string, unknown>>>; 
   initialData: LoanApplicationData | null;
   handleNext: () => void; 
   handlePrev: () => void; 
+  selectedLanguage: Language;
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -408,10 +536,12 @@ function PhoneVerificationStep({ formData, setFormData, initialData, handleNext,
   const phoneNumber = String(formData.phoneNumber || '');
   const verificationCode = String(formData.verificationCode || '');
   const verificationStatus = String(formData.phoneVerificationStatus || 'pending');
+  
+  const t = getTranslations(selectedLanguage);
 
   const sendVerificationCode = async () => {
     if (!phoneNumber.trim()) {
-      setError('Please enter your phone number');
+      setError(t.phoneVerification.error.enterPhone);
       return;
     }
 
@@ -440,12 +570,12 @@ function PhoneVerificationStep({ formData, setFormData, initialData, handleNext,
         phoneNumber: data.phoneNumber,
         phoneVerificationStatus: 'sent' 
       }));
-      setSuccessMessage('Verification code sent! Please check your messages.');
+      setSuccessMessage(t.phoneVerification.otpSent);
       setIsEditing(false);
       setShowOTPInput(true);
 
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to send verification code';
+      const errorMessage = err instanceof Error ? err.message : t.phoneVerification.error.sendFailed;
       setError(errorMessage);
     } finally {
       setIsSending(false);
@@ -454,7 +584,7 @@ function PhoneVerificationStep({ formData, setFormData, initialData, handleNext,
 
   const verifyCode = useCallback(async () => {
     if (!verificationCode.trim() || verificationCode.length < 6) {
-      setError('Please enter the complete 6-digit verification code');
+      setError(t.phoneVerification.error.enterCompleteCode);
       return;
     }
 
@@ -485,23 +615,23 @@ function PhoneVerificationStep({ formData, setFormData, initialData, handleNext,
           phoneVerificationStatus: 'verified',
           verificationCode: '' 
         }));
-        setSuccessMessage('Phone number verified successfully!');
+        setSuccessMessage(t.phoneVerification.verifiedMessage);
         setShowOTPInput(false);
       } else {
-        setError('Invalid verification code. Please try again.');
+        setError(t.phoneVerification.error.invalidCode);
         // Clear the code so user can try again
         setFormData(prev => ({ ...prev, verificationCode: '' }));
       }
 
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to verify code';
+      const errorMessage = err instanceof Error ? err.message : t.phoneVerification.error.verifyFailed;
       setError(errorMessage);
       // Clear the code so user can try again
       setFormData(prev => ({ ...prev, verificationCode: '' }));
     } finally {
       setIsVerifying(false);
     }
-  }, [verificationCode, initialData?.loanId, phoneNumber, setFormData]);
+  }, [verificationCode, initialData?.loanId, phoneNumber, setFormData, t.phoneVerification.error.enterCompleteCode, t.phoneVerification.error.invalidCode, t.phoneVerification.verifiedMessage, t.phoneVerification.error.verifyFailed]);
 
   // Auto-verify when code is complete
   useEffect(() => {
@@ -519,8 +649,8 @@ function PhoneVerificationStep({ formData, setFormData, initialData, handleNext,
           <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
             <Check className="w-10 h-10 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Phone Verified!</h1>
-          <p className="text-gray-600">Your phone number has been successfully verified.</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">{t.phoneVerification.verified}</h1>
+          <p className="text-gray-600">{t.phoneVerification.verifiedMessage}</p>
           <p className="text-lg font-medium text-gray-800 mt-4">{phoneNumber}</p>
         </div>
 
@@ -576,13 +706,13 @@ function PhoneVerificationStep({ formData, setFormData, initialData, handleNext,
 
           <div className="text-center">
             <p className="text-gray-600 text-sm">
-              Don&apos;t receive the OTP? 
+              {t.phoneVerification.otpNotReceived}
               <button
                 onClick={sendVerificationCode}
                 disabled={isSending}
                 className="text-purple-600 hover:text-purple-700 font-medium ml-1 disabled:opacity-50"
               >
-                {isSending ? 'SENDING...' : 'RESEND OTP'}
+                {isSending ? t.phoneVerification.resending : t.phoneVerification.otpResend}
               </button>
             </p>
           </div>
@@ -595,10 +725,10 @@ function PhoneVerificationStep({ formData, setFormData, initialData, handleNext,
             {isVerifying ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                Verifying...
+                {t.phoneVerification.verifying}
               </>
             ) : (
-              'VERIFY & PROCEED'
+              t.phoneVerification.verify
             )}
           </button>
         </div>
@@ -612,7 +742,7 @@ function PhoneVerificationStep({ formData, setFormData, initialData, handleNext,
             }} 
             className="px-8 py-3 bg-white/60 backdrop-blur-sm border border-gray-200 rounded-xl text-gray-700 font-medium hover:bg-gray-50 transition-all duration-300 shadow-sm"
           >
-            Change Number
+            {t.phoneVerification.changeNumber}
           </button>
         </div>
       </div>
@@ -626,17 +756,17 @@ function PhoneVerificationStep({ formData, setFormData, initialData, handleNext,
         <div className="w-20 h-20 bg-gradient-to-br from-purple-400 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
           <Phone className="w-10 h-10 text-white" />
         </div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Enter Your Phone Number</h1>
-        <p className="text-gray-600">We&apos;ll send you a one-time password to verify your phone number</p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">{t.phoneVerification.title}</h1>
+        <p className="text-gray-600">{t.phoneVerification.subtitle}</p>
       </div>
 
       <div className="space-y-6">
         <InputField
           icon={<Phone />}
-          label="Mobile Number"
+          label={t.phoneVerification.phoneLabel}
           name="phoneNumber"
           type="tel"
-          placeholder="+1 (555) 123-4567"
+          placeholder={t.phoneVerification.phonePlaceholder}
           value={phoneNumber}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
             setFormData({...formData, phoneNumber: e.target.value})
@@ -660,10 +790,10 @@ function PhoneVerificationStep({ formData, setFormData, initialData, handleNext,
           {isSending ? (
             <>
               <Loader2 className="w-5 h-5 animate-spin mr-2" />
-              Sending...
+              {t.phoneVerification.sending}
             </>
           ) : (
-            'GET OTP'
+            t.phoneVerification.getOtp
           )}
         </button>
       </div>
@@ -673,44 +803,54 @@ function PhoneVerificationStep({ formData, setFormData, initialData, handleNext,
           onClick={handlePrev} 
           className="px-8 py-3 bg-white/60 backdrop-blur-sm border border-gray-200 rounded-xl text-gray-700 font-medium hover:bg-gray-50 transition-all duration-300 shadow-sm"
         >
-          Back
+          {t.phoneVerification.back}
         </button>
       </div>
     </div>
   );
 }
 
-// Step 1: Welcome
-function WelcomeStep({ initialData, handleNext }: { initialData: LoanApplicationData | null; handleNext: () => void }) {
-    return (
-        <div className="text-center py-8">
-            <div className="text-center mb-8">
-                <Image 
-                  src="/logoMain.png" 
-                  alt="iPayUS Logo" 
-                  width={150} 
-                  height={150}
-                  className="rounded-2xl shadow-lg mx-auto"
-                />
-            </div>
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">Welcome, {initialData?.borrower.first_name}!</h1>
-            <p className="text-gray-600 text-base md:text-lg max-w-md mx-auto mb-8">Thank you for choosing iPayUS. You&apos;re just a few steps away from completing your loan application. Let&apos;s get started.</p>
-            <button onClick={handleNext} className="w-full md:w-auto md:mx-auto px-10 py-5 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-2xl font-semibold hover:from-purple-600 hover:to-blue-600 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center text-lg">
-                Get Started <ArrowRight className="w-6 h-6 ml-3" />
-            </button>
-        </div>
-    );
+// Step 2: Welcome
+function WelcomeStep({ initialData, handleNext, selectedLanguage }: { 
+  initialData: LoanApplicationData | null; 
+  handleNext: () => void;
+  selectedLanguage: Language;
+}) {
+  const t = getTranslations(selectedLanguage);
+  
+  return (
+    <div className="text-center py-8">
+      <div className="text-center mb-8">
+        <Image 
+          src="/logoMain.png" 
+          alt="iPayUS Logo" 
+          width={150} 
+          height={150}
+          className="rounded-2xl shadow-lg mx-auto"
+        />
+      </div>
+      <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">
+        {interpolate(t.welcome.title, { name: initialData?.borrower.first_name || '' })}
+      </h1>
+      <p className="text-gray-600 text-base md:text-lg max-w-md mx-auto mb-8">{t.welcome.subtitle}</p>
+      <button onClick={handleNext} className="w-full md:w-auto md:mx-auto px-10 py-5 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-2xl font-semibold hover:from-purple-600 hover:to-blue-600 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center text-lg">
+        {t.welcome.getStarted} <ArrowRight className="w-6 h-6 ml-3" />
+      </button>
+    </div>
+  );
 }
 
 // Step 3: Personal Details
-function PersonalDetailsStep({ formData, setFormData, initialData, handleNext, handlePrev }: { 
+function PersonalDetailsStep({ formData, setFormData, initialData, handleNext, handlePrev, selectedLanguage }: { 
   formData: Record<string, unknown>; 
   setFormData: React.Dispatch<React.SetStateAction<Record<string, unknown>>>; 
   initialData: LoanApplicationData | null; 
   handleNext: () => void; 
   handlePrev: () => void; 
+  selectedLanguage: Language;
 }) {
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const t = getTranslations(selectedLanguage);
 
   // Validation function
   const validateForm = () => {
@@ -718,45 +858,45 @@ function PersonalDetailsStep({ formData, setFormData, initialData, handleNext, h
 
     // Date of birth validation
     if (!formData.dateOfBirth || String(formData.dateOfBirth).trim() === '') {
-      newErrors.dateOfBirth = 'Date of birth is required';
+      newErrors.dateOfBirth = t.personalDetails.validation.dobRequired;
     } else {
       const dob = new Date(String(formData.dateOfBirth));
       const today = new Date();
       const age = today.getFullYear() - dob.getFullYear();
       if (age < 18 || age > 100) {
-        newErrors.dateOfBirth = 'You must be between 18 and 100 years old';
+        newErrors.dateOfBirth = t.personalDetails.validation.ageRequirement;
       }
     }
 
     // Address validation
     if (!formData.address || String(formData.address).trim() === '') {
-      newErrors.address = 'Address is required';
+      newErrors.address = t.personalDetails.validation.addressRequired;
     } else if (String(formData.address).trim().length < 5) {
-      newErrors.address = 'Please enter a complete address';
+      newErrors.address = t.personalDetails.validation.addressMinLength;
     }
 
     // City validation
     if (!formData.city || String(formData.city).trim() === '') {
-      newErrors.city = 'City is required';
+      newErrors.city = t.personalDetails.validation.cityRequired;
     } else if (String(formData.city).trim().length < 2) {
-      newErrors.city = 'Please enter a valid city name';
+      newErrors.city = t.personalDetails.validation.cityMinLength;
     }
 
     // State validation
     if (!formData.state || String(formData.state).trim() === '') {
-      newErrors.state = 'State is required';
+      newErrors.state = t.personalDetails.validation.stateRequired;
     } else if (String(formData.state).trim().length < 2) {
-      newErrors.state = 'Please enter a valid state';
+      newErrors.state = t.personalDetails.validation.stateMinLength;
     }
 
     // ZIP code validation
     if (!formData.zipCode || String(formData.zipCode).trim() === '') {
-      newErrors.zipCode = 'ZIP code is required';
+      newErrors.zipCode = t.personalDetails.validation.zipRequired;
     } else {
       const zipCode = String(formData.zipCode).trim();
       const zipRegex = /^\d{5}(-\d{4})?$/;
       if (!zipRegex.test(zipCode)) {
-        newErrors.zipCode = 'Please enter a valid ZIP code (e.g., 12345 or 12345-6789)';
+        newErrors.zipCode = t.personalDetails.validation.zipInvalid;
       }
     }
 
@@ -771,19 +911,19 @@ function PersonalDetailsStep({ formData, setFormData, initialData, handleNext, h
   };
   return (
     <div>
-      <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Personal Information</h1>
-      <p className="text-gray-600 mb-8">Please provide your personal details. Identity verification (including SSN) will be handled securely through Stripe in a later step.</p>
+      <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">{t.personalDetails.title}</h1>
+      <p className="text-gray-600 mb-8">{t.personalDetails.subtitle}</p>
       
       <div className="space-y-6">
         {/* Pre-filled, non-changeable fields */}
         <div className="grid md:grid-cols-2 gap-6">
-          <InfoField icon={<User />} label="Full Name" value={`${initialData?.borrower.first_name} ${initialData?.borrower.last_name}`} />
-          <InfoField icon={<DollarSign />} label="Loan Amount" value={`$${initialData?.loan.principal_amount.toLocaleString()}`} />
+          <InfoField icon={<User />} label={t.personalDetails.fullName} value={`${initialData?.borrower.first_name} ${initialData?.borrower.last_name}`} />
+          <InfoField icon={<DollarSign />} label={t.personalDetails.loanAmount} value={`$${initialData?.loan.principal_amount.toLocaleString()}`} />
           {initialData?.borrower.email && (
-            <InfoField icon={<Mail />} label="Email" value={initialData.borrower.email} />
+            <InfoField icon={<Mail />} label={t.personalDetails.email} value={initialData.borrower.email} />
           )}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Verified Phone Number</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">{t.personalDetails.verifiedPhone}</label>
             <div className="relative">
               <div className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400">
                 <Phone />
@@ -799,13 +939,13 @@ function PersonalDetailsStep({ formData, setFormData, initialData, handleNext, h
 
         {/* Vehicle and Dealer Information */}
         <div className="space-y-4">
-          <h3 className="text-xl font-bold text-gray-900">Loan Details</h3>
+          <h3 className="text-xl font-bold text-gray-900">{t.personalDetails.loanDetails}</h3>
           <div className="grid md:grid-cols-2 gap-6">
-            <InfoField label="Dealer" value={initialData?.dealerName} icon={undefined} />
-            <InfoField label="Vehicle Year" value={initialData?.loan.vehicleYear} icon={undefined} />
-            <InfoField label="Vehicle Make" value={initialData?.loan.vehicleMake} icon={undefined} />
-            <InfoField label="Vehicle Model" value={initialData?.loan.vehicleModel} icon={undefined} />
-            <InfoField label="Vehicle VIN" value={initialData?.loan.vehicleVin} icon={undefined} />
+            <InfoField label={t.personalDetails.dealer} value={initialData?.dealerName} icon={undefined} />
+            <InfoField label={t.personalDetails.vehicleYear} value={initialData?.loan.vehicleYear} icon={undefined} />
+            <InfoField label={t.personalDetails.vehicleMake} value={initialData?.loan.vehicleMake} icon={undefined} />
+            <InfoField label={t.personalDetails.vehicleModel} value={initialData?.loan.vehicleModel} icon={undefined} />
+            <InfoField label={t.personalDetails.vehicleVin} value={initialData?.loan.vehicleVin} icon={undefined} />
           </div>
         </div>
 
@@ -814,7 +954,7 @@ function PersonalDetailsStep({ formData, setFormData, initialData, handleNext, h
         {/* Form fields */}
         <InputFieldWithError 
           icon={<Calendar />} 
-          label="Date of Birth" 
+          label={t.personalDetails.dateOfBirth} 
           name="dateOfBirth" 
           type="date" 
           value={formData.dateOfBirth} 
@@ -822,7 +962,7 @@ function PersonalDetailsStep({ formData, setFormData, initialData, handleNext, h
           error={errors.dateOfBirth}
         />
         <InputFieldWithError 
-          label="Address" 
+          label={t.personalDetails.address} 
           name="address" 
           type="text" 
           placeholder="123 Main Street"
@@ -832,7 +972,7 @@ function PersonalDetailsStep({ formData, setFormData, initialData, handleNext, h
         />
         <div className="grid md:grid-cols-3 gap-4">
           <InputFieldWithError 
-            label="City" 
+            label={t.personalDetails.city} 
             name="city" 
             type="text" 
             placeholder="Miami"
@@ -841,7 +981,7 @@ function PersonalDetailsStep({ formData, setFormData, initialData, handleNext, h
             error={errors.city}
           />
           <InputFieldWithError 
-            label="State" 
+            label={t.personalDetails.state} 
             name="state" 
             type="text" 
             placeholder="FL"
@@ -850,7 +990,7 @@ function PersonalDetailsStep({ formData, setFormData, initialData, handleNext, h
             error={errors.state}
           />
           <InputFieldWithError 
-            label="ZIP Code" 
+            label={t.personalDetails.zipCode} 
             name="zipCode" 
             type="text" 
             placeholder="33101"
@@ -866,13 +1006,13 @@ function PersonalDetailsStep({ formData, setFormData, initialData, handleNext, h
           onClick={handlePrev} 
           className="w-full md:w-auto px-8 py-4 bg-white/60 backdrop-blur-sm border border-white/30 rounded-2xl text-gray-700 font-semibold hover:bg-white/80 hover:shadow-lg transition-all duration-300 shadow-sm justify-center"
         >
-          Back
+          {t.personalDetails.back}
         </button>
         <button 
           onClick={handleNextClick} 
           className="w-full md:w-auto px-8 py-4 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-2xl font-semibold hover:from-purple-600 hover:to-blue-600 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center"
         >
-          Next <ArrowRight className="w-5 h-5 ml-2" />
+          {t.personalDetails.next} <ArrowRight className="w-5 h-5 ml-2" />
         </button>
       </div>
     </div>
@@ -880,13 +1020,15 @@ function PersonalDetailsStep({ formData, setFormData, initialData, handleNext, h
 }
 
 // Step 4: Employment Details
-function EmploymentDetailsStep({ formData, setFormData, handleNext, handlePrev }: { 
+function EmploymentDetailsStep({ formData, setFormData, handleNext, handlePrev, selectedLanguage }: { 
   formData: Record<string, unknown>; 
   setFormData: React.Dispatch<React.SetStateAction<Record<string, unknown>>>; 
   handleNext: () => void; 
   handlePrev: () => void; 
+  selectedLanguage: Language;
 }) {
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const t = getTranslations(selectedLanguage);
 
   // Validation function
   const validateForm = () => {
@@ -894,20 +1036,20 @@ function EmploymentDetailsStep({ formData, setFormData, handleNext, handlePrev }
 
     // Employment status validation
     if (!formData.employmentStatus || String(formData.employmentStatus).trim() === '') {
-      newErrors.employmentStatus = 'Employment status is required';
+      newErrors.employmentStatus = t.employment.validation.statusRequired;
     }
 
     // Annual income validation
     if (!formData.annualIncome || String(formData.annualIncome).trim() === '') {
-      newErrors.annualIncome = 'Annual income is required';
+      newErrors.annualIncome = t.employment.validation.incomeRequired;
     } else {
       const income = parseFloat(String(formData.annualIncome));
       if (isNaN(income) || income <= 0) {
-        newErrors.annualIncome = 'Please enter a valid annual income';
+        newErrors.annualIncome = t.employment.validation.incomeInvalid;
       } else if (income < 1000) {
-        newErrors.annualIncome = 'Annual income must be at least $1,000';
+        newErrors.annualIncome = t.employment.validation.incomeMinimum;
       } else if (income > 10000000) {
-        newErrors.annualIncome = 'Please enter a reasonable annual income';
+        newErrors.annualIncome = t.employment.validation.incomeMaximum;
       }
     }
 
@@ -915,16 +1057,16 @@ function EmploymentDetailsStep({ formData, setFormData, handleNext, handlePrev }
     const employmentStatus = String(formData.employmentStatus);
     if (employmentStatus === 'employed' || employmentStatus === 'self_employed') {
       if (!formData.currentEmployerName || String(formData.currentEmployerName).trim() === '') {
-        newErrors.currentEmployerName = 'Employer name is required';
+        newErrors.currentEmployerName = t.employment.validation.employerRequired;
       } else if (String(formData.currentEmployerName).trim().length < 2) {
-        newErrors.currentEmployerName = 'Please enter a valid employer name';
+        newErrors.currentEmployerName = t.employment.validation.employerMinLength;
       }
 
       // Time with employment validation (required for employed/self-employed)
       if (!formData.timeWithEmployment || String(formData.timeWithEmployment).trim() === '') {
-        newErrors.timeWithEmployment = 'Time with current employment is required';
+        newErrors.timeWithEmployment = t.employment.validation.timeRequired;
       } else if (String(formData.timeWithEmployment).trim().length < 2) {
-        newErrors.timeWithEmployment = 'Please enter a valid duration (e.g., "2 years", "6 months")';
+        newErrors.timeWithEmployment = t.employment.validation.timeMinLength;
       }
     }
 
@@ -942,23 +1084,23 @@ function EmploymentDetailsStep({ formData, setFormData, handleNext, handlePrev }
   const showEmployerFields = employmentStatus === 'employed' || employmentStatus === 'self_employed';
   return (
     <div>
-      <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Employment Details</h1>
-      <p className="text-gray-600 mb-8">Please provide your employment information.</p>
+      <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">{t.employment.title}</h1>
+      <p className="text-gray-600 mb-8">{t.employment.subtitle}</p>
 
       <div className="space-y-6">
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">Employment Status</label>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">{t.employment.employmentStatus}</label>
           <CustomSelect
             options={[
-              { value: 'employed', label: 'Employed' },
-              { value: 'self_employed', label: 'Self Employed' },
-              { value: 'unemployed', label: 'Unemployed' },
-              { value: 'retired', label: 'Retired' },
-              { value: 'student', label: 'Student' },
+              { value: 'employed', label: t.employment.employmentOptions.employed },
+              { value: 'self_employed', label: t.employment.employmentOptions.selfEmployed },
+              { value: 'unemployed', label: t.employment.employmentOptions.unemployed },
+              { value: 'retired', label: t.employment.employmentOptions.retired },
+              { value: 'student', label: t.employment.employmentOptions.student },
             ]}
             value={formData.employmentStatus as string}
             onChange={(value) => setFormData({...formData, employmentStatus: value})}
-            placeholder="Select Employment Status"
+            placeholder={t.employment.employmentStatus}
           />
           {errors.employmentStatus && (
             <p className="mt-2 text-sm text-red-600 flex items-center">
@@ -969,7 +1111,7 @@ function EmploymentDetailsStep({ formData, setFormData, handleNext, handlePrev }
         </div>
 
         <InputFieldWithError 
-          label="Annual Income" 
+          label={t.employment.annualIncome} 
           name="annualIncome" 
           type="number" 
           placeholder="50000" 
@@ -981,16 +1123,16 @@ function EmploymentDetailsStep({ formData, setFormData, handleNext, handlePrev }
         {showEmployerFields && (
           <>
             <InputFieldWithError 
-              label={employmentStatus === 'self_employed' ? 'Business/Company Name' : 'Current Employer Name'} 
+              label={employmentStatus === 'self_employed' ? t.employment.businessName : t.employment.currentEmployer} 
               name="currentEmployerName" 
               type="text" 
-              placeholder={employmentStatus === 'self_employed' ? 'Your Business Name' : 'Company Name'}
+              placeholder={employmentStatus === 'self_employed' ? t.employment.businessName : t.employment.currentEmployer}
               value={formData.currentEmployerName} 
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, currentEmployerName: e.target.value })} 
               error={errors.currentEmployerName}
             />
             <InputFieldWithError 
-              label="Time with Current Employment" 
+              label={t.employment.timeWithEmployment} 
               name="timeWithEmployment" 
               type="text" 
               placeholder="e.g., 2 years, 6 months, 1.5 years" 
@@ -1010,11 +1152,11 @@ function EmploymentDetailsStep({ formData, setFormData, handleNext, handlePrev }
                 </div>
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-blue-900 mb-2">Additional Information</h3>
+                <h3 className="text-lg font-semibold text-blue-900 mb-2">{t.employment.additionalInfo.title}</h3>
                 <p className="text-blue-800 text-sm">
-                  {employmentStatus === 'unemployed' && 'Please note that unemployment status may affect loan approval. You may be asked to provide additional documentation.'}
-                  {employmentStatus === 'retired' && 'Please be prepared to provide information about your retirement income, pensions, or social security benefits.'}
-                  {employmentStatus === 'student' && 'As a student, you may need to provide information about financial aid, part-time employment, or a co-signer.'}
+                  {employmentStatus === 'unemployed' && t.employment.additionalInfo.unemployed}
+                  {employmentStatus === 'retired' && t.employment.additionalInfo.retired}
+                  {employmentStatus === 'student' && t.employment.additionalInfo.student}
                 </p>
               </div>
             </div>
@@ -1023,12 +1165,12 @@ function EmploymentDetailsStep({ formData, setFormData, handleNext, handlePrev }
       </div>
 
       <div className="mt-10 flex flex-col-reverse md:flex-row md:justify-between gap-4">
-        <button onClick={handlePrev} className="w-full md:w-auto px-8 py-4 bg-white/60 backdrop-blur-sm border border-white/30 rounded-2xl text-gray-700 font-semibold hover:bg-white/80 hover:shadow-lg transition-all duration-300 shadow-sm justify-center">Back</button>
+        <button onClick={handlePrev} className="w-full md:w-auto px-8 py-4 bg-white/60 backdrop-blur-sm border border-white/30 rounded-2xl text-gray-700 font-semibold hover:bg-white/80 hover:shadow-lg transition-all duration-300 shadow-sm justify-center">{t.employment.back}</button>
         <button 
           onClick={handleNextClick} 
           className="w-full md:w-auto px-8 py-4 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-2xl font-semibold hover:from-purple-600 hover:to-blue-600 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center"
         >
-          Next <ArrowRight className="w-5 h-5 ml-2" />
+          {t.employment.next} <ArrowRight className="w-5 h-5 ml-2" />
         </button>
       </div>
     </div>
@@ -1036,33 +1178,35 @@ function EmploymentDetailsStep({ formData, setFormData, handleNext, handlePrev }
 }
 
 // Step 5: Review (Modified - added new employment fields)
-function ReviewStep({ formData, initialData, handlePrev, handleSubmit, loading }: { 
+function ReviewStep({ formData, initialData, handlePrev, handleSubmit, loading, selectedLanguage }: { 
   formData: Record<string, unknown>; 
   initialData: LoanApplicationData | null; 
   handlePrev: () => void; 
   handleSubmit: () => void; 
   loading: boolean; 
+  selectedLanguage: Language;
 }) {
   const reviewData = {
     ...initialData?.borrower,
     ...initialData?.loan,
     ...formData
   };
+  const t = getTranslations(selectedLanguage);
 
   return (
     <div>
-      <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Review Your Application</h1>
-      <p className="text-gray-600 mb-8">Please confirm that the following information is correct before submitting.</p>
+      <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">{t.review.title}</h1>
+      <p className="text-gray-600 mb-8">{t.review.subtitle}</p>
       
       <div className="space-y-6 bg-gray-50/50 p-4 md:p-6 rounded-2xl border">
         {/* Basic Information */}
         <div>
-          <h3 className="text-lg font-bold text-gray-900 mb-3">Basic Information</h3>
+          <h3 className="text-lg font-bold text-gray-900 mb-3">{t.review.basicInfo}</h3>
           <div className="space-y-2">
-            <ReviewItem label="Full Name" value={`${reviewData.first_name || ''} ${reviewData.last_name || ''}`} />
-            <ReviewItem label="Email" value={reviewData.email || 'Not provided'} />
-            <ReviewItem label="Verified Phone" value={`✅ ${(reviewData as Record<string, unknown>).phoneNumber as string || reviewData.phone || 'Not provided'}`} />
-            <ReviewItem label="Date of Birth" value={(reviewData as Record<string, unknown>).dateOfBirth as string || 'Not provided'} />
+            <ReviewItem label={t.review.fullName} value={`${reviewData.first_name || ''} ${reviewData.last_name || ''}`} />
+            <ReviewItem label={t.review.email} value={reviewData.email || t.common.notProvided} />
+            <ReviewItem label={t.review.verifiedPhone} value={`✅ ${(reviewData as Record<string, unknown>).phoneNumber as string || reviewData.phone || t.common.notProvided}`} />
+            <ReviewItem label={t.review.dateOfBirth} value={(reviewData as Record<string, unknown>).dateOfBirth as string || t.common.notProvided} />
           </div>
         </div>
 
@@ -1070,12 +1214,12 @@ function ReviewStep({ formData, initialData, handlePrev, handleSubmit, loading }
 
         {/* Address Information */}
         <div>
-          <h3 className="text-lg font-bold text-gray-900 mb-3">Address</h3>
+          <h3 className="text-lg font-bold text-gray-900 mb-3">{t.review.address}</h3>
           <div className="space-y-2">
-            <ReviewItem label="Street Address" value={(reviewData as Record<string, unknown>).address as string || 'Not provided'} />
-            <ReviewItem label="City" value={(reviewData as Record<string, unknown>).city as string || 'Not provided'} />
-            <ReviewItem label="State" value={(reviewData as Record<string, unknown>).state as string || 'Not provided'} />
-            <ReviewItem label="ZIP Code" value={(reviewData as Record<string, unknown>).zipCode as string || 'Not provided'} />
+            <ReviewItem label={t.review.streetAddress} value={(reviewData as Record<string, unknown>).address as string || t.common.notProvided} />
+            <ReviewItem label={t.review.city} value={(reviewData as Record<string, unknown>).city as string || t.common.notProvided} />
+            <ReviewItem label={t.review.state} value={(reviewData as Record<string, unknown>).state as string || t.common.notProvided} />
+            <ReviewItem label={t.review.zipCode} value={(reviewData as Record<string, unknown>).zipCode as string || t.common.notProvided} />
           </div>
         </div>
 
@@ -1083,10 +1227,10 @@ function ReviewStep({ formData, initialData, handlePrev, handleSubmit, loading }
 
         {/* Loan Information */}
         <div>
-          <h3 className="text-lg font-bold text-gray-900 mb-3">Loan Information</h3>
+          <h3 className="text-lg font-bold text-gray-900 mb-3">{t.review.loanInfo}</h3>
           <div className="space-y-2">
-            <ReviewItem label="Loan Amount" value={`$${reviewData.principal_amount?.toLocaleString() || 'N/A'}`} />
-            <ReviewItem label="Dealer" value={initialData?.dealerName || 'Not provided'} />
+            <ReviewItem label={t.review.loanAmount} value={`$${reviewData.principal_amount?.toLocaleString() || 'N/A'}`} />
+            <ReviewItem label={t.review.dealer} value={initialData?.dealerName || t.common.notProvided} />
           </div>
         </div>
 
@@ -1094,12 +1238,12 @@ function ReviewStep({ formData, initialData, handlePrev, handleSubmit, loading }
 
         {/* Vehicle Information */}
         <div>
-          <h3 className="text-lg font-bold text-gray-900 mb-3">Vehicle Information</h3>
+          <h3 className="text-lg font-bold text-gray-900 mb-3">{t.review.vehicleInfo}</h3>
           <div className="space-y-2">
-            <ReviewItem label="Year" value={reviewData.vehicleYear || initialData?.loan?.vehicleYear || 'Not provided'} />
-            <ReviewItem label="Make" value={reviewData.vehicleMake || initialData?.loan?.vehicleMake || 'Not provided'} />
-            <ReviewItem label="Model" value={reviewData.vehicleModel || initialData?.loan?.vehicleModel || 'Not provided'} />
-            <ReviewItem label="VIN" value={reviewData.vehicleVin || initialData?.loan?.vehicleVin || 'Not provided'} />
+            <ReviewItem label={t.review.year} value={reviewData.vehicleYear || initialData?.loan?.vehicleYear || t.common.notProvided} />
+            <ReviewItem label={t.review.make} value={reviewData.vehicleMake || initialData?.loan?.vehicleMake || t.common.notProvided} />
+            <ReviewItem label={t.review.model} value={reviewData.vehicleModel || initialData?.loan?.vehicleModel || t.common.notProvided} />
+            <ReviewItem label={t.review.vin} value={reviewData.vehicleVin || initialData?.loan?.vehicleVin || t.common.notProvided} />
           </div>
         </div>
 
@@ -1107,12 +1251,12 @@ function ReviewStep({ formData, initialData, handlePrev, handleSubmit, loading }
 
         {/* Employment Information */}
         <div>
-          <h3 className="text-lg font-bold text-gray-900 mb-3">Employment Information</h3>
+          <h3 className="text-lg font-bold text-gray-900 mb-3">{t.review.employmentInfo}</h3>
           <div className="space-y-2">
-            <ReviewItem label="Employment Status" value={(reviewData as Record<string, unknown>).employmentStatus as string || 'Not provided'} />
-            <ReviewItem label="Annual Income" value={(reviewData as Record<string, unknown>).annualIncome ? `$${parseFloat((reviewData as Record<string, unknown>).annualIncome as string).toLocaleString()}` : 'Not provided'} />
-            <ReviewItem label="Current Employer" value={(reviewData as Record<string, unknown>).currentEmployerName as string || 'Not provided'} />
-            <ReviewItem label="Time with Employment" value={(reviewData as Record<string, unknown>).timeWithEmployment as string || 'Not provided'} />
+            <ReviewItem label={t.review.employmentStatus} value={(reviewData as Record<string, unknown>).employmentStatus as string || t.common.notProvided} />
+            <ReviewItem label={t.review.annualIncome} value={(reviewData as Record<string, unknown>).annualIncome ? `$${parseFloat((reviewData as Record<string, unknown>).annualIncome as string).toLocaleString()}` : t.common.notProvided} />
+            <ReviewItem label={t.review.currentEmployer} value={(reviewData as Record<string, unknown>).currentEmployerName as string || t.common.notProvided} />
+            <ReviewItem label={t.review.timeWithEmployment} value={(reviewData as Record<string, unknown>).timeWithEmployment as string || t.common.notProvided} />
           </div>
         </div>
 
@@ -1120,15 +1264,15 @@ function ReviewStep({ formData, initialData, handlePrev, handleSubmit, loading }
 
         {/* References */}
         <div>
-          <h3 className="text-lg font-bold text-gray-900 mb-3">References</h3>
+          <h3 className="text-lg font-bold text-gray-900 mb-3">{t.review.references}</h3>
           <div className="space-y-4">
             {/* Reference 1 */}
             {((reviewData as Record<string, unknown>).reference1Name || (reviewData as Record<string, unknown>).reference1Phone || (reviewData as Record<string, unknown>).reference1Email) ? (
               <div>
-                <h4 className="font-semibold text-gray-800 mb-1">Reference 1</h4>
+                <h4 className="font-semibold text-gray-800 mb-1">{t.review.reference} 1</h4>
                 <div className="ml-4 space-y-1">
-                  {(reviewData as Record<string, unknown>).reference1Name ? <ReviewItem label="Name" value={(reviewData as Record<string, unknown>).reference1Name as string} /> : null}
-                  {(reviewData as Record<string, unknown>).reference1Phone ? <ReviewItem label="Phone" value={(reviewData as Record<string, unknown>).reference1Phone as string} /> : null}
+                  {(reviewData as Record<string, unknown>).reference1Name ? <ReviewItem label={t.review.name} value={(reviewData as Record<string, unknown>).reference1Name as string} /> : null}
+                  {(reviewData as Record<string, unknown>).reference1Phone ? <ReviewItem label={t.review.phone} value={(reviewData as Record<string, unknown>).reference1Phone as string} /> : null}
                   {(reviewData as Record<string, unknown>).reference1Email ? <ReviewItem label="Email" value={(reviewData as Record<string, unknown>).reference1Email as string} /> : null}
                 </div>
               </div>
@@ -1137,10 +1281,10 @@ function ReviewStep({ formData, initialData, handlePrev, handleSubmit, loading }
             {/* Reference 2 */}
             {((reviewData as Record<string, unknown>).reference2Name || (reviewData as Record<string, unknown>).reference2Phone || (reviewData as Record<string, unknown>).reference2Email) ? (
               <div>
-                <h4 className="font-semibold text-gray-800 mb-1">Reference 2</h4>
+                <h4 className="font-semibold text-gray-800 mb-1">{t.review.reference} 2</h4>
                 <div className="ml-4 space-y-1">
-                  {(reviewData as Record<string, unknown>).reference2Name ? <ReviewItem label="Name" value={(reviewData as Record<string, unknown>).reference2Name as string} /> : null}
-                  {(reviewData as Record<string, unknown>).reference2Phone ? <ReviewItem label="Phone" value={(reviewData as Record<string, unknown>).reference2Phone as string} /> : null}
+                  {(reviewData as Record<string, unknown>).reference2Name ? <ReviewItem label={t.review.name} value={(reviewData as Record<string, unknown>).reference2Name as string} /> : null}
+                  {(reviewData as Record<string, unknown>).reference2Phone ? <ReviewItem label={t.review.phone} value={(reviewData as Record<string, unknown>).reference2Phone as string} /> : null}
                   {(reviewData as Record<string, unknown>).reference2Email ? <ReviewItem label="Email" value={(reviewData as Record<string, unknown>).reference2Email as string} /> : null}
                 </div>
               </div>
@@ -1149,10 +1293,10 @@ function ReviewStep({ formData, initialData, handlePrev, handleSubmit, loading }
             {/* Reference 3 */}
             {((reviewData as Record<string, unknown>).reference3Name || (reviewData as Record<string, unknown>).reference3Phone || (reviewData as Record<string, unknown>).reference3Email) ? (
               <div>
-                <h4 className="font-semibold text-gray-800 mb-1">Reference 3</h4>
+                <h4 className="font-semibold text-gray-800 mb-1">{t.review.reference} 3</h4>
                 <div className="ml-4 space-y-1">
-                  {(reviewData as Record<string, unknown>).reference3Name ? <ReviewItem label="Name" value={(reviewData as Record<string, unknown>).reference3Name as string} /> : null}
-                  {(reviewData as Record<string, unknown>).reference3Phone ? <ReviewItem label="Phone" value={(reviewData as Record<string, unknown>).reference3Phone as string} /> : null}
+                  {(reviewData as Record<string, unknown>).reference3Name ? <ReviewItem label={t.review.name} value={(reviewData as Record<string, unknown>).reference3Name as string} /> : null}
+                  {(reviewData as Record<string, unknown>).reference3Phone ? <ReviewItem label={t.review.phone} value={(reviewData as Record<string, unknown>).reference3Phone as string} /> : null}
                   {(reviewData as Record<string, unknown>).reference3Email ? <ReviewItem label="Email" value={(reviewData as Record<string, unknown>).reference3Email as string} /> : null}
                 </div>
               </div>
@@ -1161,7 +1305,7 @@ function ReviewStep({ formData, initialData, handlePrev, handleSubmit, loading }
             {!(reviewData as Record<string, unknown>).reference1Name && !(reviewData as Record<string, unknown>).reference1Phone && !(reviewData as Record<string, unknown>).reference1Email &&
              !(reviewData as Record<string, unknown>).reference2Name && !(reviewData as Record<string, unknown>).reference2Phone && !(reviewData as Record<string, unknown>).reference2Email &&
              !(reviewData as Record<string, unknown>).reference3Name && !(reviewData as Record<string, unknown>).reference3Phone && !(reviewData as Record<string, unknown>).reference3Email ? (
-              <p className="text-gray-500 italic">No references provided</p>
+              <p className="text-gray-500 italic">{t.review.noReferences}</p>
             ) : null}
           </div>
         </div>
@@ -1170,23 +1314,23 @@ function ReviewStep({ formData, initialData, handlePrev, handleSubmit, loading }
 
         {/* Verification & Consent */}
         <div>
-          <h3 className="text-lg font-bold text-gray-900 mb-3">Verification & Consent</h3>
+          <h3 className="text-lg font-bold text-gray-900 mb-3">{t.review.verificationConsent}</h3>
           <div className="space-y-2">
             <ReviewItem 
-              label="Identity Verification" 
-              value={(reviewData as Record<string, unknown>).stripeVerificationStatus === 'completed' ? '✅ Verified' : '⏳ Pending verification'} 
+              label={t.review.identityVerification} 
+              value={(reviewData as Record<string, unknown>).stripeVerificationStatus === 'completed' ? t.review.verified : t.review.pending} 
             />
-            <ReviewItem label="Communication Consent" value={(reviewData as Record<string, unknown>).consentToContact ? '✅ Yes' : '❌ No'} />
-            {(reviewData as Record<string, unknown>).consentToText ? <ReviewItem label="Text Message Consent" value="✅ Yes" /> : null}
-            {(reviewData as Record<string, unknown>).consentToCall ? <ReviewItem label="Phone Call Consent" value="✅ Yes" /> : null}
+            <ReviewItem label={t.review.communicationConsent} value={(reviewData as Record<string, unknown>).consentToContact ? t.review.yes : t.review.no} />
+            {(reviewData as Record<string, unknown>).consentToText ? <ReviewItem label={t.review.textConsent} value={t.review.yes} /> : null}
+            {(reviewData as Record<string, unknown>).consentToCall ? <ReviewItem label={t.review.phoneConsent} value={t.review.yes} /> : null}
           </div>
         </div>
       </div>
 
       <div className="mt-10 flex flex-col-reverse md:flex-row md:justify-between gap-4">
-        <button onClick={handlePrev} className="w-full md:w-auto px-8 py-4 bg-white/60 backdrop-blur-sm border border-white/30 rounded-2xl text-gray-700 font-semibold hover:bg-white/80 hover:shadow-lg transition-all duration-300 shadow-sm justify-center">Back</button>
+        <button onClick={handlePrev} className="w-full md:w-auto px-8 py-4 bg-white/60 backdrop-blur-sm border border-white/30 rounded-2xl text-gray-700 font-semibold hover:bg-white/80 hover:shadow-lg transition-all duration-300 shadow-sm justify-center">{t.review.back}</button>
         <button onClick={handleSubmit} disabled={loading} className="w-full md:w-auto px-8 py-4 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-2xl font-semibold hover:from-green-600 hover:to-teal-600 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center disabled:opacity-50">
-          {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Check className="w-5 h-5 mr-2" />} Submit Application
+          {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Check className="w-5 h-5 mr-2" />} {loading ? t.review.submitting : t.review.submitApplication}
         </button>
       </div>
     </div>
@@ -1265,98 +1409,141 @@ const Loader = ({ text }: { text: string }) => (
   </div>
 );
 
-const ErrorMessage = ({ error }: { error: string }) => (
-  <div className="text-center py-20">
-    <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-      <AlertCircle className="w-8 h-8 text-red-500" />
+const ErrorMessage = ({ error, selectedLanguage = 'en' }: { error: string; selectedLanguage?: Language }) => {
+  const t = getTranslations(selectedLanguage);
+  return (
+    <div className="text-center py-20">
+      <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <AlertCircle className="w-8 h-8 text-red-500" />
+      </div>
+      <h2 className="text-2xl font-bold text-gray-900 mb-2">{t.error.title}</h2>
+      <p className="text-gray-600">{error}</p>
     </div>
-    <h2 className="text-2xl font-bold text-gray-900 mb-2">An Error Occurred</h2>
-    <p className="text-gray-600">{error}</p>
-  </div>
-);
+  );
+};
 
-const SuccessMessage = () => (
-  <div className="text-center py-12">
-    <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-      <Check className="w-10 h-10 text-green-500" />
+// Step 1: Language Selection
+function LanguageSelectionStepInternal({ handleLanguageSelection }: { 
+  handleLanguageSelection: (language: Language) => void;
+}) {
+  const t = getTranslations('en'); // Always show in English for language selection
+
+  return (
+    <div className="text-center py-8">
+      <div className="text-center mb-8">
+        <div className="w-20 h-20 bg-gradient-to-br from-purple-400 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+          <Globe className="w-10 h-10 text-white" />
+        </div>
+        <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">{t.languageSelection.title}</h1>
+        <p className="text-gray-600 text-base md:text-lg max-w-md mx-auto mb-8">{t.languageSelection.subtitle}</p>
+      </div>
+
+      <div className="space-y-4 max-w-md mx-auto">
+        <button
+          onClick={() => handleLanguageSelection('en')}
+          className="w-full px-8 py-4 bg-white border-2 border-gray-200 rounded-2xl text-gray-900 font-semibold hover:border-purple-500 hover:bg-purple-50 transition-all duration-300 shadow-sm hover:shadow-md flex items-center justify-between"
+        >
+          <span className="text-lg">{t.languageSelection.english}</span>
+          <span className="text-2xl">🇺🇸</span>
+        </button>
+        
+        <button
+          onClick={() => handleLanguageSelection('es')}
+          className="w-full px-8 py-4 bg-white border-2 border-gray-200 rounded-2xl text-gray-900 font-semibold hover:border-purple-500 hover:bg-purple-50 transition-all duration-300 shadow-sm hover:shadow-md flex items-center justify-between"
+        >
+          <span className="text-lg">{t.languageSelection.spanish}</span>
+          <span className="text-2xl">🇲🇽</span>
+        </button>
+      </div>
     </div>
-    <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Congratulations!</h2>
-    <h3 className="text-xl md:text-2xl font-semibold text-green-600 mb-6">Your Application is Under Review</h3>
-    
-    <div className="max-w-2xl mx-auto space-y-6">
-      <div className="bg-green-50 border border-green-200 rounded-2xl p-6">
-        <h4 className="text-lg font-semibold text-green-800 mb-3">What Happens Next?</h4>
-        <div className="space-y-3 text-left">
-          <div className="flex items-start space-x-3">
-            <div className="w-6 h-6 bg-green-200 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-              <span className="text-green-700 text-sm font-bold">1</span>
+  );
+}
+
+const SuccessMessage = ({ selectedLanguage = 'en' }: { selectedLanguage?: Language }) => {
+  const t = getTranslations(selectedLanguage);
+  
+  return (
+    <div className="text-center py-12">
+      <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+        <Check className="w-10 h-10 text-green-500" />
+      </div>
+      <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">{t.success.title}</h2>
+      <h3 className="text-xl md:text-2xl font-semibold text-green-600 mb-6">{t.success.subtitle}</h3>
+      
+      <div className="max-w-2xl mx-auto space-y-6">
+        <div className="bg-green-50 border border-green-200 rounded-2xl p-6">
+          <h4 className="text-lg font-semibold text-green-800 mb-3">{t.success.whatNext}</h4>
+          <div className="space-y-3 text-left">
+            <div className="flex items-start space-x-3">
+              <div className="w-6 h-6 bg-green-200 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                <span className="text-green-700 text-sm font-bold">1</span>
+              </div>
+              <p className="text-green-700">{t.success.step1}</p>
             </div>
-            <p className="text-green-700">Our team will review your application and verify all information provided</p>
-          </div>
-          <div className="flex items-start space-x-3">
-            <div className="w-6 h-6 bg-green-200 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-              <span className="text-green-700 text-sm font-bold">2</span>
+            <div className="flex items-start space-x-3">
+              <div className="w-6 h-6 bg-green-200 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                <span className="text-green-700 text-sm font-bold">2</span>
+              </div>
+              <p className="text-green-700">{t.success.step2}</p>
             </div>
-            <p className="text-green-700">We&apos;ll contact your references and employer to confirm employment details</p>
-          </div>
-          <div className="flex items-start space-x-3">
-            <div className="w-6 h-6 bg-green-200 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-              <span className="text-green-700 text-sm font-bold">3</span>
+            <div className="flex items-start space-x-3">
+              <div className="w-6 h-6 bg-green-200 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                <span className="text-green-700 text-sm font-bold">3</span>
+              </div>
+              <p className="text-green-700">{t.success.step3}</p>
             </div>
-            <p className="text-green-700">You&apos;ll receive loan terms and next steps within 2-3 business days</p>
           </div>
         </div>
-      </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6">
-        <h4 className="text-lg font-semibold text-blue-800 mb-3">Important Information</h4>
-        <div className="space-y-2 text-left text-blue-700">
-          <p>• Check your email and phone for updates from our team</p>
-          <p>• Your identity has been verified through Stripe Identity</p>
-          <p>• We&apos;ll contact you using your preferred communication method</p>
-          <p>• Keep your phone accessible in case we need additional information</p>
+        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6">
+          <h4 className="text-lg font-semibold text-blue-800 mb-3">{t.success.importantInfo}</h4>
+          <div className="space-y-2 text-left text-blue-700">
+            {t.success.info.map((item, index) => (
+              <p key={index}>• {item}</p>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6">
+          <h4 className="text-lg font-semibold text-gray-800 mb-2">{t.success.questions}</h4>
+          <p className="text-gray-600">{t.success.questionsText}</p>
         </div>
       </div>
-
-      <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6">
-        <h4 className="text-lg font-semibold text-gray-800 mb-2">Questions?</h4>
-        <p className="text-gray-600">
-          If you have any questions about your application, please contact our customer service team.
-        </p>
-      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // New Step: References
-function ReferencesStep({ formData, setFormData, handleNext, handlePrev }: { 
+function ReferencesStep({ formData, setFormData, handleNext, handlePrev, selectedLanguage }: { 
   formData: Record<string, unknown>; 
   setFormData: React.Dispatch<React.SetStateAction<Record<string, unknown>>>; 
   handleNext: () => void; 
   handlePrev: () => void; 
+  selectedLanguage: Language;
 }) {
+  const t = getTranslations(selectedLanguage);
   return (
     <div>
-      <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">References</h1>
-      <p className="text-gray-600 mb-8">Please provide three personal references.</p>
+      <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">{t.references.title}</h1>
+      <p className="text-gray-600 mb-8">{t.references.subtitle}</p>
 
       <div className="space-y-8">
         {[1, 2, 3].map((num) => (
           <div key={num} className="p-4 border border-gray-200 rounded-2xl bg-gray-50/50">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">Reference {num}</h3>
+            <h3 className="text-xl font-bold text-gray-900 mb-4">{t.references.reference} {num}</h3>
             <div className="space-y-4">
-              <InputField label="Name" name={`reference${num}Name`} type="text" value={formData[`reference${num}Name`]} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, [`reference${num}Name`]: e.target.value})} />
-              <InputField label="Phone" name={`reference${num}Phone`} type="text" value={formData[`reference${num}Phone`]} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, [`reference${num}Phone`]: e.target.value})} />
-              <InputField label="Email" name={`reference${num}Email`} type="email" value={formData[`reference${num}Email`]} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, [`reference${num}Email`]: e.target.value})} />
+              <InputField label={t.references.name} name={`reference${num}Name`} type="text" value={formData[`reference${num}Name`]} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, [`reference${num}Name`]: e.target.value})} />
+              <InputField label={t.references.phone} name={`reference${num}Phone`} type="text" value={formData[`reference${num}Phone`]} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, [`reference${num}Phone`]: e.target.value})} />
+              <InputField label={t.references.email} name={`reference${num}Email`} type="email" value={formData[`reference${num}Email`]} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, [`reference${num}Email`]: e.target.value})} />
             </div>
           </div>
         ))}
       </div>
 
       <div className="mt-10 flex flex-col-reverse md:flex-row md:justify-between gap-4">
-        <button onClick={handlePrev} className="w-full md:w-auto px-8 py-4 bg-white/60 backdrop-blur-sm border border-white/30 rounded-2xl text-gray-700 font-semibold hover:bg-white/80 hover:shadow-lg transition-all duration-300 shadow-sm justify-center">Back</button>
+        <button onClick={handlePrev} className="w-full md:w-auto px-8 py-4 bg-white/60 backdrop-blur-sm border border-white/30 rounded-2xl text-gray-700 font-semibold hover:bg-white/80 hover:shadow-lg transition-all duration-300 shadow-sm justify-center">{t.references.back}</button>
         <button onClick={handleNext} className="w-full md:w-auto px-8 py-4 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-2xl font-semibold hover:from-purple-600 hover:to-blue-600 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center">
-          Next <ArrowRight className="w-5 h-5 ml-2" />
+          {t.references.next} <ArrowRight className="w-5 h-5 ml-2" />
         </button>
       </div>
     </div>
@@ -1364,18 +1551,20 @@ function ReferencesStep({ formData, setFormData, handleNext, handlePrev }: {
 }
 
 // Step 5: Stripe Identity Verification
-function StripeVerificationStep({ formData, setFormData, initialData, handleNext, handlePrev, saveProgress }: { 
+function StripeVerificationStep({ formData, setFormData, initialData, handleNext, handlePrev, saveProgress, selectedLanguage }: { 
   formData: Record<string, unknown>; 
   setFormData: React.Dispatch<React.SetStateAction<Record<string, unknown>>>; 
   initialData: LoanApplicationData | null; 
   handleNext: () => void; 
   handlePrev: () => void; 
   saveProgress: (step: number, data: Record<string, unknown>) => void; 
+  selectedLanguage: Language;
 }) {
   const [verificationStatus, setVerificationStatus] = useState(formData.stripeVerificationStatus || 'not_started'); // not_started, in_progress, completed, failed
   const [isVerifying, setIsVerifying] = useState(false);
   const [stripe, setStripe] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const t = getTranslations(selectedLanguage);
 
   useEffect(() => {
     // Load Stripe.js
@@ -1520,8 +1709,8 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
 
   return (
     <div>
-      <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Identity Verification</h1>
-      <p className="text-gray-600 mb-8">To protect against fraud and comply with regulations, we need to verify your identity using Stripe Identity.</p>
+      <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">{t.identityVerification.title}</h1>
+      <p className="text-gray-600 mb-8">{t.identityVerification.subtitle}</p>
 
       <div className="space-y-6">
         {/* Information Card */}
@@ -1531,12 +1720,11 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
               <Lock className="w-8 h-8 text-blue-500" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-blue-900 mb-2">Secure Identity Verification</h3>
+              <h3 className="text-lg font-semibold text-blue-900 mb-2">{t.identityVerification.secureTitle}</h3>
               <ul className="text-blue-800 text-sm space-y-2">
-                <li>• Your personal information is encrypted and secure</li>
-                <li>• We use Stripe&apos;s industry-leading identity verification</li>
-                <li>• This process typically takes 2-3 minutes</li>
-                <li>• You&apos;ll need a government-issued photo ID</li>
+                {t.identityVerification.secureList.map((item, index) => (
+                  <li key={index}>• {item}</li>
+                ))}
               </ul>
             </div>
           </div>
@@ -1560,21 +1748,21 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
                 <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Lock className="w-8 h-8 text-gray-400" />
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">Ready to Verify</h3>
-                <p className="text-gray-600 mb-6">Click the button below to start the identity verification process.</p>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">{t.identityVerification.readyTitle}</h3>
+                <p className="text-gray-600 mb-6">{t.identityVerification.readySubtitle}</p>
                 <button
                   onClick={startVerification}
                   disabled={isVerifying}
                   className="px-8 py-4 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-2xl font-semibold hover:from-green-600 hover:to-teal-600 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
                 >
-                  Start Verification
+                  {t.identityVerification.startVerification}
                 </button>
                 <button
                   onClick={handleSkipVerification}
                   disabled={isVerifying}
                   className="mt-4 px-8 py-4 bg-gray-300 text-gray-800 rounded-2xl font-semibold hover:bg-gray-400 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
                 >
-                  Skip Verification (for testing)
+                  {t.identityVerification.skipVerification}
                 </button>
               </div>
             )}
@@ -1584,8 +1772,8 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
                 <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">Starting Verification</h3>
-                <p className="text-gray-600 mb-6">Please complete the identity verification in the Stripe modal...</p>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">{t.identityVerification.startingTitle}</h3>
+                <p className="text-gray-600 mb-6">{t.identityVerification.startingSubtitle}</p>
               </div>
             )}
 
@@ -1594,8 +1782,8 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
                 <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Loader2 className="w-8 h-8 text-yellow-500 animate-spin" />
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">Processing Verification</h3>
-                <p className="text-gray-600 mb-6">Your documents are being verified. This usually takes a few moments...</p>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">{t.identityVerification.processingTitle}</h3>
+                <p className="text-gray-600 mb-6">{t.identityVerification.processingSubtitle}</p>
               </div>
             )}
 
@@ -1604,8 +1792,8 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
                 <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Check className="w-8 h-8 text-green-500" />
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">Identity Verified!</h3>
-                <p className="text-green-600 mb-6">Your identity has been successfully verified. You can now proceed to the next step.</p>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">{t.identityVerification.verifiedTitle}</h3>
+                <p className="text-green-600 mb-6">{t.identityVerification.verifiedSubtitle}</p>
               </div>
             )}
 
@@ -1614,8 +1802,8 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
                 <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <AlertCircle className="w-8 h-8 text-red-500" />
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">Verification Failed</h3>
-                <p className="text-red-600 mb-6">We were unable to verify your identity. Please try again or contact support.</p>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">{t.identityVerification.failedTitle}</h3>
+                <p className="text-red-600 mb-6">{t.identityVerification.failedSubtitle}</p>
                 <button
                   onClick={() => {
                     setError(null);
@@ -1626,7 +1814,7 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
                   disabled={isVerifying}
                   className="px-8 py-4 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-2xl font-semibold hover:from-red-600 hover:to-red-700 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
                 >
-                  Try Again
+                  {t.identityVerification.tryAgain}
                 </button>
               </div>
             )}
@@ -1635,13 +1823,13 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
       </div>
 
       <div className="mt-10 flex flex-col-reverse md:flex-row md:justify-between gap-4">
-        <button onClick={handlePrev} className="w-full md:w-auto px-8 py-4 bg-white/60 backdrop-blur-sm border border-white/30 rounded-2xl text-gray-700 font-semibold hover:bg-white/80 hover:shadow-lg transition-all duration-300 shadow-sm justify-center">Back</button>
+        <button onClick={handlePrev} className="w-full md:w-auto px-8 py-4 bg-white/60 backdrop-blur-sm border border-white/30 rounded-2xl text-gray-700 font-semibold hover:bg-white/80 hover:shadow-lg transition-all duration-300 shadow-sm justify-center">{t.identityVerification.back}</button>
         <button 
           onClick={handleNext} 
           disabled={!canProceed}
           className="w-full md:w-auto px-8 py-4 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-2xl font-semibold hover:from-purple-600 hover:to-blue-600 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Next <ArrowRight className="w-5 h-5 ml-2" />
+          {t.identityVerification.next} <ArrowRight className="w-5 h-5 ml-2" />
         </button>
       </div>
     </div>
@@ -1649,18 +1837,20 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
 }
 
 // Step 6: Consent & Communication Preferences
-function ConsentStep({ formData, setFormData, handleNext, handlePrev }: { 
+function ConsentStep({ formData, setFormData, handleNext, handlePrev, selectedLanguage }: { 
   formData: Record<string, unknown>; 
   setFormData: React.Dispatch<React.SetStateAction<Record<string, unknown>>>; 
   handleNext: () => void; 
   handlePrev: () => void; 
+  selectedLanguage: Language;
 }) {
   const canProceed = formData.consentToContact && (formData.consentToText || formData.consentToCall);
+  const t = getTranslations(selectedLanguage);
 
   return (
     <div>
-      <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Communication Consent</h1>
-      <p className="text-gray-600 mb-8">Please review and provide your consent for how we can contact you during your loan period.</p>
+      <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">{t.consent.title}</h1>
+      <p className="text-gray-600 mb-8">{t.consent.subtitle}</p>
 
       <div className="space-y-6">
         {/* Important Notice */}
@@ -1670,10 +1860,9 @@ function ConsentStep({ formData, setFormData, handleNext, handlePrev }: {
               <AlertCircle className="w-6 h-6 text-yellow-600" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-yellow-900 mb-2">Important Notice</h3>
+              <h3 className="text-lg font-semibold text-yellow-900 mb-2">{t.consent.importantNotice}</h3>
               <p className="text-yellow-800 text-sm">
-                By proceeding with this loan application, you agree to be contacted regarding loan updates, payment reminders, and account information. 
-                You must consent to at least one form of communication and cannot opt out until your loan is paid in full.
+                {t.consent.noticeText}
               </p>
             </div>
           </div>
@@ -1681,7 +1870,7 @@ function ConsentStep({ formData, setFormData, handleNext, handlePrev }: {
 
         {/* Consent Checkboxes */}
         <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-6">
-          <h3 className="text-xl font-bold text-gray-900">Communication Consent (Required)</h3>
+          <h3 className="text-xl font-bold text-gray-900">{t.consent.communicationTitle}</h3>
           
           {/* Primary Consent */}
           <div className="space-y-4">
@@ -1693,9 +1882,9 @@ function ConsentStep({ formData, setFormData, handleNext, handlePrev }: {
                 className="mt-1 w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
               />
               <div>
-                <span className="text-gray-900 font-semibold">I consent to be contacted by iPayUS regarding my loan</span>
+                <span className="text-gray-900 font-semibold">{t.consent.primaryConsent}</span>
                 <p className="text-sm text-gray-600 mt-1">
-                  This includes loan updates, payment notifications, account information, and customer service communications.
+                  {t.consent.primaryConsentDetail}
                 </p>
               </div>
             </label>
@@ -1704,7 +1893,7 @@ function ConsentStep({ formData, setFormData, handleNext, handlePrev }: {
           {/* Communication Methods */}
           {Boolean(formData.consentToContact) && (
             <div className="pl-8 space-y-4 border-l-2 border-purple-200">
-              <p className="text-sm font-semibold text-gray-700 mb-3">Select how we can contact you (choose at least one):</p>
+              <p className="text-sm font-semibold text-gray-700 mb-3">{t.consent.selectMethods}</p>
               
               <label className="flex items-start space-x-3 cursor-pointer">
                 <input
@@ -1714,8 +1903,8 @@ function ConsentStep({ formData, setFormData, handleNext, handlePrev }: {
                   className="mt-1 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
                 />
                 <div>
-                  <span className="text-gray-900 font-medium">Text Messages (SMS)</span>
-                  <p className="text-sm text-gray-600">Receive payment reminders, account alerts, and important updates via text message.</p>
+                  <span className="text-gray-900 font-medium">{t.consent.textMessages}</span>
+                  <p className="text-sm text-gray-600">{t.consent.textMessagesDetail}</p>
                 </div>
               </label>
 
@@ -1727,8 +1916,8 @@ function ConsentStep({ formData, setFormData, handleNext, handlePrev }: {
                   className="mt-1 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
                 />
                 <div>
-                  <span className="text-gray-900 font-medium">Phone Calls</span>
-                  <p className="text-sm text-gray-600">Receive calls for payment reminders, account updates, and customer service.</p>
+                  <span className="text-gray-900 font-medium">{t.consent.phoneCalls}</span>
+                  <p className="text-sm text-gray-600">{t.consent.phoneCallsDetail}</p>
                 </div>
               </label>
             </div>
@@ -1785,13 +1974,13 @@ function ConsentStep({ formData, setFormData, handleNext, handlePrev }: {
       </div>
 
       <div className="mt-10 flex flex-col-reverse md:flex-row md:justify-between gap-4">
-        <button onClick={handlePrev} className="w-full md:w-auto px-8 py-4 bg-white/60 backdrop-blur-sm border border-white/30 rounded-2xl text-gray-700 font-semibold hover:bg-white/80 hover:shadow-lg transition-all duration-300 shadow-sm justify-center">Back</button>
+        <button onClick={handlePrev} className="w-full md:w-auto px-8 py-4 bg-white/60 backdrop-blur-sm border border-white/30 rounded-2xl text-gray-700 font-semibold hover:bg-white/80 hover:shadow-lg transition-all duration-300 shadow-sm justify-center">{t.consent.back}</button>
         <button 
           onClick={handleNext} 
           disabled={!canProceed}
           className="w-full md:w-auto px-8 py-4 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-2xl font-semibold hover:from-purple-600 hover:to-blue-600 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Next <ArrowRight className="w-5 h-5 ml-2" />
+          {t.consent.next} <ArrowRight className="w-5 h-5 ml-2" />
         </button>
       </div>
     </div>

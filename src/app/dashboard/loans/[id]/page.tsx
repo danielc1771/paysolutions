@@ -412,6 +412,10 @@ export default function LoanDetail({ params }: LoanDetailProps) {
                       <p className="text-lg text-gray-900">{loan.borrower.phone}</p>
                     </div>
                     <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Email (Application Sent To)</label>
+                      <p className="text-lg text-gray-900 text-blue-600 font-medium">{loan.borrower.email}</p>
+                    </div>
+                    <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Date of Birth</label>
                       <p className="text-lg text-gray-900">{loan.borrower.date_of_birth ? new Date(loan.borrower.date_of_birth).toLocaleDateString() : 'Not provided'}</p>
                     </div>

@@ -59,6 +59,7 @@ export const borrowers = pgTable("borrowers", {
 	currentEmployerName: varchar("current_employer_name", { length: 255 }),
 	timeWithEmployment: varchar("time_with_employment", { length: 50 }),
 	kycStatus: varchar("kyc_status", { length: 50 }).default('pending'),
+	preferredLanguage: varchar("preferred_language", { length: 10 }).default('en'),
 	reference1Name: varchar("reference1_name", { length: 255 }),
 	reference1Phone: varchar("reference1_phone", { length: 20 }),
 	reference1Email: varchar("reference1_email", { length: 255 }),

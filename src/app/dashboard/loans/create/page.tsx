@@ -186,7 +186,7 @@ export default function CreateLoan() {
         throw new Error(result.error || result.message || 'Failed to send application');
       }
 
-      setSuccessMessage(`Application sent successfully! Application URL: ${result.applicationUrl}`);
+      setSuccessMessage(`Application sent successfully to ${sendFormData.customerEmail}! Application URL: ${result.applicationUrl}`);
       setCreatedLoanId(result.loanId || null);
       setShowSuccessModal(true);
       setSendFormData({

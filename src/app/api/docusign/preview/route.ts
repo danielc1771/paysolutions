@@ -1,7 +1,11 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { generateLoanAgreementHTMLInline, LoanData } from '@/utils/docusign/templates-inline';
+import { Language } from '@/utils/translations';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const lang = searchParams.get('lang');
+  const language: Language = (lang === 'es') ? 'es' : 'en';
   try {
     // Sample loan data for preview
     const sampleLoanData: LoanData = {
@@ -44,7 +48,7 @@ export async function GET() {
       }
     };
 
-    const html = generateLoanAgreementHTMLInline(sampleLoanData);
+    const html = generateLoanAgreementHTMLInline(sampleLoanData, language);
 
     return new Response(html, {
       headers: {

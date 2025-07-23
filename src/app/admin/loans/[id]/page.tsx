@@ -539,8 +539,8 @@ export default function LoanDetail({ params }: LoanDetailProps) {
                   <span className="font-semibold text-gray-900">{loan.borrower.first_name} {loan.borrower.last_name}</span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-50">
-                  <span className="text-gray-600 font-medium">Email:</span>
-                  <span className="font-semibold text-gray-900">{loan.borrower.email}</span>
+                  <span className="text-gray-600 font-medium">Email (Application Sent To):</span>
+                  <span className="font-semibold text-blue-600">{loan.borrower.email}</span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-50">
                   <span className="text-gray-600 font-medium">Phone:</span>

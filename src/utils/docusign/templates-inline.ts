@@ -1,5 +1,6 @@
 import 'server-only';
 import docusign from 'docusign-esign';
+import { getTranslations, interpolate, Language } from '../translations';
 
 // Extended interfaces for DocuSign features not in the official types
 interface ExtendedDocument extends Omit<docusign.Document, 'documentBase64' | 'fileExtension'> {
@@ -122,8 +123,11 @@ export function calculateWeeklyPaymentSchedule(
 }
 
 // Generate DocuSign-optimized loan agreement document with inline styles
-export const generateLoanAgreementHTMLInline = (loanData: LoanData): string => {
-  const currentDate = new Date().toLocaleDateString('en-US', {
+export const generateLoanAgreementHTMLInline = (loanData: LoanData, language: Language = 'en'): string => {
+  const t = getTranslations(language);
+  const locale = language === 'es' ? 'es-ES' : 'en-US';
+  
+  const currentDate = new Date().toLocaleDateString(locale, {
     month: '2-digit',
     day: '2-digit',
     year: 'numeric'
@@ -138,6 +142,13 @@ export const generateLoanAgreementHTMLInline = (loanData: LoanData): string => {
     loanData.interestRate,
     loanData.termWeeks
   );
+
+  // Locale-aware date formatting for first payment
+  const firstPaymentDateFormatted = firstPaymentDate.toLocaleDateString(locale, { 
+    month: '2-digit', 
+    day: '2-digit', 
+    year: 'numeric' 
+  });
   
   const totalFinanceCharge = paymentSchedule.reduce((sum, payment) => sum + payment.interestAmount, 0);
   const totalOfPayments = paymentSchedule.reduce((sum, payment) => sum + payment.totalAmount, 0);
@@ -146,7 +157,7 @@ export const generateLoanAgreementHTMLInline = (loanData: LoanData): string => {
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Vehicle Loan Agreement - ${loanData.loanNumber}</title>
+    <title>${t.docusign.document.title} - ${loanData.loanNumber}</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
@@ -154,21 +165,21 @@ export const generateLoanAgreementHTMLInline = (loanData: LoanData): string => {
 
     <!-- Enhanced Document Header -->
     <div style="background-color: #2563eb; color: white; padding: 30px 20px; text-align: center; margin: -20px -20px 30px -20px; border-radius: 0 0 15px 15px;">
-        <h1 style="font-size: 28px; font-weight: bold; margin: 0 0 8px 0; letter-spacing: -0.5px;">Vehicle Loan Agreement</h1>
-        <p style="font-size: 16px; margin: 0; opacity: 0.9;">PaySolutions LLC - Professional Financing Services</p>
+        <h1 style="font-size: 28px; font-weight: bold; margin: 0 0 8px 0; letter-spacing: -0.5px;">${t.docusign.document.title}</h1>
+        <p style="font-size: 16px; margin: 0; opacity: 0.9;">${t.docusign.document.companyTagline}</p>
     </div>
 
     <div style="background-color: #f8fafc; padding: 20px; margin: 20px 0; border-radius: 10px; border: 2px solid #e2e8f0;">
-        <h3 style="color: #1e40af; font-size: 18px; font-weight: bold; margin: 0 0 15px 0; padding-bottom: 8px; border-bottom: 2px solid #3b82f6;">📋 Loan Information</h3>
+        <h3 style="color: #1e40af; font-size: 18px; font-weight: bold; margin: 0 0 15px 0; padding-bottom: 8px; border-bottom: 2px solid #3b82f6;">${t.docusign.document.loanInformation}</h3>
         <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
             <tr>
-                <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">Application Date:</th>
+                <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">${t.docusign.headers.applicationDate}</th>
                 <td style="border: 1px solid #d1d5db; padding: 10px; background-color: white; font-weight: 500;">${currentDate}</td>
-                <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">Requested Loan Amount:</th>
+                <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">${t.docusign.headers.requestedLoanAmount}</th>
                 <td style="border: 1px solid #d1d5db; padding: 10px; background-color: white; font-weight: 500;">$${loanData.principalAmount.toLocaleString()}</td>
             </tr>
             <tr>
-                <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">Dealership:</th>
+                <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">${t.docusign.headers.dealership}</th>
                 <td colspan="3" style="border: 1px solid #d1d5db; padding: 10px; background-color: white; font-weight: 500;">Pay Solutions</td>
             </tr>
         </table>
@@ -176,15 +187,15 @@ export const generateLoanAgreementHTMLInline = (loanData: LoanData): string => {
         ${loanData.vehicle ? `
         <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
             <tr>
-                <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">Vehicle Year:</th>
+                <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">${t.docusign.headers.vehicleYear}</th>
                 <td style="border: 1px solid #d1d5db; padding: 10px; background-color: white; font-weight: 500;">${loanData.vehicle.year}</td>
-                <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">Make:</th>
+                <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">${t.docusign.headers.make}</th>
                 <td style="border: 1px solid #d1d5db; padding: 10px; background-color: white; font-weight: 500;">${loanData.vehicle.make}</td>
             </tr>
             <tr>
-                <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">Model:</th>
+                <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">${t.docusign.headers.model}</th>
                 <td style="border: 1px solid #d1d5db; padding: 10px; background-color: white; font-weight: 500;">${loanData.vehicle.model}</td>
-                <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">VIN:</th>
+                <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">${t.docusign.headers.vin}</th>
                 <td style="border: 1px solid #d1d5db; padding: 10px; background-color: white; font-weight: 500;">${loanData.vehicle.vin}</td>
             </tr>
         </table>
@@ -193,50 +204,50 @@ export const generateLoanAgreementHTMLInline = (loanData: LoanData): string => {
 
     <div style="display: table; width: 100%; margin-bottom: 20px; border-spacing: 10px;">
         <div style="display: table-cell; width: 50%; border: 2px solid #3b82f6; border-radius: 10px; padding: 15px; background-color: #f0f9ff; vertical-align: top;">
-            <h4 style="color: #1e40af; font-size: 16px; font-weight: bold; margin: 0 0 12px 0; text-transform: uppercase; letter-spacing: 0.5px;">🏢 Lender Information</h4>
+            <h4 style="color: #1e40af; font-size: 16px; font-weight: bold; margin: 0 0 12px 0; text-transform: uppercase; letter-spacing: 0.5px;">${t.docusign.headers.lenderInformation}</h4>
             <strong style="color: #1e40af; font-size: 16px;">Pay Solutions LLC</strong><br>
             575 NW 50th St<br>
             Miami, FL 33166<br>
             <br>
-            <strong>Professional Lending Services</strong><br>
-            <em>Your trusted financial partner</em>
+            <strong>${t.docusign.headers.professionalLendingServices}</strong><br>
+            <em>${t.docusign.headers.trustedFinancialPartner}</em>
         </div>
         <div style="display: table-cell; width: 50%; border: 2px solid #3b82f6; border-radius: 10px; padding: 15px; background-color: #f0f9ff; vertical-align: top;">
-            <h4 style="color: #1e40af; font-size: 16px; font-weight: bold; margin: 0 0 12px 0; text-transform: uppercase; letter-spacing: 0.5px;">👤 Borrower Information</h4>
+            <h4 style="color: #1e40af; font-size: 16px; font-weight: bold; margin: 0 0 12px 0; text-transform: uppercase; letter-spacing: 0.5px;">${t.docusign.headers.borrowerInformation}</h4>
             <strong style="color: #1e40af; font-size: 16px;">${loanData.borrower.firstName} ${loanData.borrower.lastName}</strong><br>
             📧 ${loanData.borrower.email}<br>
             ${loanData.borrower.phone ? `📱 ${loanData.borrower.phone}<br>` : ''}
-            🎂 Date of Birth: ${loanData.borrower.dateOfBirth}<br>
+            🎂 ${t.docusign.labels.dateOfBirth} ${loanData.borrower.dateOfBirth}<br>
             <br>
-            <strong>📍 Address:</strong><br>
+            <strong>${t.docusign.labels.address}</strong><br>
             ${loanData.borrower.addressLine1}<br>
             ${loanData.borrower.city}, ${loanData.borrower.state} ${loanData.borrower.zipCode}<br>
             <br>
-            <strong>💼 Employment:</strong><br>
-            Status: ${loanData.borrower.employmentStatus}<br>
-            Annual Salary: $${loanData.borrower.annualIncome?.toLocaleString()}<br>
-            ${loanData.borrower.currentEmployerName ? `Employer: ${loanData.borrower.currentEmployerName}<br>` : ''}
-            ${loanData.borrower.timeWithEmployment ? `Time with Employer: ${loanData.borrower.timeWithEmployment}` : ''}
+            <strong>${t.docusign.labels.employment}</strong><br>
+            ${t.docusign.labels.status} ${loanData.borrower.employmentStatus}<br>
+            ${t.docusign.labels.annualSalary} $${loanData.borrower.annualIncome?.toLocaleString()}<br>
+            ${loanData.borrower.currentEmployerName ? `${t.docusign.labels.employer} ${loanData.borrower.currentEmployerName}<br>` : ''}
+            ${loanData.borrower.timeWithEmployment ? `${t.docusign.labels.timeWithEmployer} ${loanData.borrower.timeWithEmployment}` : ''}
         </div>
     </div>
 
     ${(loanData.borrower.reference1Name || loanData.borrower.reference2Name) ? `
     <div style="background-color: #f8fafc; padding: 20px; margin: 20px 0; border-radius: 10px; border: 2px solid #e2e8f0;">
-        <h3 style="color: #1e40af; font-size: 18px; font-weight: bold; margin: 0 0 15px 0; padding-bottom: 8px; border-bottom: 2px solid #3b82f6;">📞 References</h3>
+        <h3 style="color: #1e40af; font-size: 18px; font-weight: bold; margin: 0 0 15px 0; padding-bottom: 8px; border-bottom: 2px solid #3b82f6;">${t.docusign.headers.references}</h3>
         <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
             ${loanData.borrower.reference1Name ? `
             <tr>
-                <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">Reference 1:</th>
+                <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">${t.docusign.labels.reference1}</th>
                 <td style="border: 1px solid #d1d5db; padding: 10px; background-color: white; font-weight: 500;">${loanData.borrower.reference1Name}</td>
-                <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">Phone:</th>
+                <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">${t.docusign.labels.phone}</th>
                 <td style="border: 1px solid #d1d5db; padding: 10px; background-color: white; font-weight: 500;">${loanData.borrower.reference1Phone || ''}</td>
             </tr>
             ` : ''}
             ${loanData.borrower.reference2Name ? `
             <tr>
-                <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">Reference 2:</th>
+                <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">${t.docusign.labels.reference2}</th>
                 <td style="border: 1px solid #d1d5db; padding: 10px; background-color: white; font-weight: 500;">${loanData.borrower.reference2Name}</td>
-                <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">Phone:</th>
+                <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">${t.docusign.labels.phone}</th>
                 <td style="border: 1px solid #d1d5db; padding: 10px; background-color: white; font-weight: 500;">${loanData.borrower.reference2Phone || ''}</td>
             </tr>
             ` : ''}
@@ -248,41 +259,41 @@ export const generateLoanAgreementHTMLInline = (loanData: LoanData): string => {
         <h3 style="color: #1e40af; font-size: 18px; font-weight: bold; margin: 0 0 15px 0; padding-bottom: 8px; border-bottom: 2px solid #3b82f6;">📄 Personal Financing Agreement ("PFA") - Exhibit "A"</h3>
         <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
             <tr>
-                <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">Borrower Name:</th>
+                <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">${t.docusign.fields.borrowerName}</th>
                 <td style="border: 1px solid #d1d5db; padding: 10px; background-color: white; font-weight: 500;">${loanData.borrower.firstName} ${loanData.borrower.lastName}</td>
-                <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">Interest Rate:</th>
+                <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">${t.docusign.fields.interestRate}</th>
                 <td style="border: 1px solid #d1d5db; padding: 10px; background-color: white; font-weight: 500;">${(loanData.interestRate * 100).toFixed(2)}%</td>
             </tr>
             <tr>
-                <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">Principal Amount:</th>
+                <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">${t.docusign.fields.principalAmount}</th>
                 <td style="border: 1px solid #d1d5db; padding: 10px; background-color: white; font-weight: 500;">$${loanData.principalAmount.toLocaleString()}</td>
-                <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">Issue Date:</th>
+                <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">${t.docusign.headers.issueDate}</th>
                 <td style="border: 1px solid #d1d5db; padding: 10px; background-color: white; font-weight: 500;">${currentDate}</td>
             </tr>
             <tr>
-                <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">Term (Weeks):</th>
+                <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">${t.docusign.fields.termWeeks}</th>
                 <td style="border: 1px solid #d1d5db; padding: 10px; background-color: white; font-weight: 500;">${loanData.termWeeks}</td>
-                <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">First Payment Date:</th>
-                <td style="border: 1px solid #d1d5db; padding: 10px; background-color: white; font-weight: 500;">${firstPaymentDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}</td>
+                <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">${t.docusign.headers.firstPaymentDate}</th>
+                <td style="border: 1px solid #d1d5db; padding: 10px; background-color: white; font-weight: 500;">${firstPaymentDateFormatted}</td>
             </tr>
         </table>
     </div>
 
     <!-- Amortization Schedule -->
     <div style="background-color: #f8fafc; padding: 20px; margin: 20px 0; border-radius: 10px; border: 2px solid #e2e8f0;">
-        <h3 style="color: #1e40af; font-size: 18px; font-weight: bold; margin: 0 0 15px 0; padding-bottom: 8px; border-bottom: 2px solid #3b82f6;">📊 Weekly Payment Schedule</h3>
+        <h3 style="color: #1e40af; font-size: 18px; font-weight: bold; margin: 0 0 15px 0; padding-bottom: 8px; border-bottom: 2px solid #3b82f6;">${t.docusign.document.weeklyPaymentSchedule}</h3>
         <div style="background-color: #fef3c7; border: 2px solid #f59e0b; border-radius: 8px; padding: 12px; margin: 12px 0; text-align: center;">
-            <p style="margin: 0; font-weight: bold; color: #92400e;">Total of ${loanData.termWeeks} Weekly Payments</p>
+            <p style="margin: 0; font-weight: bold; color: #92400e;">${interpolate(t.docusign.document.totalPayments, { termWeeks: loanData.termWeeks.toString() })}</p>
         </div>
         <table style="width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 12px;">
             <thead>
                 <tr>
-                    <th style="border: 1px solid #d1d5db; padding: 8px; text-align: center; background-color: #059669; color: white; font-weight: bold; font-size: 11px;">Payment #</th>
-                    <th style="border: 1px solid #d1d5db; padding: 8px; text-align: center; background-color: #059669; color: white; font-weight: bold; font-size: 11px;">Due Date</th>
-                    <th style="border: 1px solid #d1d5db; padding: 8px; text-align: center; background-color: #059669; color: white; font-weight: bold; font-size: 11px;">Principal</th>
-                    <th style="border: 1px solid #d1d5db; padding: 8px; text-align: center; background-color: #059669; color: white; font-weight: bold; font-size: 11px;">Interest</th>
-                    <th style="border: 1px solid #d1d5db; padding: 8px; text-align: center; background-color: #059669; color: white; font-weight: bold; font-size: 11px;">Total Payment</th>
-                    <th style="border: 1px solid #d1d5db; padding: 8px; text-align: center; background-color: #059669; color: white; font-weight: bold; font-size: 11px;">Remaining Balance</th>
+                    <th style="border: 1px solid #d1d5db; padding: 8px; text-align: center; background-color: #059669; color: white; font-weight: bold; font-size: 11px;">${t.docusign.fields.paymentNumber}</th>
+                    <th style="border: 1px solid #d1d5db; padding: 8px; text-align: center; background-color: #059669; color: white; font-weight: bold; font-size: 11px;">${t.docusign.fields.dueDate}</th>
+                    <th style="border: 1px solid #d1d5db; padding: 8px; text-align: center; background-color: #059669; color: white; font-weight: bold; font-size: 11px;">${t.docusign.fields.principal}</th>
+                    <th style="border: 1px solid #d1d5db; padding: 8px; text-align: center; background-color: #059669; color: white; font-weight: bold; font-size: 11px;">${t.docusign.fields.interest}</th>
+                    <th style="border: 1px solid #d1d5db; padding: 8px; text-align: center; background-color: #059669; color: white; font-weight: bold; font-size: 11px;">${t.docusign.fields.payment}</th>
+                    <th style="border: 1px solid #d1d5db; padding: 8px; text-align: center; background-color: #059669; color: white; font-weight: bold; font-size: 11px;">${t.docusign.fields.balance}</th>
                 </tr>
             </thead>
             <tbody>
@@ -300,14 +311,14 @@ export const generateLoanAgreementHTMLInline = (loanData: LoanData): string => {
         </table>
         
         <div style="background-color: #f0f9ff; border: 2px solid #3b82f6; border-radius: 10px; padding: 15px; margin: 15px 0;">
-            <h4 style="color: #1e40af; font-size: 16px; font-weight: bold; margin: 0 0 12px 0; text-align: center;">💰 Financial Summary</h4>
+            <h4 style="color: #1e40af; font-size: 16px; font-weight: bold; margin: 0 0 12px 0; text-align: center;">${t.docusign.headers.financialSummary}</h4>
             <table style="width: 100%; border-collapse: collapse; margin: 0;">
                 <tr>
-                    <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">Principal Amount:</th>
+                    <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">${t.docusign.fields.principalAmount}</th>
                     <td style="border: 1px solid #d1d5db; padding: 10px; background-color: white; font-weight: bold; color: #1e40af;">$${loanData.principalAmount.toLocaleString()}</td>
-                    <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">Finance Charge:</th>
+                    <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">${t.docusign.labels.financeCharge}</th>
                     <td style="border: 1px solid #d1d5db; padding: 10px; background-color: white; font-weight: bold; color: #dc2626;">$${totalFinanceCharge.toFixed(2)}</td>
-                    <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">Total of Payments:</th>
+                    <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">${t.docusign.labels.totalOfPayments}</th>
                     <td style="border: 1px solid #d1d5db; padding: 10px; background-color: white; font-weight: bold; color: #059669;">$${totalOfPayments.toFixed(2)}</td>
                 </tr>
             </table>
@@ -319,105 +330,145 @@ export const generateLoanAgreementHTMLInline = (loanData: LoanData): string => {
 
     <!-- Legal Agreement Content -->
     <div style="background-color: #2563eb; color: white; padding: 30px 20px; text-align: center; margin: -20px -20px 30px -20px; border-radius: 0 0 15px 15px;">
-        <h1 style="font-size: 28px; font-weight: bold; margin: 0 0 8px 0; letter-spacing: -0.5px;">Personal Financing Agreement</h1>
-        <p style="font-size: 16px; margin: 0; opacity: 0.9;">Pay Solutions LLC - The Simple, Smart Way to Grow</p>
+        <h1 style="font-size: 28px; font-weight: bold; margin: 0 0 8px 0; letter-spacing: -0.5px;">${t.docusign.content.legalAgreementTitle}</h1>
+        <p style="font-size: 16px; margin: 0; opacity: 0.9;">${t.docusign.content.legalAgreementSubtitle}</p>
     </div>
 
     <div style="text-align: justify; margin-bottom: 15px; line-height: 1.5; font-size: 14px;">
-        <p><strong>YOU</strong> and <strong>PAY SOLUTIONS LLC</strong> (hereinafter referred to as "PS") are entering into this personal financing agreement (hereinafter referred to as "Agreement" or "PFA" interchangeably) for the purposes of a personal financing contract to partially cover a down payment for a vehicle sold by ${loanData.purpose || 'the dealership'} to you as "Buyer" or "Borrower" (hereinafter interchangeably), and agree as follows:</p>
+        <p>${interpolate(t.docusign.content.contractIntroduction, { purpose: loanData.purpose || 'the dealership' })}</p>
     </div>
 
     <div style="background-color: #f8fafc; padding: 20px; margin: 20px 0; border-radius: 10px; border: 2px solid #e2e8f0;">
-        <h3 style="color: #1e40af; font-size: 18px; font-weight: bold; margin: 0 0 15px 0; padding-bottom: 8px; border-bottom: 2px solid #3b82f6;">⚖️ Contract Parties</h3>
+        <h3 style="color: #1e40af; font-size: 18px; font-weight: bold; margin: 0 0 15px 0; padding-bottom: 8px; border-bottom: 2px solid #3b82f6;">${t.docusign.legal.contractParties}</h3>
         <ol style="counter-reset: item; padding-left: 0; margin: 15px 0;">
-            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">a.</span> <strong>BORROWER</strong> shall mean, an individual ("Borrower"), ${loanData.borrower.firstName} ${loanData.borrower.lastName} with mailing address at ${loanData.borrower.addressLine1}, ${loanData.borrower.city}, ${loanData.borrower.state} ${loanData.borrower.zipCode}.</li>
-            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">b.</span> <strong>LENDER</strong> shall mean PAY SOLUTIONS LLC ("PS"), a Florida Limited Liability Company at its office at 575 NW 50th St, Miami, FL 33166, its successors, assigns, and any other holder of this PFA.</li>
-            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">c.</span> <strong>PAYMENT BENEFICIARY</strong> shall mean the dealership or entity from whom the vehicle is being purchased.</li>
+            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">a.</span> ${interpolate(t.docusign.content.borrowerDefinition, { borrowerName: `${loanData.borrower.firstName} ${loanData.borrower.lastName}`, address: `${loanData.borrower.addressLine1}, ${loanData.borrower.city}, ${loanData.borrower.state} ${loanData.borrower.zipCode}` })}</li>
+            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">b.</span> ${t.docusign.content.lenderDefinition}</li>
+            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">c.</span> ${t.docusign.content.paymentBeneficiaryDefinition}</li>
         </ol>
     </div>
 
     <div style="background-color: #f8fafc; padding: 20px; margin: 20px 0; border-radius: 10px; border: 2px solid #e2e8f0;">
-        <h3 style="color: #1e40af; font-size: 18px; font-weight: bold; margin: 0 0 15px 0; padding-bottom: 8px; border-bottom: 2px solid #3b82f6;">✅ Borrower's Representations</h3>
-        <p>You represent and acknowledge that: <span style="color: white;">\\i1\\</span> (Initial)</p>
+        <h3 style="color: #1e40af; font-size: 18px; font-weight: bold; margin: 0 0 15px 0; padding-bottom: 8px; border-bottom: 2px solid #3b82f6;">${t.docusign.legal.borrowerRepresentations}</h3>
+        <p>${t.docusign.content.representationIntro} <span style="color: white;">\\i1\\</span> (${t.docusign.fields.initialToAcknowledge})</p>
         <ol style="counter-reset: item; padding-left: 0; margin: 15px 0;">
-            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">a.</span> <strong>Legal Age.</strong> You are of legal age and have legal capacity to enter into this Contract.</li>
-            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">b.</span> <strong>Vehicle Condition.</strong> I have thoroughly inspected, accepted, and approved the motor vehicle in all respects, and I am satisfied with the condition of the vehicle.</li>
-            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">c.</span> <strong>Separate to Retail Contract.</strong> You represent and understand that this is not an agreement to purchase the vehicle, but rather, an agreement to cover the down payment portion of said vehicle.</li>
-            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">d.</span> <strong>No Oral Promises.</strong> You agree that this contract shall be controlling over all oral and verbal discussion and negotiations leading up to this contract.</li>
+            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">a.</span> <strong>Edad Legal.</strong> ${t.docusign.content.legalAgeText}</li>
+            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">b.</span> <strong>Condición del Vehículo.</strong> ${t.docusign.content.vehicleConditionText}</li>
+            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">c.</span> <strong>Separado del Contrato de Venta.</strong> ${t.docusign.content.separateContractText}</li>
+            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">d.</span> <strong>Sin Promesas Orales.</strong> ${t.docusign.content.noOralPromisesText}</li>
         </ol>
     </div>
 
     <div style="background-color: #f8fafc; padding: 20px; margin: 20px 0; border-radius: 10px; border: 2px solid #e2e8f0;">
-        <h3 style="color: #1e40af; font-size: 18px; font-weight: bold; margin: 0 0 15px 0; padding-bottom: 8px; border-bottom: 2px solid #3b82f6;">💳 Payment Terms</h3>
-        <p>Initial to acknowledge: <span style="color: white;">\\i2\\</span></p>
+        <h3 style="color: #1e40af; font-size: 18px; font-weight: bold; margin: 0 0 15px 0; padding-bottom: 8px; border-bottom: 2px solid #3b82f6;">${t.docusign.legal.paymentTerms}</h3>
+        <p>${t.docusign.content.paymentTermsIntro} <span style="color: white;">\\i2\\</span></p>
         <ol style="counter-reset: item; padding-left: 0; margin: 15px 0;">
-            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">a.</span> For all provisions in this contract, time is of the essence.</li>
-            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">b.</span> Principal Amount shall mean $${loanData.principalAmount.toLocaleString()} (US Dollars) that will cover a portion of an initial payment.</li>
-            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">c.</span> For VALUE RECEIVED, the Buyer hereby promises to pay to the order of the Lender, the Principal Amount with interest at the annual rate of ${(loanData.interestRate * 100).toFixed(2)}% percent, interest shall be calculated on a 365/365 simple interest basis.</li>
-            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">d.</span> All payments shall be received on or before the business day specified in Exhibit "A". If a payment is not received by the end of the business day applicable, an automatic $10.00 flat administrative late fee shall be assessed.</li>
-            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">e.</span> All payments shall be received on a Business Day on or before 5:00PM Eastern Time (ET).</li>
-            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">f.</span> If payment is returned for any reason, a returned payment fee of $35.00 shall be paid by Borrower upon demand.</li>
-            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">g.</span> <strong>Card Payment Surcharge.</strong> If a customer makes a payment using a card, a surcharge of 1.8% of the payment amount will be applied.</li>
-            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">h.</span> Borrower can request up to two deferment payments to extend for seven (7) days the current payment date. A fee of $20.00 shall be charged.</li>
-            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">i.</span> <strong>No Prepayment Penalty.</strong> This PFA may be prepaid in whole or in part at any time, without incurring any penalty.</li>
+            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">a.</span> ${t.docusign.content.paymentTermsItem1}</li>
+            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">b.</span> ${interpolate(t.docusign.content.paymentTermsItem2, { principalAmount: `$${loanData.principalAmount.toLocaleString()}` })}</li>
+            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">c.</span> ${interpolate(t.docusign.content.paymentTermsItem3, { interestRate: (loanData.interestRate * 100).toFixed(2) })}</li>
+            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">d.</span> ${t.docusign.content.paymentTermsItem4}</li>
+            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">e.</span> ${t.docusign.content.paymentTermsItem5}</li>
+            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">f.</span> ${t.docusign.content.paymentTermsItem6}</li>
+            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">g.</span> ${t.docusign.content.paymentTermsItem7}</li>
+            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">h.</span> ${t.docusign.content.paymentTermsItem8}</li>
+            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">i.</span> ${t.docusign.content.paymentTermsItem9}</li>
         </ol>
     </div>
 
     <div style="background-color: #f8fafc; padding: 20px; margin: 20px 0; border-radius: 10px; border: 2px solid #e2e8f0;">
-        <h3 style="color: #1e40af; font-size: 18px; font-weight: bold; margin: 0 0 15px 0; padding-bottom: 8px; border-bottom: 2px solid #3b82f6;">⚠️ Default Conditions</h3>
-        <p>Initial to acknowledge: <span style="color: white;">\\i3\\</span></p>
-        <p>You will be deemed in default if any of the following occurs:</p>
+        <h3 style="color: #1e40af; font-size: 18px; font-weight: bold; margin: 0 0 15px 0; padding-bottom: 8px; border-bottom: 2px solid #3b82f6;">${t.docusign.legal.defaultConditions}</h3>
+        <p>${t.docusign.content.paymentTermsIntro} <span style="color: white;">\\i3\\</span></p>
+        <p>${t.docusign.content.defaultConditionsIntro}</p>
         <ol style="counter-reset: item; padding-left: 0; margin: 15px 0;">
-            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">a.</span> You fail to perform any obligation under this Contract.</li>
-            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">b.</span> Buyer fails to timely pay as per schedule, or within five (5) days of due date.</li>
-            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">c.</span> Any materially false statement(s) is made by Borrower.</li>
-            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">d.</span> Any bankruptcy proceeding is begun by or against Borrower.</li>
-            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">e.</span> Cancellation or attempted cancellation of this agreement unilaterally by Borrower.</li>
-            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">f.</span> Failure to report change of name, address or telephone number with at least thirty (30) days' notice.</li>
+            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">a.</span> ${t.docusign.content.defaultItem1}</li>
+            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">b.</span> ${t.docusign.content.defaultItem2}</li>
+            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">c.</span> ${t.docusign.content.defaultItem3}</li>
+            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">d.</span> ${t.docusign.content.defaultItem4}</li>
+            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">e.</span> ${t.docusign.content.defaultItem5}</li>
+            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">f.</span> ${t.docusign.content.defaultItem6}</li>
         </ol>
     </div>
 
     <div style="background-color: #f8fafc; padding: 20px; margin: 20px 0; border-radius: 10px; border: 2px solid #e2e8f0;">
-        <h3 style="color: #1e40af; font-size: 18px; font-weight: bold; margin: 0 0 15px 0; padding-bottom: 8px; border-bottom: 2px solid #3b82f6;">📋 Additional Agreements</h3>
-        <p>Initial to acknowledge: <span style="color: white;">\\i4\\</span></p>
+        <h3 style="color: #1e40af; font-size: 18px; font-weight: bold; margin: 0 0 15px 0; padding-bottom: 8px; border-bottom: 2px solid #3b82f6;">${t.docusign.legal.additionalAgreements}</h3>
+        <p>${t.docusign.content.additionalAgreementsIntro} <span style="color: white;">\\i4\\</span></p>
         <ol style="counter-reset: item; padding-left: 0; margin: 15px 0;">
-            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">a.</span> <strong>GPS/Tracking Device Installation.</strong> Your vehicle could potentially feature a GPS/TRACKING DEVICE and by signing this document you acknowledge and give consent to the device's installation.</li>
-            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">b.</span> <strong>Waiver of Privacy Rights.</strong> You agree that you have no privacy rights in the tracking of your vehicle for collection and/or repossession purposes.</li>
-            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">c.</span> <strong>Electronic Communications.</strong> You give permission to contact you via telephone, SMS text messages, emails, or messaging applications.</li>
+            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">a.</span> <strong>Instalación de Dispositivo GPS/Rastreo.</strong> ${t.docusign.content.gpsTrackingText}</li>
+            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">b.</span> <strong>Renuncia a Derechos de Privacidad.</strong> ${t.docusign.content.privacyWaiverText}</li>
+            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">c.</span> <strong>Comunicaciones Electrónicas.</strong> ${t.docusign.content.electronicCommunicationsText}</li>
         </ol>
+    </div>
+
+    <div style="background-color: #f8fafc; padding: 20px; margin: 20px 0; border-radius: 10px; border: 2px solid #e2e8f0;">
+        <h3 style="color: #1e40af; font-size: 18px; font-weight: bold; margin: 0 0 15px 0; padding-bottom: 8px; border-bottom: 2px solid #3b82f6;">${t.docusign.legal.fees}</h3>
+        
+        <div style="background-color: #fef3c7; border: 2px solid #f59e0b; border-radius: 8px; padding: 12px; margin: 12px 0;">
+            <p style="margin: 0; font-weight: bold; color: #92400e; text-align: center;">${t.docusign.content.feesTitle}</p>
+        </div>
+        
+        <div style="margin-bottom: 15px;">
+            <h4 style="color: #dc2626; font-size: 16px; font-weight: bold; margin: 10px 0 5px 0;">${t.docusign.content.processingFeeTitle}</h4>
+            <p style="margin: 5px 0; font-size: 14px;">${t.docusign.content.processingFeeDescription}</p>
+            <p style="margin: 5px 0; font-size: 14px; font-weight: bold; color: #dc2626;">${t.docusign.content.processingFeeAmount}</p>
+            <p style="margin: 5px 0; font-size: 14px; color: #059669;">${t.docusign.content.processingFeeAvoidance}</p>
+        </div>
+        
+        <div style="margin-bottom: 15px;">
+            <h4 style="color: #dc2626; font-size: 16px; font-weight: bold; margin: 10px 0 5px 0;">${t.docusign.content.lateFeeTitle}</h4>
+            <p style="margin: 5px 0; font-size: 14px;">${t.docusign.content.lateFeeDescription}</p>
+            <p style="margin: 5px 0; font-size: 14px; font-weight: bold; color: #dc2626;">${t.docusign.content.lateFeeAmount}</p>
+        </div>
+        
+        <div style="margin-bottom: 15px;">
+            <h4 style="color: #dc2626; font-size: 16px; font-weight: bold; margin: 10px 0 5px 0;">${t.docusign.content.defermentFeeTitle}</h4>
+            <p style="margin: 5px 0; font-size: 14px;">${t.docusign.content.defermentFeeDescription}</p>
+            <p style="margin: 5px 0; font-size: 14px; color: #6b7280;">${t.docusign.content.defermentFeeRestrictions}</p>
+            <p style="margin: 5px 0; font-size: 14px; font-weight: bold; color: #dc2626;">${t.docusign.content.defermentFeeAmount}</p>
+        </div>
+        
+        <div style="margin-bottom: 15px;">
+            <h4 style="color: #dc2626; font-size: 16px; font-weight: bold; margin: 10px 0 5px 0;">${t.docusign.content.returnedPaymentFeeTitle}</h4>
+            <p style="margin: 5px 0; font-size: 14px;">${t.docusign.content.returnedPaymentFeeDescription}</p>
+            <p style="margin: 5px 0; font-size: 14px; font-weight: bold; color: #dc2626;">${t.docusign.content.returnedPaymentFeeAmount}</p>
+        </div>
+        
+        <div style="background-color: #fef2f2; border: 2px solid #dc2626; border-radius: 8px; padding: 15px; margin: 15px 0;">
+            <p style="margin: 0 0 10px 0; font-weight: bold; color: #dc2626; font-size: 16px;">${t.docusign.content.feesImportantNote}</p>
+            <p style="margin: 5px 0; font-size: 14px;">${t.docusign.content.feesAutoDebit}</p>
+            <p style="margin: 5px 0; font-size: 14px; font-weight: bold; color: #059669;">${t.docusign.content.accountVerificationFee}</p>
+        </div>
     </div>
 
     <div style="text-align: justify; margin-bottom: 15px; line-height: 1.5; font-size: 14px;">
-        <p><strong>JURY TRIAL WAIVER.</strong> LENDER AND BORROWER HEREBY KNOWINGLY, VOLUNTARILY AND INTENTIONALLY WAIVE THE RIGHT EITHER MAY HAVE TO A TRIAL BY JURY. <span style="color: white;">\\i5\\</span> (Initial)</p>
+        <p><strong>RENUNCIA AL JUICIO POR JURADO.</strong> ${t.docusign.legal.juryTrialWaiver} <span style="color: white;">\\i5\\</span> (${t.docusign.fields.initialToAcknowledge})</p>
     </div>
 
     <div style="text-align: justify; margin-bottom: 15px; line-height: 1.5; font-size: 14px;">
-        <p><strong>ARBITRATION PROVISION:</strong> Any claim or dispute between you and us shall, at your or our election, be resolved by neutral, binding arbitration and not by a court action. (Initial provided separately)</p>
+        <p><strong>DISPOSICIÓN DE ARBITRAJE:</strong> ${t.docusign.legal.arbitrationProvision}</p>
     </div>
 
     <!-- Signatures Section -->
     <div style="margin-top: 30px; background-color: #f8fafc; padding: 25px; border-radius: 10px; border: 2px solid #e2e8f0;">
-        <h3 style="color: #1e40af; font-size: 20px; font-weight: bold; margin: 0 0 15px 0; text-align: center; text-transform: uppercase; letter-spacing: 0.5px;">ACKNOWLEDGMENT AND SIGNATURES</h3>
-        <p style="text-align: justify; margin-bottom: 15px; line-height: 1.5; font-size: 14px;">THIS AGREEMENT IS SUBJECT TO AN ARBITRATION AGREEMENT AND A PRESUIT DEMAND NOTICE REQUIREMENT, AS SET FORTH IN THIS AGREEMENT. BY SIGNING BELOW, I ACKNOWLEDGE THAT I HAVE READ AND UNDERSTOOD THE PROVISIONS IN THIS AGREEMENT AND AGREE TO THE TERMS AND CONDITIONS AS SET FORTH THEREIN.</p>
+        <h3 style="color: #1e40af; font-size: 20px; font-weight: bold; margin: 0 0 15px 0; text-align: center; text-transform: uppercase; letter-spacing: 0.5px;">${t.docusign.headers.acknowledgmentSignatures}</h3>
+        <p style="text-align: justify; margin-bottom: 15px; line-height: 1.5; font-size: 14px;">${t.docusign.legal.acknowledgmentText}</p>
         
-        <p style="text-align: justify; margin-bottom: 15px; line-height: 1.5; font-size: 14px;"><strong>I HEREBY SWEAR AND AFFIRM THAT I HAVE READ AND UNDERSTAND THE TERMS OF THIS CONTRACT.</strong> (Initial required above)</p>
+        <p style="text-align: justify; margin-bottom: 15px; line-height: 1.5; font-size: 14px;"><strong>POR LA PRESENTE JURO Y AFIRMO QUE HE LEÍDO Y ENTIENDO LOS TÉRMINOS DE ESTE CONTRATO.</strong> ${t.docusign.legal.contractUnderstanding}</p>
         
         <div style="margin-top: 30px;">
             <table style="width: 100%; border-collapse: collapse;">
                 <tr>
                     <td style="width: 50%; padding-right: 15px; vertical-align: top;">
-                        <p style="font-weight: bold;">Borrower Signature:</p>
+                        <p style="font-weight: bold;">${t.docusign.labels.borrowerSignature}</p>
                         <div style="border-bottom: 2px solid #000; height: 35px; margin: 15px 0;">
                             <span style="color: white;">\\s1\\</span>
                         </div>
-                        <p>Print Name: ${loanData.borrower.firstName} ${loanData.borrower.lastName}</p>
-                        <p>Date: <span style="color: white;">\\d1\\</span>_______________</p>
+                        <p>${t.docusign.labels.printName} ${loanData.borrower.firstName} ${loanData.borrower.lastName}</p>
+                        <p>${t.docusign.labels.date} <span style="color: white;">\\d1\\</span>_______________</p>
                     </td>
                     <td style="width: 50%; padding-left: 15px; vertical-align: top;">
-                        <p style="font-weight: bold;">Dealer Representative:</p>
+                        <p style="font-weight: bold;">${t.docusign.labels.dealerRepresentative}</p>
                         <div style="border-bottom: 2px solid #000; height: 35px; margin: 15px 0;"></div>
-                        <p>Print Name: Pay Solutions Admin</p>
-                        <p>Date: _______________</p>
+                        <p>${t.docusign.labels.printName} Pay Solutions Admin</p>
+                        <p>${t.docusign.labels.date} _______________</p>
                     </td>
                 </tr>
             </table>
@@ -430,15 +481,16 @@ export const generateLoanAgreementHTMLInline = (loanData: LoanData): string => {
 };
 
 // Create DocuSign envelope with inline-styled loan agreement
-export const createLoanAgreementEnvelopeInline = (loanData: LoanData): docusign.EnvelopeDefinition => {
-  const documentHtml = generateLoanAgreementHTMLInline(loanData);
+export const createLoanAgreementEnvelopeInline = (loanData: LoanData, language: Language = 'en'): docusign.EnvelopeDefinition => {
+  const documentHtml = generateLoanAgreementHTMLInline(loanData, language);
+  const t = getTranslations(language);
   
   // Use htmlDefinition for responsive HTML documents (best practice)
   const document: ExtendedDocument = {
     htmlDefinition: {
       source: documentHtml
     },
-    name: `Vehicle Loan Agreement - ${loanData.loanNumber}`,
+    name: `${t.docusign.document.title} - ${loanData.loanNumber}`,
     documentId: '1'
   };
 
@@ -479,7 +531,7 @@ export const createLoanAgreementEnvelopeInline = (loanData: LoanData): docusign.
 
   // Create envelope definition
   const envelopeDefinition: docusign.EnvelopeDefinition = {
-    emailSubject: `Vehicle Loan Agreement - ${loanData.loanNumber} - Signature Required`,
+    emailSubject: interpolate(t.docusign.document.emailSubject, { loanNumber: loanData.loanNumber }),
     documents: [document as docusign.Document],
     recipients: {
       signers: [signer]
