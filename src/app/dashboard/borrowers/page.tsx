@@ -201,7 +201,7 @@ export default function UserBorrowers() {
   ];
 
   return (
-    <RoleRedirect allowedRoles={['admin', 'user', 'organization_owner']}>
+    <RoleRedirect allowedRoles={['admin', 'user', 'organization_owner', 'team_member']}>
       <UserLayout>
         <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-teal-100">
           <div className="p-8">

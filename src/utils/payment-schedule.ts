@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server';
 import { LoanForSchedule } from '@/types/loan';
+import { getEffectiveInterestRate } from '@/utils/interest-config';
 
 export interface PaymentScheduleItem {
   paymentNumber: number;
@@ -12,12 +13,14 @@ export interface PaymentScheduleItem {
 }
 
 // Generate payment schedule for a loan
+// Uses interest configuration to handle zero interest scenarios
 export function generatePaymentSchedule(loan: LoanForSchedule): PaymentScheduleItem[] {
   const schedule: PaymentScheduleItem[] = [];
   const weeklyPayment = parseFloat(loan.weekly_payment);
   const principalAmount = parseFloat(loan.principal_amount);
-  const annualRate = parseFloat(loan.interest_rate) / 100; // Convert percentage to decimal
-  const weeklyRate = annualRate / 52; // Weekly interest rate
+  const storedRate = parseFloat(loan.interest_rate) / 100; // Convert percentage to decimal
+  const effectiveRate = getEffectiveInterestRate(storedRate); // Apply interest configuration
+  const weeklyRate = effectiveRate / 52; // Weekly interest rate (will be 0 when disabled)
   const termWeeks = parseInt(loan.term_weeks);
   
   let remainingBalance = principalAmount;
@@ -27,6 +30,7 @@ export function generatePaymentSchedule(loan: LoanForSchedule): PaymentScheduleI
     const paymentDate = new Date(startDate);
     paymentDate.setDate(paymentDate.getDate() + (i * 7)); // Add weeks instead of months
     
+    // Interest payment will be 0 when interest calculations are disabled
     const interestPayment = remainingBalance * weeklyRate;
     const principalPayment = weeklyPayment - interestPayment;
     remainingBalance = Math.max(0, remainingBalance - principalPayment);
@@ -35,7 +39,7 @@ export function generatePaymentSchedule(loan: LoanForSchedule): PaymentScheduleI
       paymentNumber: i,
       dueDate: paymentDate.toISOString().split('T')[0],
       principalPayment: Math.round(principalPayment * 100) / 100,
-      interestPayment: Math.round(interestPayment * 100) / 100,
+      interestPayment: Math.round(interestPayment * 100) / 100, // Will be 0.00 when disabled
       totalPayment: Math.round(weeklyPayment * 100) / 100,
       remainingBalance: Math.round(remainingBalance * 100) / 100,
       status: 'pending'
