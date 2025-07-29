@@ -379,6 +379,7 @@ export interface Translations {
     fields: {
       borrowerName: string;
       interestRate: string;
+      loanType: string;
       principalAmount: string;
       weeklyPayment: string;
       termWeeks: string;
@@ -772,6 +773,7 @@ export const translations: Record<Language, Translations> = {
       fields: {
         borrowerName: "Borrower Name:",
         interestRate: "Interest Rate:",
+        loanType: "Loan Type:",
         principalAmount: "Principal Amount:",
         weeklyPayment: "Weekly Payment:",
         termWeeks: "Term (Weeks):",
@@ -1164,6 +1166,7 @@ export const translations: Record<Language, Translations> = {
       fields: {
         borrowerName: "Nombre del Prestatario:",
         interestRate: "Tasa de Interés:",
+        loanType: "Tipo de Préstamo:",
         principalAmount: "Monto Principal:",
         weeklyPayment: "Pago Semanal:",
         termWeeks: "Plazo (Semanas):",

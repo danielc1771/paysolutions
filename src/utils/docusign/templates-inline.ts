@@ -1,6 +1,7 @@
 import 'server-only';
 import docusign from 'docusign-esign';
 import { getTranslations, interpolate, Language } from '../translations';
+import { getInterestDisplayConfig, calculatePaymentAmount, INTEREST_CONFIG } from '../interest-config';
 
 // Extended interfaces for DocuSign features not in the official types
 interface ExtendedDocument extends Omit<docusign.Document, 'documentBase64' | 'fileExtension'> {
@@ -81,18 +82,17 @@ export interface WeeklyPaymentScheduleItem {
 }
 
 // Calculate weekly payment schedule for variable term weeks
+// Uses interest configuration to handle zero interest scenarios
 export function calculateWeeklyPaymentSchedule(
   principalAmount: number,
   annualInterestRate: number,
   termWeeks: number
 ): WeeklyPaymentScheduleItem[] {
   const schedule: WeeklyPaymentScheduleItem[] = [];
-  const weeklyRate = annualInterestRate / 52; // Convert annual to weekly rate
   
-  // Calculate weekly payment using amortization formula
-  const weeklyPayment = principalAmount * 
-    (weeklyRate * Math.pow(1 + weeklyRate, termWeeks)) /
-    (Math.pow(1 + weeklyRate, termWeeks) - 1);
+  // Use interest configuration to get effective payment amount
+  const weeklyPayment = calculatePaymentAmount(principalAmount, termWeeks, annualInterestRate);
+  const weeklyRate = INTEREST_CONFIG.CALCULATE_INTEREST ? annualInterestRate / 52 : 0;
   
   let remainingBalance = principalAmount;
   const startDate = new Date();
@@ -113,7 +113,7 @@ export function calculateWeeklyPaymentSchedule(
         year: 'numeric'
       }),
       principalAmount: Math.round(principalPayment * 100) / 100,
-      interestAmount: Math.round(interestPayment * 100) / 100,
+      interestAmount: Math.round(interestPayment * 100) / 100, // Will be 0.00 when disabled
       totalAmount: Math.round(weeklyPayment * 100) / 100,
       remainingBalance: Math.round(remainingBalance * 100) / 100,
     });
@@ -126,6 +126,7 @@ export function calculateWeeklyPaymentSchedule(
 export const generateLoanAgreementHTMLInline = (loanData: LoanData, language: Language = 'en'): string => {
   const t = getTranslations(language);
   const locale = language === 'es' ? 'es-ES' : 'en-US';
+  const displayConfig = getInterestDisplayConfig();
   
   const currentDate = new Date().toLocaleDateString(locale, {
     month: '2-digit',
@@ -261,8 +262,13 @@ export const generateLoanAgreementHTMLInline = (loanData: LoanData, language: La
             <tr>
                 <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">${t.docusign.fields.borrowerName}</th>
                 <td style="border: 1px solid #d1d5db; padding: 10px; background-color: white; font-weight: 500;">${loanData.borrower.firstName} ${loanData.borrower.lastName}</td>
+                ${displayConfig.showInterestRate ? `
                 <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">${t.docusign.fields.interestRate}</th>
                 <td style="border: 1px solid #d1d5db; padding: 10px; background-color: white; font-weight: 500;">${(loanData.interestRate * 100).toFixed(2)}%</td>
+                ` : `
+                <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">${t.docusign.fields.loanType}</th>
+                <td style="border: 1px solid #d1d5db; padding: 10px; background-color: white; font-weight: 500;">${displayConfig.financeChargeLabel}</td>
+                `}
             </tr>
             <tr>
                 <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">${t.docusign.fields.principalAmount}</th>
@@ -291,7 +297,7 @@ export const generateLoanAgreementHTMLInline = (loanData: LoanData, language: La
                     <th style="border: 1px solid #d1d5db; padding: 8px; text-align: center; background-color: #059669; color: white; font-weight: bold; font-size: 11px;">${t.docusign.fields.paymentNumber}</th>
                     <th style="border: 1px solid #d1d5db; padding: 8px; text-align: center; background-color: #059669; color: white; font-weight: bold; font-size: 11px;">${t.docusign.fields.dueDate}</th>
                     <th style="border: 1px solid #d1d5db; padding: 8px; text-align: center; background-color: #059669; color: white; font-weight: bold; font-size: 11px;">${t.docusign.fields.principal}</th>
-                    <th style="border: 1px solid #d1d5db; padding: 8px; text-align: center; background-color: #059669; color: white; font-weight: bold; font-size: 11px;">${t.docusign.fields.interest}</th>
+                    ${displayConfig.showInterestColumn ? `<th style="border: 1px solid #d1d5db; padding: 8px; text-align: center; background-color: #059669; color: white; font-weight: bold; font-size: 11px;">${t.docusign.fields.interest}</th>` : ''}
                     <th style="border: 1px solid #d1d5db; padding: 8px; text-align: center; background-color: #059669; color: white; font-weight: bold; font-size: 11px;">${t.docusign.fields.payment}</th>
                     <th style="border: 1px solid #d1d5db; padding: 8px; text-align: center; background-color: #059669; color: white; font-weight: bold; font-size: 11px;">${t.docusign.fields.balance}</th>
                 </tr>
@@ -302,7 +308,7 @@ export const generateLoanAgreementHTMLInline = (loanData: LoanData, language: La
                     <td style="border: 1px solid #d1d5db; padding: 8px; text-align: center; font-weight: 500;">${payment.paymentNumber}</td>
                     <td style="border: 1px solid #d1d5db; padding: 8px; text-align: center; font-weight: 500;">${payment.dueDate}</td>
                     <td style="border: 1px solid #d1d5db; padding: 8px; text-align: center; font-weight: 500;">$${payment.principalAmount.toFixed(2)}</td>
-                    <td style="border: 1px solid #d1d5db; padding: 8px; text-align: center; font-weight: 500;">$${payment.interestAmount.toFixed(2)}</td>
+                    ${displayConfig.showInterestColumn ? `<td style="border: 1px solid #d1d5db; padding: 8px; text-align: center; font-weight: 500;">$${payment.interestAmount.toFixed(2)}</td>` : ''}
                     <td style="border: 1px solid #d1d5db; padding: 8px; text-align: center; font-weight: 500;">$${payment.totalAmount.toFixed(2)}</td>
                     <td style="border: 1px solid #d1d5db; padding: 8px; text-align: center; font-weight: 500;">$${payment.remainingBalance.toFixed(2)}</td>
                 </tr>
@@ -316,8 +322,13 @@ export const generateLoanAgreementHTMLInline = (loanData: LoanData, language: La
                 <tr>
                     <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">${t.docusign.fields.principalAmount}</th>
                     <td style="border: 1px solid #d1d5db; padding: 10px; background-color: white; font-weight: bold; color: #1e40af;">$${loanData.principalAmount.toLocaleString()}</td>
+                    ${displayConfig.showFinanceCharge ? `
                     <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">${t.docusign.labels.financeCharge}</th>
                     <td style="border: 1px solid #d1d5db; padding: 10px; background-color: white; font-weight: bold; color: #dc2626;">$${totalFinanceCharge.toFixed(2)}</td>
+                    ` : `
+                    <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">${displayConfig.financeChargeLabel}</th>
+                    <td style="border: 1px solid #d1d5db; padding: 10px; background-color: white; font-weight: bold; color: #059669;">$0.00</td>
+                    `}
                     <th style="border: 1px solid #d1d5db; padding: 10px; text-align: left; background-color: #3b82f6; color: white; font-weight: bold; font-size: 13px;">${t.docusign.labels.totalOfPayments}</th>
                     <td style="border: 1px solid #d1d5db; padding: 10px; background-color: white; font-weight: bold; color: #059669;">$${totalOfPayments.toFixed(2)}</td>
                 </tr>
@@ -364,7 +375,7 @@ export const generateLoanAgreementHTMLInline = (loanData: LoanData, language: La
         <ol style="counter-reset: item; padding-left: 0; margin: 15px 0;">
             <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">a.</span> ${t.docusign.content.paymentTermsItem1}</li>
             <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">b.</span> ${interpolate(t.docusign.content.paymentTermsItem2, { principalAmount: `$${loanData.principalAmount.toLocaleString()}` })}</li>
-            <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">c.</span> ${interpolate(t.docusign.content.paymentTermsItem3, { interestRate: (loanData.interestRate * 100).toFixed(2) })}</li>
+            ${displayConfig.showInterestRate ? `<li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">c.</span> ${interpolate(t.docusign.content.paymentTermsItem3, { interestRate: (loanData.interestRate * 100).toFixed(2) })}</li>` : ''}
             <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">d.</span> ${t.docusign.content.paymentTermsItem4}</li>
             <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">e.</span> ${t.docusign.content.paymentTermsItem5}</li>
             <li style="display: block; margin-bottom: 12px; padding-left: 20px;"><span style="font-weight: bold; color: #1e40af;">f.</span> ${t.docusign.content.paymentTermsItem6}</li>

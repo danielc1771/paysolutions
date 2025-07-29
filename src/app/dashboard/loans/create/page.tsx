@@ -6,11 +6,13 @@ import UserLayout from '@/components/UserLayout';
 import { RoleRedirect } from '@/components/auth/RoleRedirect';
 import { createClient } from '@/utils/supabase/client';
 import { getAvailableTerms, calculateLoanPayment, generateWeeklyPaymentSchedule } from '@/utils/loan-calculations';
+import { getInterestDisplayConfig } from '@/utils/interest-config';
 import { Calculator, DollarSign } from 'lucide-react';
 import CustomSelect from '@/components/CustomSelect';
 
 export default function CreateLoan() {
   const router = useRouter();
+  const displayConfig = getInterestDisplayConfig();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -444,10 +446,12 @@ export default function CreateLoan() {
                           </div>
                           <p className="text-2xl font-bold text-green-600">${loanCalculation.weeklyPayment.toLocaleString()}</p>
                         </div>
-                        <div className="bg-white/60 p-4 rounded-xl">
-                          <div className="text-sm font-medium text-gray-600 mb-2">Total Interest</div>
-                          <p className="text-xl font-semibold text-orange-600">${loanCalculation.totalInterest.toLocaleString()}</p>
-                        </div>
+                        {displayConfig.showInterestAmount && (
+                          <div className="bg-white/60 p-4 rounded-xl">
+                            <div className="text-sm font-medium text-gray-600 mb-2">Total Interest</div>
+                            <p className="text-xl font-semibold text-orange-600">${loanCalculation.totalInterest.toLocaleString()}</p>
+                          </div>
+                        )}
                         <div className="bg-white/60 p-4 rounded-xl">
                           <div className="text-sm font-medium text-gray-600 mb-2">Total Payment</div>
                           <p className="text-xl font-semibold text-blue-600">${loanCalculation.totalPayment.toLocaleString()}</p>
@@ -467,7 +471,7 @@ export default function CreateLoan() {
                                 <th className="px-3 py-2 text-left font-semibold text-gray-900">Due Date</th>
                                 <th className="px-3 py-2 text-right font-semibold text-gray-900">Payment</th>
                                 <th className="px-3 py-2 text-right font-semibold text-gray-900">Principal</th>
-                                <th className="px-3 py-2 text-right font-semibold text-gray-900">Interest</th>
+                                {displayConfig.showInterestColumn && <th className="px-3 py-2 text-right font-semibold text-gray-900">Interest</th>}
                                 <th className="px-3 py-2 text-right font-semibold text-gray-900">Balance</th>
                               </tr>
                             </thead>
@@ -478,7 +482,7 @@ export default function CreateLoan() {
                                   <td className="px-3 py-2 text-gray-800">{new Date(payment.dueDate).toLocaleDateString()}</td>
                                   <td className="px-3 py-2 text-right font-semibold text-gray-900">${payment.totalPayment.toFixed(2)}</td>
                                   <td className="px-3 py-2 text-right text-gray-800">${payment.principalAmount.toFixed(2)}</td>
-                                  <td className="px-3 py-2 text-right text-gray-800">${payment.interestAmount.toFixed(2)}</td>
+                                  {displayConfig.showInterestColumn && <td className="px-3 py-2 text-right text-gray-800">${payment.interestAmount.toFixed(2)}</td>}
                                   <td className="px-3 py-2 text-right text-gray-800">${payment.remainingBalance.toFixed(2)}</td>
                                 </tr>
                               ))}

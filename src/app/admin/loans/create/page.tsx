@@ -7,6 +7,7 @@ import { Send, Edit, User, Mail, CheckCircle, AlertCircle, Loader2, Calculator, 
 
 import CustomSelect from '@/components/CustomSelect';
 import { getAvailableTerms, calculateLoanPayment, generateWeeklyPaymentSchedule } from '@/utils/loan-calculations';
+import { getInterestDisplayConfig } from '@/utils/interest-config';
 
 export default function CreateLoanPage() {
   const [mode, setMode] = useState('send');
@@ -50,6 +51,7 @@ export default function CreateLoanPage() {
 
 // Form for sending an application link
 function SendApplicationForm() {
+  const displayConfig = getInterestDisplayConfig();
   const [fullName, setFullName] = useState('');
   const [loanAmount, setLoanAmount] = useState('');
   const [loanTerm, setLoanTerm] = useState('4'); // Default to 4 weeks
@@ -194,10 +196,12 @@ function SendApplicationForm() {
                 </div>
                 <p className="text-2xl font-bold text-green-600">${loanCalculation.weeklyPayment.toLocaleString()}</p>
               </div>
-              <div className="bg-white/60 p-4 rounded-xl">
-                <div className="text-sm font-medium text-gray-600 mb-2">Total Interest</div>
-                <p className="text-xl font-semibold text-orange-600">${loanCalculation.totalInterest.toLocaleString()}</p>
-              </div>
+              {displayConfig.showInterestAmount && (
+                <div className="bg-white/60 p-4 rounded-xl">
+                  <div className="text-sm font-medium text-gray-600 mb-2">Total Interest</div>
+                  <p className="text-xl font-semibold text-orange-600">${loanCalculation.totalInterest.toLocaleString()}</p>
+                </div>
+              )}
               <div className="bg-white/60 p-4 rounded-xl">
                 <div className="text-sm font-medium text-gray-600 mb-2">Total Payment</div>
                 <p className="text-xl font-semibold text-blue-600">${loanCalculation.totalPayment.toLocaleString()}</p>
@@ -217,7 +221,7 @@ function SendApplicationForm() {
                       <th className="px-3 py-2 text-left font-medium text-gray-700">Due Date</th>
                       <th className="px-3 py-2 text-right font-medium text-gray-700">Payment</th>
                       <th className="px-3 py-2 text-right font-medium text-gray-700">Principal</th>
-                      <th className="px-3 py-2 text-right font-medium text-gray-700">Interest</th>
+                      {displayConfig.showInterestColumn && <th className="px-3 py-2 text-right font-medium text-gray-700">Interest</th>}
                       <th className="px-3 py-2 text-right font-medium text-gray-700">Balance</th>
                     </tr>
                   </thead>
@@ -228,7 +232,7 @@ function SendApplicationForm() {
                         <td className="px-3 py-2">{new Date(payment.dueDate).toLocaleDateString()}</td>
                         <td className="px-3 py-2 text-right font-medium">${payment.totalPayment.toFixed(2)}</td>
                         <td className="px-3 py-2 text-right">${payment.principalAmount.toFixed(2)}</td>
-                        <td className="px-3 py-2 text-right">${payment.interestAmount.toFixed(2)}</td>
+                        {displayConfig.showInterestColumn && <td className="px-3 py-2 text-right">${payment.interestAmount.toFixed(2)}</td>}
                         <td className="px-3 py-2 text-right">${payment.remainingBalance.toFixed(2)}</td>
                       </tr>
                     ))}
