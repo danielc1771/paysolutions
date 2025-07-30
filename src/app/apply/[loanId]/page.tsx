@@ -53,6 +53,7 @@ export default function ApplyPage() {
   const [initialData, setInitialData] = useState<LoanApplicationData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false); // Guard against double submissions
 
   // SessionStorage helper functions
   const getSessionKey = useCallback(() => `loan_application_${loanId}`, [loanId]);
@@ -392,6 +393,14 @@ export default function ApplyPage() {
   };
 
   const handleSubmit = async () => {
+    // Prevent double submissions
+    if (isSubmitting || step === 10) {
+      console.log('🚫 Preventing double submission - already submitting or completed');
+      return;
+    }
+    
+    console.log('🚀 Starting application submission');
+    setIsSubmitting(true);
     setLoading(true);
     setError(null);
     try {
@@ -410,18 +419,29 @@ export default function ApplyPage() {
       // Clear sessionStorage on successful submission
       clearSession();
       
-      // Go directly to congratulations page (step 10)
-      setStep(10);
-      
       // Update the loan status in realtime (will be handled by server response)
       console.log('🎉 Application submitted successfully!');
       
+      // Go directly to congratulations page (step 10) - moved after console log for debugging
+      console.log('🎯 Setting step to 10 (success page)');
+      
+      // Use setTimeout to ensure state updates properly
+      setTimeout(() => {
+        console.log('🎯 Actually setting step to 10 now');
+        setStep(10);
+      }, 100);
+      
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+      console.error('💥 Application submission failed:', errorMessage);
       
-      // If submission fails due to loan status or missing data, reset to fresh state
-      if (errorMessage.includes('already been completed') || errorMessage.includes('Loan not found') || 
-          errorMessage.includes('invalid') || errorMessage.includes('404')) {
+      // If submission fails due to loan status that indicates it was already completed successfully,
+      // just show the success page instead of resetting
+      if (errorMessage.includes('already been completed') && errorMessage.includes('application_completed')) {
+        console.log('✅ Application was already completed successfully, showing success page');
+        setStep(10);
+        setError(null);
+      } else if (errorMessage.includes('Loan not found') || errorMessage.includes('invalid') || errorMessage.includes('404')) {
         console.log('🔄 Submission failed due to invalid loan state, resetting application...');
         // Clear session storage
         clearSession();
@@ -471,7 +491,9 @@ export default function ApplyPage() {
         setError(errorMessage);
       }
     } finally {
+      console.log('🔄 handleSubmit finally block: setting loading to false');
       setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -528,6 +550,7 @@ export default function ApplyPage() {
                 handleLanguageSelection={handleLanguageSelection}
                 selectedLanguage={selectedLanguage}
                 loading={loading}
+                isSubmitting={isSubmitting}
                 saveProgress={saveProgress}
               />
             )}
@@ -1201,12 +1224,13 @@ function EmploymentDetailsStep({ formData, setFormData, handleNext, handlePrev, 
 }
 
 // Step 5: Review (Modified - added new employment fields)
-function ReviewStep({ formData, initialData, handlePrev, handleSubmit, loading, selectedLanguage }: { 
+function ReviewStep({ formData, initialData, handlePrev, handleSubmit, loading, isSubmitting, selectedLanguage }: { 
   formData: Record<string, unknown>; 
   initialData: LoanApplicationData | null; 
   handlePrev: () => void; 
   handleSubmit: () => void; 
   loading: boolean; 
+  isSubmitting: boolean;
   selectedLanguage: Language;
 }) {
   const reviewData = {
@@ -1352,8 +1376,8 @@ function ReviewStep({ formData, initialData, handlePrev, handleSubmit, loading, 
 
       <div className="mt-10 flex flex-col-reverse md:flex-row md:justify-between gap-4">
         <button onClick={handlePrev} className="w-full md:w-auto px-8 py-4 bg-white/60 backdrop-blur-sm border border-white/30 rounded-2xl text-gray-700 font-semibold hover:bg-white/80 hover:shadow-lg transition-all duration-300 shadow-sm justify-center">{t.review.back}</button>
-        <button onClick={handleSubmit} disabled={loading} className="w-full md:w-auto px-8 py-4 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-2xl font-semibold hover:from-green-600 hover:to-teal-600 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center disabled:opacity-50">
-          {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Check className="w-5 h-5 mr-2" />} {loading ? t.review.submitting : t.review.submitApplication}
+        <button onClick={handleSubmit} disabled={loading || isSubmitting} className="w-full md:w-auto px-8 py-4 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-2xl font-semibold hover:from-green-600 hover:to-teal-600 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center disabled:opacity-50">
+          {(loading || isSubmitting) ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Check className="w-5 h-5 mr-2" />} {(loading || isSubmitting) ? t.review.submitting : t.review.submitApplication}
         </button>
       </div>
     </div>
