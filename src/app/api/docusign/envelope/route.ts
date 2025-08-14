@@ -127,7 +127,8 @@ export async function POST(request: NextRequest) {
         message: 'Loan agreement sent for signature successfully!'
       });
       
-    } catch (apiError: any) {
+    } catch (error: unknown) {
+      const apiError = error as { response: { status: number; statusText: string; body: unknown; headers: unknown } };
       // Log detailed error information
       console.error('❌ DocuSign API Error Details:');
       if (apiError.response) {
