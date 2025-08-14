@@ -94,36 +94,50 @@ export async function POST(request: NextRequest) {
     const envelopeDefinition = createLoanAgreementEnvelopeInline(loanData, borrowerLanguage);
 
     console.log('📤 Sending envelope to DocuSign...');
-    const result = await envelopesApi.createEnvelope(accountId, {
-      envelopeDefinition
-    });
+    
+    try {
+      const result = await envelopesApi.createEnvelope(accountId, {
+        envelopeDefinition
+      });
 
-    if (!result || !result.envelopeId) {
-      throw new Error('Failed to create DocuSign envelope');
+      if (!result || !result.envelopeId) {
+        throw new Error('Failed to create DocuSign envelope');
+      }
+
+      console.log('✅ DocuSign envelope created:', result.envelopeId);
+
+      // Update loan with DocuSign envelope ID and status
+      const { error: updateError } = await supabase
+        .from('loans')
+        .update({
+          docusign_envelope_id: result.envelopeId,
+          docusign_status: 'sent',
+          docusign_status_updated: new Date().toISOString()
+        })
+        .eq('id', loanId);
+
+      if (updateError) {
+        console.error('❌ Error updating loan with DocuSign data:', updateError);
+        // Don't fail the request since envelope was created successfully
+      }
+
+      return NextResponse.json({
+        success: true,
+        envelopeId: result.envelopeId,
+        message: 'Loan agreement sent for signature successfully!'
+      });
+      
+    } catch (apiError: any) {
+      // Log detailed error information
+      console.error('❌ DocuSign API Error Details:');
+      if (apiError.response) {
+        console.error('Status:', apiError.response.status);
+        console.error('Status Text:', apiError.response.statusText);
+        console.error('Response Body:', JSON.stringify(apiError.response.body, null, 2));
+        console.error('Response Headers:', apiError.response.headers);
+      }
+      throw apiError;
     }
-
-    console.log('✅ DocuSign envelope created:', result.envelopeId);
-
-    // Update loan with DocuSign envelope ID and status
-    const { error: updateError } = await supabase
-      .from('loans')
-      .update({
-        docusign_envelope_id: result.envelopeId,
-        docusign_status: 'sent',
-        docusign_status_updated: new Date().toISOString()
-      })
-      .eq('id', loanId);
-
-    if (updateError) {
-      console.error('❌ Error updating loan with DocuSign data:', updateError);
-      // Don't fail the request since envelope was created successfully
-    }
-
-    return NextResponse.json({
-      success: true,
-      envelopeId: result.envelopeId,
-      message: 'Loan agreement sent for signature successfully!'
-    });
 
   } catch (error: unknown) {
     console.error('❌ DocuSign envelope creation error:', JSON.stringify(error));
