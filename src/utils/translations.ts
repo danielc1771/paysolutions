@@ -146,7 +146,6 @@ export interface Translations {
     readyTitle: string;
     readySubtitle: string;
     startVerification: string;
-    skipVerification: string;
     startingTitle: string;
     startingSubtitle: string;
     processingTitle: string;
@@ -541,7 +540,6 @@ export const translations: Record<Language, Translations> = {
       readyTitle: "Ready to Verify",
       readySubtitle: "Click the button below to start the identity verification process.",
       startVerification: "Start Verification",
-      skipVerification: "Skip Verification (for testing)",
       startingTitle: "Starting Verification",
       startingSubtitle: "Please complete the identity verification in the Stripe modal...",
       processingTitle: "Processing Verification",
@@ -934,7 +932,6 @@ export const translations: Record<Language, Translations> = {
       readyTitle: "Listo para Verificar",
       readySubtitle: "Haga clic en el botón de abajo para comenzar el proceso de verificación de identidad.",
       startVerification: "Iniciar Verificación",
-      skipVerification: "Omitir Verificación (para pruebas)",
       startingTitle: "Iniciando Verificación",
       startingSubtitle: "Por favor complete la verificación de identidad en el modal de Stripe...",
       processingTitle: "Procesando Verificación",

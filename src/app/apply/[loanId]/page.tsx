@@ -74,7 +74,6 @@ export default function ApplyPage() {
         const saved = sessionStorage.getItem(getSessionKey());
         return saved ? JSON.parse(saved) : null;
       } catch (error) {
-        console.warn('Failed to load from sessionStorage:', error);
         return null;
       }
     }
@@ -86,7 +85,6 @@ export default function ApplyPage() {
       try {
         sessionStorage.removeItem(getSessionKey());
       } catch (error) {
-        console.warn('Failed to clear sessionStorage:', error);
       }
     }
   }, [getSessionKey]);
@@ -145,7 +143,6 @@ export default function ApplyPage() {
         // If loan/borrower data is missing or corrupted, reset to fresh state
         if (errorMessage.includes('Loan not found') || errorMessage.includes('404') || 
             errorMessage.includes('already been submitted') || errorMessage.includes('invalid')) {
-          console.log('🔄 Loan/borrower data missing or invalid, resetting application state...');
           // Clear session storage
           clearSession();
           // Reset form data to initial state
@@ -242,7 +239,6 @@ export default function ApplyPage() {
       const existingChannels = supabase.getChannels();
       const existingChannel = existingChannels.find(ch => ch.topic === `loan-updates-${loanId}`);
       if (existingChannel) {
-        console.log('🧹 Removing existing channel before creating new one');
         await supabase.removeChannel(existingChannel);
       }
 
@@ -262,7 +258,6 @@ export default function ApplyPage() {
           (payload) => {
             if (!isMounted) return;
             
-            console.log('Received loan update:', payload);
             const newRecord = payload.new as {
               phone_verification_status: string;
               verified_phone_number: string;
@@ -274,7 +269,6 @@ export default function ApplyPage() {
             if (newRecord.phone_verification_status || newRecord.verified_phone_number) {
               const phoneStatus = newRecord.phone_verification_status;
               const verifiedPhone = newRecord.verified_phone_number;
-              console.log('📱 Phone verification update:', { phoneStatus, verifiedPhone });
               
               setFormData((prev) => {
                 const updates: Record<string, unknown> = {};
@@ -314,17 +308,8 @@ export default function ApplyPage() {
             }
           }
         )
-        .subscribe((status) => {
+        .subscribe(() => {
           if (!isMounted) return;
-          
-          console.log('Realtime subscription status:', status);
-          if (status === 'SUBSCRIBED') {
-            console.log('✅ Successfully subscribed to loan updates');
-          } else if (status === 'CHANNEL_ERROR') {
-            console.error('❌ Realtime subscription error');
-          } else if (status === 'TIMED_OUT') {
-            console.error('⏰ Realtime subscription timed out');
-          }
         });
     };
 
@@ -334,7 +319,6 @@ export default function ApplyPage() {
     return () => {
       isMounted = false;
       if (channel) {
-        console.log('Cleaning up realtime subscription');
         supabase.removeChannel(channel);
       }
     };
@@ -342,7 +326,6 @@ export default function ApplyPage() {
 
   const saveProgress = async (currentStep: number, data: Record<string, unknown>) => {
     try {
-      console.log({ data, currentStep });
       
       // Save to sessionStorage for immediate persistence
       const sessionData = { ...data, currentStep };
@@ -395,11 +378,9 @@ export default function ApplyPage() {
   const handleSubmit = async () => {
     // Prevent double submissions
     if (isSubmitting || step === 10) {
-      console.log('🚫 Preventing double submission - already submitting or completed');
       return;
     }
     
-    console.log('🚀 Starting application submission');
     setIsSubmitting(true);
     setLoading(true);
     setError(null);
@@ -419,15 +400,8 @@ export default function ApplyPage() {
       // Clear sessionStorage on successful submission
       clearSession();
       
-      // Update the loan status in realtime (will be handled by server response)
-      console.log('🎉 Application submitted successfully!');
-      
-      // Go directly to congratulations page (step 10) - moved after console log for debugging
-      console.log('🎯 Setting step to 10 (success page)');
-      
       // Use setTimeout to ensure state updates properly
       setTimeout(() => {
-        console.log('🎯 Actually setting step to 10 now');
         setStep(10);
       }, 100);
       
@@ -438,11 +412,9 @@ export default function ApplyPage() {
       // If submission fails due to loan status that indicates it was already completed successfully,
       // just show the success page instead of resetting
       if (errorMessage.includes('already been completed') && errorMessage.includes('application_completed')) {
-        console.log('✅ Application was already completed successfully, showing success page');
         setStep(10);
         setError(null);
       } else if (errorMessage.includes('Loan not found') || errorMessage.includes('invalid') || errorMessage.includes('404')) {
-        console.log('🔄 Submission failed due to invalid loan state, resetting application...');
         // Clear session storage
         clearSession();
         // Reset form data to initial state
@@ -1803,13 +1775,6 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
                   className="px-8 py-4 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-2xl font-semibold hover:from-green-600 hover:to-teal-600 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
                 >
                   {t.identityVerification.startVerification}
-                </button>
-                <button
-                  onClick={handleSkipVerification}
-                  disabled={isVerifying}
-                  className="mt-4 px-8 py-4 bg-gray-300 text-gray-800 rounded-2xl font-semibold hover:bg-gray-400 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
-                >
-                  {t.identityVerification.skipVerification}
                 </button>
               </div>
             )}

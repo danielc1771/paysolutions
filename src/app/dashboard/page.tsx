@@ -87,7 +87,7 @@ export default function UserDashboard() {
     switch (status) {
       case 'new': return 'New';
       case 'application_sent': return 'Application Sent';
-      case 'application_completed': return 'Application Completed';
+      case 'application_completed': return 'Application Completed - Ready to send Docusign';
       case 'review': return 'Under Review';
       case 'signed': return 'Signed - Ready for Funding';
       case 'funded': return 'Funded';
@@ -287,7 +287,7 @@ export default function UserDashboard() {
                 <div className="p-6">
                   <div className="space-y-4">
                     {loans.slice(0, 5).map((loan) => {
-                      const needsAction = loan.docusign_status === 'signed' && loan.status !== 'funded';
+                      const needsAction = loan.status === 'application_completed' || (loan.docusign_status === 'signed' && loan.status !== 'funded');
                       
                       return (
                         <div 

@@ -7,6 +7,7 @@ const loanProgressSchema = z.object({
   dateOfBirth: z.string().optional().refine((val) => !val || val.trim() !== '', {
     message: "Date of birth cannot be empty"
   }),
+  phoneNumber: z.string().optional(),
   address: z.string().optional(),
   city: z.string().optional(),
   state: z.string().optional(),
@@ -47,8 +48,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ loa
       return new NextResponse(JSON.stringify({ message: 'Invalid form data.', errors: validation.error.issues }), { status: 400 });
     }
 
-    console.log('✅ Validation passed for dateOfBirth:', validation.data.dateOfBirth);
-
     const { data: loan } = await supabase
       .from('loans')
       .select('borrower_id, status')
@@ -66,6 +65,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ loa
     if (validation.data.dateOfBirth && validation.data.dateOfBirth.trim() !== '' && validation.data.dateOfBirth !== 'null' && validation.data.dateOfBirth !== 'undefined') {
       updateData.date_of_birth = validation.data.dateOfBirth;
     }
+
+    if (validation.data.phoneNumber && validation.data.phoneNumber.trim() !== '' && validation.data.phoneNumber !== 'null' && validation.data.phoneNumber !== 'undefined') {
+      updateData.phone = validation.data.phoneNumber;
+    }
+
     if (validation.data.address && validation.data.address.trim() !== '') {
       updateData.address_line1 = validation.data.address;
     }
