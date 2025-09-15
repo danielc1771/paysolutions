@@ -201,3 +201,69 @@ import { supabaseAdmin } from '@/utils/supabase/admin';
 // Use server client for user-scoped operations (RLS applies)
 import { createClient } from '@/utils/supabase/server';
 ```
+
+### Critical Configuration Notes
+
+#### Next.js Configuration
+- **DocuSign SDK exclusion**: The `next.config.ts` excludes DocuSign SDK from client-side bundling via webpack configuration and `serverExternalPackages`
+- **Supabase image optimization**: Configured for Supabase storage bucket image serving
+- **Server-only modules**: Use `'server-only'` imports for DocuSign and sensitive operations
+
+#### Database Schema Details
+Key database relationships and constraints:
+- **Multi-tenant isolation**: All tables include `organization_id` foreign keys with RLS policies
+- **Loan lifecycle tracking**: Status progression from `new` → `funding_in_progress` → `funded` → `closed`
+- **Payment scheduling**: Weekly payment schedules generated with precise decimal handling (`numeric` columns)
+- **Verification workflows**: Separate Stripe identity and Twilio phone verification tracking
+- **DocuSign integration**: Envelope ID and status tracking with timestamp audit trails
+
+#### Role Hierarchy and Permissions
+```typescript
+// Role-based permission matrix (from src/lib/auth/roles.ts):
+- admin: Cross-organization access, full system management
+- organization_owner: Organization-scoped with full team management
+- user: Organization-scoped with team management capabilities  
+- team_member: Organization-scoped, limited to loan/borrower operations
+- borrower: Self-service access to own loan data only
+```
+
+#### Webhook Security and Processing
+- **Stripe webhooks**: Payment lifecycle, identity verification, and late fee processing
+- **DocuSign webhooks**: Document signing status updates with JWT authentication
+- **Signature verification**: All webhooks verify signatures before processing
+- **Idempotency handling**: Prevents duplicate processing of webhook events
+
+#### Environment Variables Security
+**Critical**: Never commit actual values. Production requires:
+- DocuSign RSA private key in proper format with escaped newlines
+- Stripe webhook secrets for signature verification
+- Supabase service role key for RLS bypass operations
+- Proper CORS configuration for client-side Supabase operations
+
+### Troubleshooting Common Issues
+
+#### DocuSign Authentication
+- Ensure RSA private key format includes proper `\n` escaping
+- Verify user consent granted in DocuSign admin panel
+- Check integration key and user ID match DocuSign developer account
+
+#### Stripe Integration
+- Webhook endpoint must be publicly accessible for testing
+- Use Stripe CLI for local webhook forwarding: `stripe listen --forward-to localhost:3000/api/stripe/webhook`
+- Verify API version compatibility (`2025-06-30.basil`)
+
+#### Database Migrations
+- Always generate migrations after schema changes: `npm run db:generate`
+- Apply migrations before deployment: `npm run db:migrate`  
+- Use `db:push` only for development prototyping
+
+#### Multi-tenant Data Access
+- RLS policies automatically scope data by organization
+- Admin users bypass RLS constraints via service role client
+- Test with different organization accounts to verify isolation
+
+### Development Workflow
+1. **Schema changes**: Update schema → `npm run db:generate` → `npm run db:migrate`
+2. **API development**: Implement role checks → test with different user roles → verify organization scoping
+3. **Integration testing**: Use webhook forwarding → test with Stripe/DocuSign test accounts
+4. **Pre-deployment**: Run `npm run lint` → verify environment variables → test role-based access

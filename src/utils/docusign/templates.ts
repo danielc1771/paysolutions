@@ -701,3 +701,242 @@ export const createLoanAgreementEnvelope = (loanData: LoanForDocuSign): docusign
 
   return envelopeDefinition;
 };
+
+// Extended interface for database loan data
+export interface DatabaseLoanData {
+  // From loans table
+  id: string;
+  loanNumber: string;
+  principalAmount: number;
+  interestRate: number;
+  termWeeks: number;
+  weeklyPayment: number;
+  purpose: string | null;
+  vehicleYear: string;
+  vehicleMake: string;
+  vehicleModel: string;
+  vehicleVin: string;
+  customerFirstName: string | null;
+  customerLastName: string | null;
+  organizationId: string | null;
+
+  // From borrowers table
+  borrower: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string | null;
+    phone: string | null;
+    dateOfBirth: string | null;
+    addressLine1: string | null;
+    city: string | null;
+    state: string | null;
+    zipCode: string | null;
+    employmentStatus: string | null;
+    annualIncome: number | null;
+    currentEmployerName: string | null;
+    timeWithEmployment: string | null;
+    reference1Name: string | null;
+    reference1Phone: string | null;
+    reference1Email: string | null;
+    reference2Name: string | null;
+    reference2Phone: string | null;
+    reference2Email: string | null;
+    reference3Name: string | null;
+    reference3Phone: string | null;
+    reference3Email: string | null;
+    organizationId: string | null;
+  };
+
+  // From organizations table
+  organization: {
+    id: string;
+    name: string;
+    email: string | null;
+    phone: string | null;
+    address: string | null;
+    city: string | null;
+    state: string | null;
+    zipCode: string | null;
+  } | null;
+
+  // From payment_schedules table
+  paymentSchedules: Array<{
+    id: string;
+    paymentNumber: number;
+    dueDate: string;
+    principalAmount: number;
+    interestAmount: number;
+    totalAmount: number;
+    remainingBalance: number;
+  }>;
+}
+
+// Function to create template-based envelope with field population
+export const createTemplateBasedEnvelope = async (
+  loanData: DatabaseLoanData,
+  templateId: string = '8b9711f2-c304-4467-aa5c-27ebca4b4cc4' // Default to "iPay - Acuerdo de Financiamento Personal"
+): Promise<docusign.EnvelopeDefinition> => {
+  
+  // Helper function to format phone number
+  const formatPhoneNumber = (phone: string | null): { countryCode: string, number: string } => {
+    if (!phone) return { countryCode: '+1', number: '' };
+    
+    // Remove all non-digits
+    const digits = phone.replace(/\D/g, '');
+    
+    if (digits.length === 10) {
+      return { countryCode: '+1', number: digits };
+    } else if (digits.length === 11 && digits.startsWith('1')) {
+      return { countryCode: '+1', number: digits.substring(1) };
+    }
+    
+    return { countryCode: '+1', number: digits };
+  };
+
+  // Helper function to calculate first payment date
+  const calculateFirstPaymentDate = (): string => {
+    const firstPayment = new Date();
+    firstPayment.setDate(firstPayment.getDate() + 7); // 7 days from now
+    return firstPayment.toLocaleDateString('en-US', {
+      month: '2-digit',
+      day: '2-digit',
+      year: 'numeric'
+    });
+  };
+
+  // Parse borrower phone
+  const borrowerPhone = formatPhoneNumber(loanData.borrower.phone);
+  const reference1Phone = formatPhoneNumber(loanData.borrower.reference1Phone);
+  const reference2Phone = formatPhoneNumber(loanData.borrower.reference2Phone);
+
+  // Helper function to calculate total loan amount with interest
+  const calculateTotalLoanAmount = (): number => {
+    return loanData.paymentSchedules.reduce((total, payment) => total + payment.totalAmount, 0);
+  };
+
+  // Helper function to get current date for emission_date
+  const getCurrentDate = (): string => {
+    return new Date().toLocaleDateString('en-US', {
+      month: '2-digit',
+      day: '2-digit',
+      year: 'numeric'
+    });
+  };
+
+  // Create text tabs for iPay fields (recipient 1) - previously dealership
+  const dealershipTabs: docusign.Text[] = [
+    // Basic loan information
+    { tabLabel: 'dealership_name', value: loanData.organization?.name || 'iPay Solutions' },
+    { tabLabel: 'vehicle_year', value: loanData.vehicleYear },
+    { tabLabel: 'vehicle_make', value: loanData.vehicleMake },
+    { tabLabel: 'vehicle_model', value: loanData.vehicleModel },
+    { tabLabel: 'vehicle_vin', value: loanData.vehicleVin },
+    { tabLabel: 'loan_amount', value: loanData.principalAmount.toFixed(2) },
+    { tabLabel: 'interest_applied', value: (loanData.interestRate * 100).toFixed(2) + '%' },
+    { tabLabel: 'loan_first_payment_date', value: calculateFirstPaymentDate() },
+    
+    // New fields added
+    { tabLabel: 'loan_total', value: calculateTotalLoanAmount().toFixed(2) }, // Total amount with interest
+    { tabLabel: 'loan_term_weeks', value: loanData.termWeeks.toString() }, // Loan term in weeks
+    { tabLabel: 'emission_date', value: getCurrentDate() }, // Document emission/creation date
+    
+    // iPay company information (static) - Updated address
+    { tabLabel: 'iPay_name', value: 'iPay LLC' },
+    { tabLabel: 'iPay_address_line_1 a7128350-f962-42dc-b480-aef50fb16c54', value: '6020 NW 99TH AVE, UNIT 313' }, // Updated iPay address
+    { tabLabel: 'ipay_city', value: 'Doral' },
+    { tabLabel: 'ipay_state', value: 'FL' },
+    { tabLabel: 'ipay_zip_code', value: '33178' },
+    { tabLabel: 'ipay_country', value: 'United States' },
+  ];
+
+  // Add payment schedule fields (up to 16 payments)
+  for (let i = 1; i <= 16; i++) {
+    const payment = loanData.paymentSchedules[i - 1];
+    // Handle the special case for exp_date_16 which has a space in the template
+    const expDateLabel = i === 16 ? 'exp_date_1 6' : `exp_date_${i}`;
+    
+    if (payment) {
+      dealershipTabs.push(
+        { tabLabel: expDateLabel, value: new Date(payment.dueDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) },
+        { tabLabel: `principal_amount_${i}`, value: payment.principalAmount.toFixed(2) },
+        { tabLabel: `payment_amount_${i}`, value: payment.totalAmount.toFixed(2) },
+        { tabLabel: `balance_${i}`, value: payment.remainingBalance.toFixed(2) }
+      );
+    } else {
+      // Fill empty slots with blank values
+      dealershipTabs.push(
+        { tabLabel: expDateLabel, value: '' },
+        { tabLabel: `principal_amount_${i}`, value: '' },
+        { tabLabel: `payment_amount_${i}`, value: '' },
+        { tabLabel: `balance_${i}`, value: '' }
+      );
+    }
+  }
+
+  // Create text tabs for borrower fields (recipient 2)
+  const borrowerTabs: docusign.Text[] = [
+    // Personal information
+    { tabLabel: 'borrower_first_name', value: loanData.borrower.firstName },
+    { tabLabel: 'borrower_last_name', value: loanData.borrower.lastName },
+    { tabLabel: 'borrower_email', value: loanData.borrower.email || '' }, // Added missing email field
+    { tabLabel: 'borrower_phone_country_code', value: borrowerPhone.countryCode },
+    { tabLabel: 'borrower_phone_number', value: borrowerPhone.number },
+    
+    // Address information
+    { tabLabel: 'borrower_address_line_1', value: loanData.borrower.addressLine1 || '' },
+    { tabLabel: 'borrower_city', value: loanData.borrower.city || '' },
+    { tabLabel: 'borrower_state', value: loanData.borrower.state || '' },
+    { tabLabel: 'borrower_zip_code', value: loanData.borrower.zipCode || '' },
+    { tabLabel: 'borrower_country', value: 'United States' },
+    
+    // Employment information
+    { tabLabel: 'borrower_employer', value: loanData.borrower.currentEmployerName || '' },
+    { tabLabel: 'borrower_employer_state', value: loanData.borrower.state || loanData.organization?.state || '' },
+    { tabLabel: 'borrower_employed_time', value: loanData.borrower.timeWithEmployment || '' },
+    { tabLabel: 'borrower_salary', value: loanData.borrower.annualIncome?.toFixed(2) || '' }, // Added missing salary field (using annualIncome)
+    
+    // References (note: template has spaces in some field names)
+    { tabLabel: 'borrower_reference_name_1 _phone', value: reference1Phone.number },
+    { tabLabel: 'borrower_reference_name_1 _country_code', value: reference1Phone.countryCode },
+    { tabLabel: 'borrower_reference_name_2_phone', value: reference2Phone.number },
+    { tabLabel: 'borrower_reference_name_2_country_code', value: reference2Phone.countryCode },
+    
+    // Loan type
+    { tabLabel: 'loan_type', value: 'Personal Loan' },
+  ];
+
+  // Create iPay signer (signs first) - Changed from dealership to iPay
+  const iPaySigner: docusign.Signer = {
+    email: 'admin@ipay.com', // iPay representative email
+    name: 'iPay Representative',
+    roleName: 'iPay', // Required for template roles - changed from 'Dealership'
+    recipientId: '1',
+    routingOrder: '1',
+    tabs: {
+      textTabs: dealershipTabs
+    }
+  };
+
+  // Create borrower signer (signs second)
+  const borrowerSigner: docusign.Signer = {
+    email: loanData.borrower.email || '',
+    name: `${loanData.borrower.firstName} ${loanData.borrower.lastName}`,
+    roleName: 'Borrower', // Required for template roles
+    recipientId: '2',
+    routingOrder: '2',
+    tabs: {
+      textTabs: borrowerTabs
+    }
+  };
+
+  // Create envelope definition using template
+  const envelopeDefinition: docusign.EnvelopeDefinition = {
+    templateId,
+    emailSubject: `Loan Agreement - ${loanData.loanNumber} - Signature Required`,
+    templateRoles: [iPaySigner, borrowerSigner],
+    status: 'sent'
+  };
+
+  return envelopeDefinition;
+};

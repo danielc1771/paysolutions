@@ -1,0 +1,879 @@
+{
+  "templateInfo": {
+    "templateId": "8b9711f2-c304-4467-aa5c-27ebca4b4cc4",
+    "templateName": "iPay - Acuerdo de Financiamento Personal",
+    "totalRecipients": 2
+  },
+  "recipients": [
+    {
+      "roleName": "iPay",
+      "recipientId": "45240017",
+      "fillableFields": [
+        {
+          "tabLabel": "loan_amount",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "interest_applied",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "exp_date_1",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "exp_date_2",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "exp_date_3",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "exp_date_4",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "exp_date_5",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "exp_date_6",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "exp_date_7",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "exp_date_8",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "exp_date_9",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "exp_date_10",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "exp_date_11",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "exp_date_12",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "exp_date_13",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "exp_date_14",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "exp_date_15",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "exp_date_1 6",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "principal_amount_1",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "principal_amount_2",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "principal_amount_3",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "principal_amount_4",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "principal_amount_5",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "principal_amount_6",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "principal_amount_7",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "principal_amount_8",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "principal_amount_9",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "principal_amount_10",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "principal_amount_11",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "principal_amount_12",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "principal_amount_13",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "principal_amount_14",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "principal_amount_15",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "principal_amount_16",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "payment_amount_1",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "payment_amount_2",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "payment_amount_3",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "payment_amount_4",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "payment_amount_5",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "payment_amount_6",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "payment_amount_7",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "payment_amount_8",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "payment_amount_9",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "payment_amount_10",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "payment_amount_11",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "payment_amount_12",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "payment_amount_13",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "payment_amount_14",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "payment_amount_15",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "payment_amount_16",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "balance_1",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "balance_2",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "balance_3",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "balance_4",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "balance_5",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "balance_6",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "balance_7",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "balance_8",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "balance_9",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "balance_10",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "balance_11",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "balance_12",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "balance_13",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "balance_14",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "balance_15",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "balance_16",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "dealership_name",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "vehicle_year",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "loan_amount",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "vehicle_make",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "vehicle_model",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "vehicle_vin",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "vehicle_model",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "vehicle_vin",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "loan_amount",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "loan_first_payment_date",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "iPay_address_line_1 a7128350-f962-42dc-b480-aef50fb16c54",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "ipay_city",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "ipay_country",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "ipay_state",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "ipay_zip_code",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "borrower_first_name",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "borrower_last_name",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "iPay_name",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "emission_date",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        }
+      ],
+      "signatureFields": [
+        {
+          "tabLabel": "iPay_signature",
+          "tabType": "signHere"
+        },
+        {
+          "tabLabel": "dealership_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "dealership_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "dealership_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "dealership_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "dealership_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "dealership_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "dealership_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "dealership_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "dealership_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "dealership_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "dealership_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "dealership_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "dealership_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "dealership_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "dealership_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "dealership_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "dealership_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "dealership_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "dealership_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "dealership_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "dealership_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "Date Signed d67a99b9-e0ec-41cc-bca1-dc185bb9cd18",
+          "tabType": "dateSigned"
+        },
+        {
+          "tabLabel": "Date Signed 9ea403c2-0bd3-4103-bab1-87bc7c79cb24",
+          "tabType": "dateSigned"
+        }
+      ]
+    },
+    {
+      "roleName": "Borrower",
+      "recipientId": "98804236",
+      "fillableFields": [
+        {
+          "tabLabel": "borrower_phone_country_code",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "borrower_phone_number",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "borrower_address_line_1",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "borrower_city",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "borrower_country",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "borrower_state",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "borrower_zip_code",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "borrower_employer_state",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "borrower_employed_time",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "borrower_reference_name_2_country_code",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "borrower_reference_name_1 _country_code",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "borrower_reference_name_1 _phone",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "borrower_reference_name_2_phone",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "borrower_first_name",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "borrower_last_name",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "borrower_first_name",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "borrower_last_name",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "borrower_employer",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "loan_type",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "borrower_address_line_1",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "borrower_first_name",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "borrower_last_name",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "borrower_city",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "borrower_state",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "borrower_zip_code",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "borrower_country",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        }
+      ],
+      "signatureFields": [
+        {
+          "tabLabel": "borrower_signature",
+          "tabType": "signHere"
+        },
+        {
+          "tabLabel": "borrower_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "borrower_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "borrower_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "borrower_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "borrower_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "borrower_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "borrower_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "borrower_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "borrower_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "borrower_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "borrower_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "borrower_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "borrower_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "borrower_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "borrower_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "borrower_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "borrower_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "borrower_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "borrower_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "borrower_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "borrower_initial",
+          "tabType": "initialHere"
+        },
+        {
+          "tabLabel": "Date Signed 28a66d7b-614a-4012-874a-0a39ad27165f",
+          "tabType": "dateSigned"
+        }
+      ]
+    }
+  ]
+}
