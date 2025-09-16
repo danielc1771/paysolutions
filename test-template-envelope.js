@@ -158,7 +158,7 @@ const authenticateWithJWT = async () => {
   }
 };
 
-// Function to create template-based envelope (same as in templates.ts)
+// Function to create template-based envelope with three-party structure
 const createTemplateBasedEnvelope = (loanData, templateId = TEMPLATE_ID) => {
   
   // Helper function to format phone number
@@ -206,10 +206,10 @@ const createTemplateBasedEnvelope = (loanData, templateId = TEMPLATE_ID) => {
     });
   };
 
-  // Create text tabs for iPay fields (recipient 1) - previously dealership
-  const dealershipTabs = [
+  // Create text tabs for iPay fields (recipient 1 - signs first)
+  const iPayTabs = [
     // Basic loan information
-    { tabLabel: 'dealership_name', value: loanData.organization?.name || 'iPay Solutions' },
+    { tabLabel: 'dealership_name', value: loanData.organization?.name || 'Organization' },
     { tabLabel: 'vehicle_year', value: loanData.vehicleYear },
     { tabLabel: 'vehicle_make', value: loanData.vehicleMake },
     { tabLabel: 'vehicle_model', value: loanData.vehicleModel },
@@ -225,11 +225,18 @@ const createTemplateBasedEnvelope = (loanData, templateId = TEMPLATE_ID) => {
     
     // iPay company information (static) - Updated address
     { tabLabel: 'iPay_name', value: 'iPay LLC' },
-    { tabLabel: 'iPay_address_line_1 a7128350-f962-42dc-b480-aef50fb16c54', value: '6020 NW 99TH AVE, UNIT 313' }, // Updated iPay address
+    { tabLabel: 'iPay_address_line', value: '6020 NW 99TH AVE, UNIT 313' }, // Updated iPay address field
     { tabLabel: 'ipay_city', value: 'Doral' },
     { tabLabel: 'ipay_state', value: 'FL' },
     { tabLabel: 'ipay_zip_code', value: '33178' },
     { tabLabel: 'ipay_country', value: 'United States' },
+    
+    // Organization address information (filled by iPay but about the organization)
+    { tabLabel: 'org_address_line', value: loanData.organization?.address || '' },
+    { tabLabel: 'org_city', value: loanData.organization?.city || '' },
+    { tabLabel: 'org_state', value: loanData.organization?.state || '' },
+    { tabLabel: 'org_zip_code', value: loanData.organization?.zipCode || '' },
+    { tabLabel: 'org_country', value: 'United States' },
   ];
 
   // Add payment schedule fields (up to 16 payments)
@@ -239,7 +246,7 @@ const createTemplateBasedEnvelope = (loanData, templateId = TEMPLATE_ID) => {
     const expDateLabel = i === 16 ? 'exp_date_1 6' : `exp_date_${i}`;
     
     if (payment) {
-      dealershipTabs.push(
+      iPayTabs.push(
         { tabLabel: expDateLabel, value: new Date(payment.dueDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) },
         { tabLabel: `principal_amount_${i}`, value: payment.principalAmount.toFixed(2) },
         { tabLabel: `payment_amount_${i}`, value: payment.totalAmount.toFixed(2) },
@@ -247,7 +254,7 @@ const createTemplateBasedEnvelope = (loanData, templateId = TEMPLATE_ID) => {
       );
     } else {
       // Fill empty slots with blank values
-      dealershipTabs.push(
+      iPayTabs.push(
         { tabLabel: expDateLabel, value: '' },
         { tabLabel: `principal_amount_${i}`, value: '' },
         { tabLabel: `payment_amount_${i}`, value: '' },
@@ -288,35 +295,52 @@ const createTemplateBasedEnvelope = (loanData, templateId = TEMPLATE_ID) => {
     { tabLabel: 'loan_type', value: 'Personal Loan' },
   ];
 
-  // Create iPay signer (signs first) - Changed from dealership to iPay
-  const dealershipSigner = {
-    email: 'admin@ipay.com', // iPay representative email
+  // Create text tabs for organization fields (recipient 2 - signs second)
+  const organizationTabs = [
+    { tabLabel: 'org_name', value: loanData.organization?.name || '' }, // Organization name
+  ];
+
+  // Create iPay signer (signs first)
+  const iPaySigner = {
+    email: 'contract@ipayus.net', // iPay contract email
     name: 'iPay Representative',
-    roleName: 'iPay', // Required for template roles - changed from 'Dealership'
+    roleName: 'iPay',
     recipientId: '1',
     routingOrder: '1',
     tabs: {
-      textTabs: dealershipTabs
+      textTabs: iPayTabs
     }
   };
 
-  // Create borrower signer (signs second)
+  // Create organization signer (signs second)
+  const organizationSigner = {
+    email: loanData.organization?.email || '', // Organization's email (logged-in organization)
+    name: `${loanData.organization?.name || 'Organization'} Representative`,
+    roleName: 'Organization',
+    recipientId: '2',
+    routingOrder: '2',
+    tabs: {
+      textTabs: organizationTabs
+    }
+  };
+
+  // Create borrower signer (signs third)
   const borrowerSigner = {
     email: loanData.borrower.email || '',
     name: `${loanData.borrower.firstName} ${loanData.borrower.lastName}`,
-    roleName: 'Borrower', // Required for template roles
-    recipientId: '2',
-    routingOrder: '2',
+    roleName: 'Borrower',
+    recipientId: '3',
+    routingOrder: '3',
     tabs: {
       textTabs: borrowerTabs
     }
   };
 
-  // Create envelope definition using template
+  // Create envelope definition using template (three-party structure)
   const envelopeDefinition = {
     templateId,
-    emailSubject: `Loan Agreement - ${loanData.loanNumber} - Signature Required`,
-    templateRoles: [dealershipSigner, borrowerSigner],
+    emailSubject: `Loan Agreement - ${loanData.loanNumber} - Three-Party Signature Required`,
+    templateRoles: [iPaySigner, organizationSigner, borrowerSigner],
     status: 'created' // Use 'created' for testing, 'sent' for production
   };
 
@@ -341,20 +365,27 @@ const testEnvelopeCreation = async () => {
     console.log(`   - Template ID: ${envelopeDefinition.templateId}`);
     console.log(`   - Email Subject: ${envelopeDefinition.emailSubject}`);
     console.log(`   - Status: ${envelopeDefinition.status}`);
-    console.log(`   - Recipients: ${envelopeDefinition.templateRoles.length} signers\n`);
+    console.log(`   - Recipients: ${envelopeDefinition.templateRoles.length} signers (THREE-PARTY)\n`);
 
     // Step 3: Display field mapping summary
     console.log('3. Field Mapping Summary:\n');
     
-    console.log('   📊 DEALERSHIP FIELDS (Recipient 1):');
-    const dealershipTabs = envelopeDefinition.templateRoles[0].tabs.textTabs;
-    dealershipTabs.slice(0, 10).forEach(tab => { // Show first 10 for brevity
+    console.log('   🏢 IPAY FIELDS (Recipient 1 - Signs First):');
+    const iPayTabs = envelopeDefinition.templateRoles[0].tabs.textTabs;
+    iPayTabs.slice(0, 10).forEach(tab => { // Show first 10 for brevity
       console.log(`   - ${tab.tabLabel}: "${tab.value}"`);
     });
-    console.log(`   - ... and ${dealershipTabs.length - 10} more payment schedule fields\n`);
+    console.log(`   - ... and ${iPayTabs.length - 10} more payment schedule & address fields\n`);
     
-    console.log('   👤 BORROWER FIELDS (Recipient 2):');
-    const borrowerTabs = envelopeDefinition.templateRoles[1].tabs.textTabs;
+    console.log('   🏪 ORGANIZATION FIELDS (Recipient 2 - Signs Second):');
+    const organizationTabs = envelopeDefinition.templateRoles[1].tabs.textTabs;
+    organizationTabs.forEach(tab => {
+      console.log(`   - ${tab.tabLabel}: "${tab.value}"`);
+    });
+    console.log();
+    
+    console.log('   👤 BORROWER FIELDS (Recipient 3 - Signs Third):');
+    const borrowerTabs = envelopeDefinition.templateRoles[2].tabs.textTabs;
     borrowerTabs.forEach(tab => {
       console.log(`   - ${tab.tabLabel}: "${tab.value}"`);
     });
@@ -389,11 +420,17 @@ const testEnvelopeCreation = async () => {
     // Step 6: Test completion summary
     console.log('🎉 TEST COMPLETED SUCCESSFULLY!\n');
     console.log('✅ Field Mapping Results:');
-    console.log(`   - Database fields mapped: ${dealershipTabs.length + borrowerTabs.length} total`);
-    console.log(`   - Dealership fields: ${dealershipTabs.length} (loan details + payment schedule)`);
+    console.log(`   - Database fields mapped: ${iPayTabs.length + organizationTabs.length + borrowerTabs.length} total`);
+    console.log(`   - iPay fields: ${iPayTabs.length} (loan details + payment schedule + addresses)`);
+    console.log(`   - Organization fields: ${organizationTabs.length} (organization name)`);
     console.log(`   - Borrower fields: ${borrowerTabs.length} (personal + address + employment + references)`);
-    console.log(`   - Sequential signing: Dealership (1st) → Borrower (2nd)`);
+    console.log(`   - Sequential signing: iPay (1st) → Organization (2nd) → Borrower (3rd)`);
     console.log(`   - Envelope status: Created successfully in DocuSign\n`);
+
+    console.log('📧 Email Routing Configuration:');
+    console.log(`   - iPay: ${envelopeDefinition.templateRoles[0].email} (contract@ipayus.net)`);
+    console.log(`   - Organization: ${envelopeDefinition.templateRoles[1].email} (logged-in organization)`);
+    console.log(`   - Borrower: ${envelopeDefinition.templateRoles[2].email} (borrower email)\n`);
 
     console.log('📝 Next Steps:');
     console.log('   1. Review the populated fields in DocuSign dashboard');

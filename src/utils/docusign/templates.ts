@@ -1,17 +1,12 @@
 import 'server-only';
-import docusign from 'docusign-esign';
+import * as docusign from 'docusign-esign';
+// Note: We use docusign-esign SDK types directly in this module
 import { LoanForDocuSign } from '@/types/loan';
 
-// Extended interfaces for DocuSign features not in the official types
-interface ExtendedDocument extends Omit<docusign.Document, 'documentBase64' | 'fileExtension'> {
-  documentBase64?: string;
-  fileExtension?: string;
-  htmlDefinition?: {
-    source: string;
-  };
-}
-
-interface ExtendedSignHere extends Omit<docusign.SignHere, 'pageNumber' | 'xPosition' | 'yPosition'> {
+// Type interfaces for DocuSign tabs
+interface SignHereTab {
+  documentId?: string;
+  tabLabel?: string;
   pageNumber?: string;
   xPosition?: string;
   yPosition?: string;
@@ -21,7 +16,9 @@ interface ExtendedSignHere extends Omit<docusign.SignHere, 'pageNumber' | 'xPosi
   anchorYOffset?: string;
 }
 
-interface ExtendedDateSigned extends Omit<docusign.DateSigned, 'pageNumber' | 'xPosition' | 'yPosition'> {
+interface DateSignedTab {
+  documentId?: string;
+  tabLabel?: string;
   pageNumber?: string;
   xPosition?: string;
   yPosition?: string;
@@ -30,6 +27,8 @@ interface ExtendedDateSigned extends Omit<docusign.DateSigned, 'pageNumber' | 'x
   anchorXOffset?: string;
   anchorYOffset?: string;
 }
+
+// Prefer using the official SDK type: docusign.EnvelopeDefinition
 
 // ExtendedInitialHere interface removed due to TypeScript limitations
 // Initial tabs will be handled separately when needed
@@ -642,12 +641,13 @@ export const generateLoanAgreementHTML = (loanData: LoanForDocuSign): string => 
 export const createLoanAgreementEnvelope = (loanData: LoanForDocuSign): docusign.EnvelopeDefinition => {
   const documentHtml = generateLoanAgreementHTML(loanData);
   
-  // Use htmlDefinition for responsive HTML documents (best practice)
-  const document: ExtendedDocument = {
-    htmlDefinition: {
-      source: documentHtml
-    },
+  // Convert HTML to base64 for DocuSign
+  const documentBase64 = Buffer.from(documentHtml).toString('base64');
+
+  const document: docusign.Document = {
+    documentBase64: documentBase64,
     name: `Vehicle Loan Agreement - ${loanData.loanNumber}`,
+    fileExtension: 'html',
     documentId: '1'
   };
 
@@ -660,9 +660,8 @@ export const createLoanAgreementEnvelope = (loanData: LoanForDocuSign): docusign
   };
 
   // Use anchor string positioning (best practice for HTML documents)
-  const signHereTab: ExtendedSignHere = {
+  const signHereTab: SignHereTab = {
     documentId: '1',
-    recipientId: '1',
     tabLabel: 'BorrowerSignature',
     anchorString: '\\s1\\',
     anchorUnits: 'pixels',
@@ -670,9 +669,8 @@ export const createLoanAgreementEnvelope = (loanData: LoanForDocuSign): docusign
     anchorYOffset: '0'
   };
 
-  const dateSignedTab: ExtendedDateSigned = {
+  const dateSignedTab: DateSignedTab = {
     documentId: '1',
-    recipientId: '1',
     tabLabel: 'DateSigned',
     anchorString: '\\d1\\',
     anchorUnits: 'pixels',
@@ -683,7 +681,7 @@ export const createLoanAgreementEnvelope = (loanData: LoanForDocuSign): docusign
   // TODO: Add initial tabs when DocuSign TypeScript definitions support them
   // For now, initial fields will be handled manually or via DocuSign UI
 
-  // Add tabs to signer (excluding initial tabs due to TypeScript limitations)
+  // Add tabs to signer - cast to proper DocuSign types
   signer.tabs = {
     signHereTabs: [signHereTab as docusign.SignHere],
     dateSignedTabs: [dateSignedTab as docusign.DateSigned]
@@ -692,7 +690,7 @@ export const createLoanAgreementEnvelope = (loanData: LoanForDocuSign): docusign
   // Create envelope definition
   const envelopeDefinition: docusign.EnvelopeDefinition = {
     emailSubject: `Vehicle Loan Agreement - ${loanData.loanNumber} - Signature Required`,
-    documents: [document as docusign.Document],
+    documents: [document],
     recipients: {
       signers: [signer]
     },
@@ -824,10 +822,10 @@ export const createTemplateBasedEnvelope = async (
     });
   };
 
-  // Create text tabs for iPay fields (recipient 1) - previously dealership
-  const dealershipTabs: docusign.Text[] = [
+  // Create text tabs for iPay fields (recipient 1 - signs first)
+  const iPayTabs: docusign.Text[] = [
     // Basic loan information
-    { tabLabel: 'dealership_name', value: loanData.organization?.name || 'iPay Solutions' },
+    { tabLabel: 'dealership_name', value: loanData.organization?.name || 'Organization' },
     { tabLabel: 'vehicle_year', value: loanData.vehicleYear },
     { tabLabel: 'vehicle_make', value: loanData.vehicleMake },
     { tabLabel: 'vehicle_model', value: loanData.vehicleModel },
@@ -843,11 +841,18 @@ export const createTemplateBasedEnvelope = async (
     
     // iPay company information (static) - Updated address
     { tabLabel: 'iPay_name', value: 'iPay LLC' },
-    { tabLabel: 'iPay_address_line_1 a7128350-f962-42dc-b480-aef50fb16c54', value: '6020 NW 99TH AVE, UNIT 313' }, // Updated iPay address
+    { tabLabel: 'iPay_address_line', value: '6020 NW 99TH AVE, UNIT 313' }, // Updated iPay address field
     { tabLabel: 'ipay_city', value: 'Doral' },
     { tabLabel: 'ipay_state', value: 'FL' },
     { tabLabel: 'ipay_zip_code', value: '33178' },
     { tabLabel: 'ipay_country', value: 'United States' },
+    
+    // Organization address information (filled by iPay but about the organization)
+    { tabLabel: 'org_address_line', value: loanData.organization?.address || '' },
+    { tabLabel: 'org_city', value: loanData.organization?.city || '' },
+    { tabLabel: 'org_state', value: loanData.organization?.state || '' },
+    { tabLabel: 'org_zip_code', value: loanData.organization?.zipCode || '' },
+    { tabLabel: 'org_country', value: 'United States' },
   ];
 
   // Add payment schedule fields (up to 16 payments)
@@ -857,7 +862,7 @@ export const createTemplateBasedEnvelope = async (
     const expDateLabel = i === 16 ? 'exp_date_1 6' : `exp_date_${i}`;
     
     if (payment) {
-      dealershipTabs.push(
+      iPayTabs.push(
         { tabLabel: expDateLabel, value: new Date(payment.dueDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) },
         { tabLabel: `principal_amount_${i}`, value: payment.principalAmount.toFixed(2) },
         { tabLabel: `payment_amount_${i}`, value: payment.totalAmount.toFixed(2) },
@@ -865,7 +870,7 @@ export const createTemplateBasedEnvelope = async (
       );
     } else {
       // Fill empty slots with blank values
-      dealershipTabs.push(
+      iPayTabs.push(
         { tabLabel: expDateLabel, value: '' },
         { tabLabel: `principal_amount_${i}`, value: '' },
         { tabLabel: `payment_amount_${i}`, value: '' },
@@ -906,37 +911,48 @@ export const createTemplateBasedEnvelope = async (
     { tabLabel: 'loan_type', value: 'Personal Loan' },
   ];
 
-  // Create iPay signer (signs first) - Changed from dealership to iPay
-  const iPaySigner: docusign.Signer = {
-    email: 'admin@ipay.com', // iPay representative email
-    name: 'iPay Representative',
-    roleName: 'iPay', // Required for template roles - changed from 'Dealership'
-    recipientId: '1',
-    routingOrder: '1',
-    tabs: {
-      textTabs: dealershipTabs
-    }
-  };
+  // Create text tabs for organization fields (recipient 3 - signs second)
+  const organizationTabs: docusign.Text[] = [
+    { tabLabel: 'org_name', value: loanData.organization?.name || '' }, // Organization name
+  ];
 
-  // Create borrower signer (signs second)
-  const borrowerSigner: docusign.Signer = {
+  // Create iPay template role (signs first)
+  const iPayRole = {
+    email: 'contract@ipayus.net', // iPay contract email
+    name: 'iPay Representative',
+    roleName: 'iPay',
+    tabs: {
+      textTabs: iPayTabs,
+    },
+  } as const;
+
+  // Create organization template role (signs second)
+  const organizationRole = {
+    email: loanData.organization?.email || '', // Organization's email (logged-in organization)
+    name: `${loanData.organization?.name || 'Organization'} Representative`,
+    roleName: 'Organization',
+    tabs: {
+      textTabs: organizationTabs,
+    },
+  } as const;
+
+  // Create borrower template role (signs third)
+  const borrowerRole = {
     email: loanData.borrower.email || '',
     name: `${loanData.borrower.firstName} ${loanData.borrower.lastName}`,
-    roleName: 'Borrower', // Required for template roles
-    recipientId: '2',
-    routingOrder: '2',
+    roleName: 'Borrower',
     tabs: {
-      textTabs: borrowerTabs
-    }
-  };
+      textTabs: borrowerTabs,
+    },
+  } as const;
 
-  // Create envelope definition using template
-  const envelopeDefinition: docusign.EnvelopeDefinition = {
+  // Create envelope definition using template (three-party structure)
+  const envelopeDefinition = {
     templateId,
-    emailSubject: `Loan Agreement - ${loanData.loanNumber} - Signature Required`,
-    templateRoles: [iPaySigner, borrowerSigner],
-    status: 'sent'
-  };
+    emailSubject: `Loan Agreement - ${loanData.loanNumber} - Three-Party Signature Required`,
+    templateRoles: [iPayRole, organizationRole, borrowerRole],
+    status: 'sent',
+  } as unknown as docusign.EnvelopeDefinition;
 
   return envelopeDefinition;
 };

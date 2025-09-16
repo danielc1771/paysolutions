@@ -2,7 +2,7 @@
   "templateInfo": {
     "templateId": "8b9711f2-c304-4467-aa5c-27ebca4b4cc4",
     "templateName": "iPay - Acuerdo de Financiamento Personal",
-    "totalRecipients": 2
+    "totalRecipients": 3
   },
   "recipients": [
     {
@@ -466,12 +466,6 @@
           "currentValue": ""
         },
         {
-          "tabLabel": "iPay_address_line_1 a7128350-f962-42dc-b480-aef50fb16c54",
-          "tabType": "text",
-          "required": "true",
-          "currentValue": ""
-        },
-        {
           "tabLabel": "ipay_city",
           "tabType": "text",
           "required": "true",
@@ -484,30 +478,6 @@
           "currentValue": ""
         },
         {
-          "tabLabel": "ipay_state",
-          "tabType": "text",
-          "required": "true",
-          "currentValue": ""
-        },
-        {
-          "tabLabel": "ipay_zip_code",
-          "tabType": "text",
-          "required": "true",
-          "currentValue": ""
-        },
-        {
-          "tabLabel": "borrower_first_name",
-          "tabType": "text",
-          "required": "true",
-          "currentValue": ""
-        },
-        {
-          "tabLabel": "borrower_last_name",
-          "tabType": "text",
-          "required": "true",
-          "currentValue": ""
-        },
-        {
           "tabLabel": "iPay_name",
           "tabType": "text",
           "required": "true",
@@ -515,6 +485,54 @@
         },
         {
           "tabLabel": "emission_date",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "org_address_line",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "org_city",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "org_country",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "org_state",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "org_zip_code",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "iPay_address_line",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "ipay_state",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "ipay_zip_code",
           "tabType": "text",
           "required": "true",
           "currentValue": ""
@@ -778,6 +796,18 @@
           "tabType": "text",
           "required": "true",
           "currentValue": ""
+        },
+        {
+          "tabLabel": "borrower_last_name",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        },
+        {
+          "tabLabel": "borrower_first_name",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
         }
       ],
       "signatureFields": [
@@ -871,6 +901,28 @@
         },
         {
           "tabLabel": "Date Signed 28a66d7b-614a-4012-874a-0a39ad27165f",
+          "tabType": "dateSigned"
+        }
+      ]
+    },
+    {
+      "roleName": "Organization",
+      "recipientId": "38387563",
+      "fillableFields": [
+        {
+          "tabLabel": "org_name",
+          "tabType": "text",
+          "required": "true",
+          "currentValue": ""
+        }
+      ],
+      "signatureFields": [
+        {
+          "tabLabel": "org_signature",
+          "tabType": "signHere"
+        },
+        {
+          "tabLabel": "Date Signed dd6e1de2-86c5-4b07-b539-fb2066fc10b0",
           "tabType": "dateSigned"
         }
       ]

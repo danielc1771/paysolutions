@@ -44,6 +44,7 @@ declare module 'docusign-esign' {
       recipientId: string;
       routingOrder: string;
       tabs?: {
+        textTabs?: Text[];
         signHereTabs?: SignHere[];
         dateSignedTabs?: DateSigned[];
       };
@@ -65,6 +66,20 @@ declare module 'docusign-esign' {
       tabLabel: string;
       xPosition: string;
       yPosition: string;
+    }
+
+    interface Text {
+      documentId?: string;
+      pageNumber?: string;
+      recipientId?: string;
+      tabLabel?: string;
+      value?: string;
+      required?: string;
+      locked?: string;
+      xPosition?: string;
+      yPosition?: string;
+      width?: string;
+      height?: string;
     }
 
     interface EnvelopeDefinition {

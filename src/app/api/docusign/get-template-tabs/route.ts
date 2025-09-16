@@ -4,6 +4,17 @@ import {
   getTemplateTabsByName 
 } from '@/utils/docusign/client';
 
+// Type definition for DocuSign template
+interface DocuSignTemplate {
+  templateId?: string;
+  name?: string;
+  description?: string;
+  shared?: string;
+  created?: string;
+  lastModified?: string;
+  owner?: unknown;
+}
+
 /**
  * API route to retrieve DocuSign template tabs
  * GET /api/docusign/get-template-tabs?templateName=iPay - Acuerdo de Financiamento Personal
@@ -22,7 +33,7 @@ export async function GET(request: NextRequest) {
     const allTemplates = await listDocuSignTemplates();
     
     console.log(`Found ${allTemplates.length} templates:`);
-    allTemplates.forEach(template => {
+    allTemplates.forEach((template: DocuSignTemplate) => {
       console.log(`- ${template.name} (ID: ${template.templateId})`);
     });
 
@@ -34,7 +45,7 @@ export async function GET(request: NextRequest) {
       templateTabs = await getTemplateTabsByName(templateName);
     } catch (error) {
       // If template not found by exact name, try to find similar templates
-      const similarTemplates = allTemplates.filter(t => 
+      const similarTemplates = allTemplates.filter((t: DocuSignTemplate) => 
         t.name?.toLowerCase().includes('ipay') || 
         t.name?.toLowerCase().includes('acuerdo') ||
         t.name?.toLowerCase().includes('financiamento')
@@ -149,7 +160,7 @@ export async function GET(request: NextRequest) {
 }
 
 // Helper function to suggest field mappings based on tab labels
-function suggestFieldMapping(tabLabel: string, tabType: string): {
+function suggestFieldMapping(tabLabel: string | undefined, tabType: string): {
   borrowerField?: string;
   loanField?: string;
   staticValue?: string;

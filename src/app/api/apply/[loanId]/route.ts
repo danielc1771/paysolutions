@@ -2,6 +2,10 @@
 import { createClient } from '@/utils/supabase/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { createLoanAgreementEnvelopeInline } from '@/utils/docusign/templates-inline';
+import { createEnvelopesApi } from '@/utils/docusign/client';
+import { LoanForDocuSign } from '@/types/loan';
+import { Language } from '@/utils/translations';
 
 const loanApplicationSchema = z.object({
   dateOfBirth: z.string().min(1, "Date of birth is required"),
@@ -199,7 +203,135 @@ export async function POST(request: Request, { params }: { params: Promise<{ loa
 
     if (loanUpdateError) throw loanUpdateError;
 
-    return NextResponse.json({ message: 'Application submitted successfully' });
+    console.log('✅ Application submitted successfully, now creating DocuSign envelope...');
+
+    // Create DocuSign envelope after successful application submission
+    try {
+      // Fetch complete loan and borrower data for DocuSign
+      const { data: completeLoans, error: fetchError } = await supabase
+        .from('loans')
+        .select(`
+          *,
+          borrower:borrowers(*)
+        `)
+        .eq('id', loanId)
+        .single();
+
+      if (fetchError || !completeLoans) {
+        console.error('❌ Error fetching complete loan data for DocuSign:', fetchError);
+        throw new Error('Failed to fetch loan data for DocuSign');
+      }
+
+      // Transform data for DocuSign template
+      const loanData: LoanForDocuSign = {
+        loanNumber: completeLoans.loan_number,
+        principalAmount: parseFloat(completeLoans.principal_amount),
+        interestRate: parseFloat(completeLoans.interest_rate),
+        termWeeks: completeLoans.term_weeks,
+        weeklyPayment: parseFloat(completeLoans.weekly_payment),
+        purpose: completeLoans.purpose || 'General purpose',
+        vehicle: {
+          year: completeLoans.vehicle_year || '',
+          make: completeLoans.vehicle_make || '',
+          model: completeLoans.vehicle_model || '',
+          vin: completeLoans.vehicle_vin || ''
+        },
+        borrower: {
+          firstName: completeLoans.borrower.first_name,
+          lastName: completeLoans.borrower.last_name,
+          email: completeLoans.borrower.email,
+          phone: completeLoans.borrower.phone || '',
+          addressLine1: completeLoans.borrower.address_line1 || '',
+          city: completeLoans.borrower.city || '',
+          state: completeLoans.borrower.state || '',
+          zipCode: completeLoans.borrower.zip_code || '',
+          ssn: completeLoans.borrower.ssn || '',
+          dateOfBirth: completeLoans.borrower.date_of_birth || '',
+          employmentStatus: completeLoans.borrower.employment_status || '',
+          annualIncome: parseFloat(completeLoans.borrower.annual_income || '0'),
+          currentEmployerName: completeLoans.borrower.current_employer_name || '',
+          timeWithEmployment: completeLoans.borrower.time_with_employment || '',
+          reference1Name: completeLoans.borrower.reference1_name || '',
+          reference1Phone: completeLoans.borrower.reference1_phone || '',
+          reference1Email: completeLoans.borrower.reference1_email || '',
+          reference2Name: completeLoans.borrower.reference2_name || '',
+          reference2Phone: completeLoans.borrower.reference2_phone || '',
+          reference2Email: completeLoans.borrower.reference2_email || '',
+          reference3Name: completeLoans.borrower.reference3_name || '',
+          reference3Phone: completeLoans.borrower.reference3_phone || '',
+          reference3Email: completeLoans.borrower.reference3_email || ''
+        }
+      };
+
+      console.log('📋 Loan data prepared for DocuSign:', {
+        loanNumber: loanData.loanNumber,
+        borrowerEmail: loanData.borrower.email,
+        borrowerName: `${loanData.borrower.firstName} ${loanData.borrower.lastName}`
+      });
+
+      // Get borrower's preferred language
+      const borrowerLanguage: Language = (completeLoans.borrower.preferred_language as Language) || 'en';
+      console.log('🌍 Using language for document:', borrowerLanguage);
+
+      // Create DocuSign envelope with language preference
+      const { envelopesApi, accountId } = await createEnvelopesApi();
+      const envelopeDefinition = createLoanAgreementEnvelopeInline(loanData, borrowerLanguage);
+
+      console.log('📤 Sending envelope to DocuSign...');
+
+      const result = await envelopesApi.createEnvelope(accountId, {
+        envelopeDefinition
+      });
+
+      if (!result || !result.envelopeId) {
+        throw new Error('Failed to create DocuSign envelope');
+      }
+
+      console.log('✅ DocuSign envelope created:', result.envelopeId);
+
+      // Update loan with DocuSign envelope ID and status
+      const { error: docusignUpdateError } = await supabase
+        .from('loans')
+        .update({
+          docusign_envelope_id: result.envelopeId,
+          docusign_status: 'sent',
+          docusign_status_updated: new Date().toISOString()
+        })
+        .eq('id', loanId);
+
+      if (docusignUpdateError) {
+        console.error('❌ Error updating loan with DocuSign data:', docusignUpdateError);
+        // Don't fail the request since envelope was created successfully
+      }
+
+      return NextResponse.json({
+        message: 'Application submitted successfully and DocuSign envelope created!',
+        docusign: {
+          envelopeId: result.envelopeId,
+          status: 'sent'
+        }
+      });
+
+    } catch (docusignError: unknown) {
+      console.error('❌ DocuSign envelope creation failed:', docusignError);
+
+      // Update loan status to indicate DocuSign creation failed
+      await supabase
+        .from('loans')
+        .update({
+          docusign_status: 'failed',
+          docusign_status_updated: new Date().toISOString()
+        })
+        .eq('id', loanId);
+
+      // Don't fail the entire application submission - just log the error
+      return NextResponse.json({
+        message: 'Application submitted successfully, but DocuSign envelope creation failed. Please contact support.',
+        docusign: {
+          error: docusignError instanceof Error ? docusignError.message : 'Unknown DocuSign error'
+        }
+      });
+    }
 
   } catch (error: unknown) {
     console.error('Error submitting application:', error);

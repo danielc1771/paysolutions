@@ -73,7 +73,7 @@ export default function ApplyPage() {
       try {
         const saved = sessionStorage.getItem(getSessionKey());
         return saved ? JSON.parse(saved) : null;
-      } catch (error) {
+      } catch {
         return null;
       }
     }
@@ -84,7 +84,7 @@ export default function ApplyPage() {
     if (typeof window !== 'undefined') {
       try {
         sessionStorage.removeItem(getSessionKey());
-      } catch (error) {
+      } catch {
       }
     }
   }, [getSessionKey]);
@@ -322,7 +322,7 @@ export default function ApplyPage() {
         supabase.removeChannel(channel);
       }
     };
-  }, [loanId]);
+  }, [loanId, step]);
 
   const saveProgress = async (currentStep: number, data: Record<string, unknown>) => {
     try {
@@ -1618,34 +1618,6 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
     setVerificationStatus(newStatus);
   }, [formData.stripeVerificationStatus]);
 
-  const handleSkipVerification = async () => {
-    setIsVerifying(true);
-    setError(null);
-    try {
-      const response = await fetch(`/api/apply/${initialData?.loanId}/skip-verification`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ loanId: initialData?.loanId }),
-      });
-
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.message || 'Failed to skip verification.');
-      }
-
-      // Update through formData only, not local state
-      setFormData({
-        ...formData,
-        stripeVerificationStatus: 'completed',
-      });
-    } catch (err: unknown) {
-      console.error('Error skipping verification:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-      setError(errorMessage);
-    } finally {
-      setIsVerifying(false);
-    }
-  };
 
   const startVerification = async () => {
     if (!stripe) {

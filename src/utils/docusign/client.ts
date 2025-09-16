@@ -1,5 +1,189 @@
 import 'server-only';
-import docusign from 'docusign-esign';
+import * as docusign from 'docusign-esign';
+
+// Type declarations for DocuSign classes
+interface ApiClient {
+  setBasePath(basePath: string): void;
+  addDefaultHeader(name: string, value: string): void;
+  requestJWTUserToken(
+    integrationKey: string,
+    userId: string,
+    scopes: string[],
+    privateKey: Buffer,
+    expiresIn: number
+  ): Promise<{ body: { access_token: string } }>;
+}
+
+interface EnvelopesApi {
+  createEnvelope(accountId: string, options: unknown): Promise<{
+    envelopeId?: string;
+    status?: string;
+    statusDateTime?: string;
+    uri?: string;
+  }>;
+  createRecipientView(accountId: string, envelopeId: string, options: unknown): Promise<{
+    url?: string;
+  }>;
+  getEnvelope(accountId: string, envelopeId: string, options?: unknown): Promise<{
+    envelopeId?: string;
+    status?: string;
+    statusDateTime?: string;
+    statusChangedDateTime?: string;
+    emailSubject?: string;
+    documentsUri?: string;
+    recipientsUri?: string;
+    created?: string;
+    lastModified?: string;
+    sentDateTime?: string;
+    completedDateTime?: string;
+    voidedDateTime?: string;
+    deliveredDateTime?: string;
+    initialSentDateTime?: string;
+  }>;
+}
+
+interface TemplatesApi {
+  listTemplates(accountId: string, options?: unknown): Promise<{
+    envelopeTemplates?: Array<{
+      templateId?: string;
+      name?: string;
+      description?: string;
+      shared?: string;
+      created?: string;
+      lastModified?: string;
+      owner?: unknown;
+    }>;
+  }>;
+  listRecipients(accountId: string, templateId: string): Promise<{
+    signers?: Array<{
+      recipientId?: string;
+      roleName?: string;
+      name?: string;
+    }>;
+  }>;
+  listTabs(accountId: string, templateId: string, recipientId: string): Promise<{
+    textTabs?: Array<{
+      tabLabel?: string;
+      name?: string;
+      value?: string;
+      required?: string;
+      xPosition?: string;
+      yPosition?: string;
+      width?: string;
+      height?: string;
+      pageNumber?: string;
+      documentId?: string;
+    }>;
+    checkboxTabs?: Array<{
+      tabLabel?: string;
+      name?: string;
+      selected?: string;
+      required?: string;
+      xPosition?: string;
+      yPosition?: string;
+      pageNumber?: string;
+      documentId?: string;
+    }>;
+    dateSignedTabs?: Array<{
+      tabLabel?: string;
+      name?: string;
+      required?: string;
+      xPosition?: string;
+      yPosition?: string;
+      pageNumber?: string;
+      documentId?: string;
+    }>;
+    dateTabs?: Array<{
+      tabLabel?: string;
+      name?: string;
+      value?: string;
+      required?: string;
+      xPosition?: string;
+      yPosition?: string;
+      pageNumber?: string;
+      documentId?: string;
+    }>;
+    emailTabs?: Array<{
+      tabLabel?: string;
+      name?: string;
+      value?: string;
+      required?: string;
+      xPosition?: string;
+      yPosition?: string;
+      pageNumber?: string;
+      documentId?: string;
+    }>;
+    numberTabs?: Array<{
+      tabLabel?: string;
+      name?: string;
+      value?: string;
+      required?: string;
+      xPosition?: string;
+      yPosition?: string;
+      pageNumber?: string;
+      documentId?: string;
+    }>;
+    signHereTabs?: Array<{
+      tabLabel?: string;
+      name?: string;
+      required?: string;
+      xPosition?: string;
+      yPosition?: string;
+      pageNumber?: string;
+      documentId?: string;
+    }>;
+    initialHereTabs?: Array<{
+      tabLabel?: string;
+      name?: string;
+      required?: string;
+      xPosition?: string;
+      yPosition?: string;
+      pageNumber?: string;
+      documentId?: string;
+    }>;
+  }>;
+}
+
+// Type assertion for the DocuSign module
+const DocuSignApiClient = (docusign as unknown as { ApiClient: new() => ApiClient }).ApiClient;
+const DocuSignEnvelopesApi = (docusign as unknown as { EnvelopesApi: new(client: ApiClient) => EnvelopesApi }).EnvelopesApi;
+const DocuSignTemplatesApi = (docusign as unknown as { TemplatesApi: new(client: ApiClient) => TemplatesApi }).TemplatesApi;
+
+// Type for DocuSign module with class constructors
+interface DocuSignModule {
+  Text: unknown;
+  EnvelopeDefinition: new () => {
+    templateId?: string;
+    emailSubject?: string;
+    templateRoles?: unknown[];
+    status?: string;
+    documents?: unknown[];
+    recipients?: unknown;
+  };
+  Document: unknown;
+  Signer: unknown;
+  Recipients: unknown;
+  Tabs: unknown;
+  TemplateRole: {
+    constructFromObject: (obj: {
+      email?: string;
+      name?: string;
+      roleName?: string;
+      tabs?: unknown;
+    }) => unknown;
+  };
+}
+
+// Export DocuSign classes for use in other files
+export const DocuSignClasses = {
+  Text: (docusign as unknown as DocuSignModule).Text,
+  EnvelopeDefinition: (docusign as unknown as DocuSignModule).EnvelopeDefinition,
+  Document: (docusign as unknown as DocuSignModule).Document,
+  Signer: (docusign as unknown as DocuSignModule).Signer,
+  Recipients: (docusign as unknown as DocuSignModule).Recipients,
+  Tabs: (docusign as unknown as DocuSignModule).Tabs,
+  TemplateRole: (docusign as unknown as DocuSignModule).TemplateRole
+};
 
 // DocuSign configuration
 const DOCUSIGN_BASE_PATH = process.env.DOCUSIGN_BASE_PATH;
@@ -14,7 +198,7 @@ export const createDocuSignClient = () => {
     throw new Error('DocuSign environment variables are not configured');
   }
 
-  const apiClient = new docusign.ApiClient();
+  const apiClient = new DocuSignApiClient();
   apiClient.setBasePath(DOCUSIGN_BASE_PATH);
 
   return apiClient;
@@ -39,7 +223,7 @@ export const authenticateWithJWT = async (): Promise<string> => {
       throw new Error('Missing required DocuSign environment variables');
     }
 
-    const apiClient = new docusign.ApiClient();
+    const apiClient = new DocuSignApiClient();
     apiClient.setBasePath(DOCUSIGN_BASE_PATH!);
 
     // Convert private key string to Buffer
@@ -91,7 +275,7 @@ export const createEnvelopesApi = async () => {
   }
   
   return {
-    envelopesApi: new docusign.EnvelopesApi(apiClient),
+    envelopesApi: new DocuSignEnvelopesApi(apiClient),
     apiClient: apiClient,
     accountId: DOCUSIGN_ACCOUNT_ID
   };
@@ -108,7 +292,7 @@ export const createTemplatesApi = async () => {
   }
   
   return {
-    templatesApi: new docusign.TemplatesApi(apiClient),
+    templatesApi: new DocuSignTemplatesApi(apiClient),
     apiClient: apiClient,
     accountId: DOCUSIGN_ACCOUNT_ID
   };
@@ -164,7 +348,102 @@ export const getTemplateTabs = async (templateId: string, templateName?: string)
     })));
     
     // Get tabs for each recipient
-    const allTabs: any[] = [];
+    interface RecipientTabs {
+      recipientId: string;
+      roleName?: string;
+      recipientName?: string;
+      tabs: {
+        textTabs: Array<{
+          tabLabel?: string;
+          name?: string;
+          value?: string;
+          required?: string;
+          tabType: string;
+          xPosition?: string;
+          yPosition?: string;
+          width?: string;
+          height?: string;
+          pageNumber?: string;
+          documentId?: string;
+        }>;
+        checkboxTabs: Array<{
+          tabLabel?: string;
+          name?: string;
+          selected?: string;
+          required?: string;
+          tabType: string;
+          xPosition?: string;
+          yPosition?: string;
+          pageNumber?: string;
+          documentId?: string;
+        }>;
+        dateSignedTabs: Array<{
+          tabLabel?: string;
+          name?: string;
+          required?: string;
+          tabType: string;
+          xPosition?: string;
+          yPosition?: string;
+          pageNumber?: string;
+          documentId?: string;
+        }>;
+        dateTabs: Array<{
+          tabLabel?: string;
+          name?: string;
+          value?: string;
+          required?: string;
+          tabType: string;
+          xPosition?: string;
+          yPosition?: string;
+          pageNumber?: string;
+          documentId?: string;
+        }>;
+        emailTabs: Array<{
+          tabLabel?: string;
+          name?: string;
+          value?: string;
+          required?: string;
+          tabType: string;
+          xPosition?: string;
+          yPosition?: string;
+          pageNumber?: string;
+          documentId?: string;
+        }>;
+        numberTabs: Array<{
+          tabLabel?: string;
+          name?: string;
+          value?: string;
+          required?: string;
+          tabType: string;
+          xPosition?: string;
+          yPosition?: string;
+          pageNumber?: string;
+          documentId?: string;
+        }>;
+        signHereTabs: Array<{
+          tabLabel?: string;
+          name?: string;
+          required?: string;
+          tabType: string;
+          xPosition?: string;
+          yPosition?: string;
+          pageNumber?: string;
+          documentId?: string;
+        }>;
+        initialHereTabs: Array<{
+          tabLabel?: string;
+          name?: string;
+          required?: string;
+          tabType: string;
+          xPosition?: string;
+          yPosition?: string;
+          pageNumber?: string;
+          documentId?: string;
+        }>;
+      };
+    }
+    
+    const allTabs: RecipientTabs[] = [];
     
     for (const recipient of recipients) {
       if (recipient.recipientId) {
