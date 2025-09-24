@@ -2,6 +2,7 @@ import 'server-only';
 import * as docusign from 'docusign-esign';
 // Note: We use docusign-esign SDK types directly in this module
 import { LoanForDocuSign } from '@/types/loan';
+import { getOrganizationOwner } from '../organization/owner-lookup';
 
 // Type interfaces for DocuSign tabs
 interface SignHereTab {
@@ -776,6 +777,16 @@ export const createTemplateBasedEnvelope = async (
   templateId: string = '8b9711f2-c304-4467-aa5c-27ebca4b4cc4' // Default to "iPay - Acuerdo de Financiamento Personal"
 ): Promise<docusign.EnvelopeDefinition> => {
   
+  // Get organization owner for proper signing flow
+  if (!loanData.organizationId) {
+    throw new Error('No organization ID found for this loan');
+  }
+  
+  const organizationOwner = await getOrganizationOwner(loanData.organizationId);
+  if (!organizationOwner) {
+    throw new Error('No organization owner found for this loan');
+  }
+  
   // Helper function to format phone number
   const formatPhoneNumber = (phone: string | null): { countryCode: string, number: string } => {
     if (!phone) return { countryCode: '+1', number: '' };
@@ -918,18 +929,18 @@ export const createTemplateBasedEnvelope = async (
 
   // Create iPay template role (signs first)
   const iPayRole = {
-    email: 'contract@ipayus.net', // iPay contract email
-    name: 'iPay Representative',
+    email: 'jhoamadrian@gmail.com', // Updated iPay representative email
+    name: 'Jhoam Adrian - iPay Admin',
     roleName: 'iPay',
     tabs: {
       textTabs: iPayTabs,
     },
   } as const;
 
-  // Create organization template role (signs second)
+  // Create organization template role (signs second) - using organization owner
   const organizationRole = {
-    email: loanData.organization?.email || '', // Organization's email (logged-in organization)
-    name: `${loanData.organization?.name || 'Organization'} Representative`,
+    email: organizationOwner.email, // Organization owner's email
+    name: organizationOwner.fullName,
     roleName: 'Organization',
     tabs: {
       textTabs: organizationTabs,

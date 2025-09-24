@@ -8,6 +8,20 @@ export const profileStatusEnum = pgEnum('profile_status', ['INVITED', 'ACTIVE'])
 export const subscriptionStatusEnum = pgEnum('subscription_status', ['trial', 'active', 'suspended', 'cancelled']);
 export const stripeVerificationStatusEnum = pgEnum('stripe_verification_status', ['pending', 'requires_action', 'verified', 'canceled', 'unverified', 'processing', 'completed']);
 export const phoneVerificationStatusEnum = pgEnum('phone_verification_status', ['pending', 'sent', 'verified', 'failed', 'expired']);
+export const loanStatusEnum = pgEnum('loan_status', [
+  'new', 
+  'application_sent', 
+  'application_in_progress', 
+  'application_completed',
+  'ipay_approved',
+  'dealer_approved', 
+  'fully_signed',
+  'review',
+  'approved', 
+  'funded', 
+  'closed', 
+  'defaulted'
+]);
 
 export const organization = pgTable("organizations", {
 	id: uuid("id").defaultRandom().primaryKey(),
@@ -140,7 +154,7 @@ export const loans = pgTable("loans", { // Added vehicle fields
 	termWeeks: integer("term_weeks").notNull(),
 	weeklyPayment: numeric("weekly_payment", { precision: 10, scale:  2 }).notNull(),
 	purpose: text(),
-	status: varchar({ length: 50 }).default('new'),
+	status: loanStatusEnum('status').default('new'),
 	fundingDate: date("funding_date"),
 	remainingBalance: numeric("remaining_balance", { precision: 12, scale:  2 }),
 	docusignEnvelopeId: varchar("docusign_envelope_id", { length: 255 }),

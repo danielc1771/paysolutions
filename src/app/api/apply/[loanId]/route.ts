@@ -2,9 +2,8 @@
 import { createClient } from '@/utils/supabase/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createLoanAgreementEnvelopeInline } from '@/utils/docusign/templates-inline';
+import { createTemplateBasedEnvelope, DatabaseLoanData } from '@/utils/docusign/templates';
 import { createEnvelopesApi } from '@/utils/docusign/client';
-import { LoanForDocuSign } from '@/types/loan';
 import { Language } from '@/utils/translations';
 
 const loanApplicationSchema = z.object({
@@ -207,12 +206,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ loa
 
     // Create DocuSign envelope after successful application submission
     try {
-      // Fetch complete loan and borrower data for DocuSign
+      // Fetch complete loan and borrower data for DocuSign, including organization and payment schedules
       const { data: completeLoans, error: fetchError } = await supabase
         .from('loans')
         .select(`
           *,
-          borrower:borrowers(*)
+          borrower:borrowers(*),
+          organization:organizations(*),
+          payment_schedules(*)
         `)
         .eq('id', loanId)
         .single();
@@ -222,60 +223,83 @@ export async function POST(request: Request, { params }: { params: Promise<{ loa
         throw new Error('Failed to fetch loan data for DocuSign');
       }
 
-      // Transform data for DocuSign template
-      const loanData: LoanForDocuSign = {
+      // Transform data for DocuSign template (using DatabaseLoanData format)
+      const loanData: DatabaseLoanData = {
+        id: completeLoans.id,
         loanNumber: completeLoans.loan_number,
         principalAmount: parseFloat(completeLoans.principal_amount),
         interestRate: parseFloat(completeLoans.interest_rate),
         termWeeks: completeLoans.term_weeks,
         weeklyPayment: parseFloat(completeLoans.weekly_payment),
-        purpose: completeLoans.purpose || 'General purpose',
-        vehicle: {
-          year: completeLoans.vehicle_year || '',
-          make: completeLoans.vehicle_make || '',
-          model: completeLoans.vehicle_model || '',
-          vin: completeLoans.vehicle_vin || ''
-        },
+        purpose: completeLoans.purpose,
+        vehicleYear: completeLoans.vehicle_year,
+        vehicleMake: completeLoans.vehicle_make,
+        vehicleModel: completeLoans.vehicle_model,
+        vehicleVin: completeLoans.vehicle_vin,
+        customerFirstName: completeLoans.customer_first_name,
+        customerLastName: completeLoans.customer_last_name,
+        organizationId: completeLoans.organization_id,
         borrower: {
+          id: completeLoans.borrower.id,
           firstName: completeLoans.borrower.first_name,
           lastName: completeLoans.borrower.last_name,
           email: completeLoans.borrower.email,
-          phone: completeLoans.borrower.phone || '',
-          addressLine1: completeLoans.borrower.address_line1 || '',
-          city: completeLoans.borrower.city || '',
-          state: completeLoans.borrower.state || '',
-          zipCode: completeLoans.borrower.zip_code || '',
-          ssn: completeLoans.borrower.ssn || '',
-          dateOfBirth: completeLoans.borrower.date_of_birth || '',
-          employmentStatus: completeLoans.borrower.employment_status || '',
+          phone: completeLoans.borrower.phone,
+          dateOfBirth: completeLoans.borrower.date_of_birth,
+          addressLine1: completeLoans.borrower.address_line1,
+          city: completeLoans.borrower.city,
+          state: completeLoans.borrower.state,
+          zipCode: completeLoans.borrower.zip_code,
+          employmentStatus: completeLoans.borrower.employment_status,
           annualIncome: parseFloat(completeLoans.borrower.annual_income || '0'),
-          currentEmployerName: completeLoans.borrower.current_employer_name || '',
-          timeWithEmployment: completeLoans.borrower.time_with_employment || '',
-          reference1Name: completeLoans.borrower.reference1_name || '',
-          reference1Phone: completeLoans.borrower.reference1_phone || '',
-          reference1Email: completeLoans.borrower.reference1_email || '',
-          reference2Name: completeLoans.borrower.reference2_name || '',
-          reference2Phone: completeLoans.borrower.reference2_phone || '',
-          reference2Email: completeLoans.borrower.reference2_email || '',
-          reference3Name: completeLoans.borrower.reference3_name || '',
-          reference3Phone: completeLoans.borrower.reference3_phone || '',
-          reference3Email: completeLoans.borrower.reference3_email || ''
-        }
+          currentEmployerName: completeLoans.borrower.current_employer_name,
+          timeWithEmployment: completeLoans.borrower.time_with_employment,
+          reference1Name: completeLoans.borrower.reference1_name,
+          reference1Phone: completeLoans.borrower.reference1_phone,
+          reference1Email: completeLoans.borrower.reference1_email,
+          reference2Name: completeLoans.borrower.reference2_name,
+          reference2Phone: completeLoans.borrower.reference2_phone,
+          reference2Email: completeLoans.borrower.reference2_email,
+          reference3Name: completeLoans.borrower.reference3_name,
+          reference3Phone: completeLoans.borrower.reference3_phone,
+          reference3Email: completeLoans.borrower.reference3_email,
+          organizationId: completeLoans.borrower.organization_id
+        },
+        organization: completeLoans.organization ? {
+          id: completeLoans.organization.id,
+          name: completeLoans.organization.name,
+          email: completeLoans.organization.email,
+          phone: completeLoans.organization.phone,
+          address: completeLoans.organization.address,
+          city: completeLoans.organization.city,
+          state: completeLoans.organization.state,
+          zipCode: completeLoans.organization.zip_code
+        } : null,
+        paymentSchedules: (completeLoans.payment_schedules || []).map((ps: Record<string, unknown>) => ({
+          id: ps.id as string,
+          paymentNumber: ps.payment_number as number,
+          dueDate: ps.due_date as string,
+          principalAmount: parseFloat(ps.principal_amount as string),
+          interestAmount: parseFloat(ps.interest_amount as string),
+          totalAmount: parseFloat(ps.total_amount as string),
+          remainingBalance: parseFloat(ps.remaining_balance as string)
+        }))
       };
 
       console.log('📋 Loan data prepared for DocuSign:', {
         loanNumber: loanData.loanNumber,
         borrowerEmail: loanData.borrower.email,
-        borrowerName: `${loanData.borrower.firstName} ${loanData.borrower.lastName}`
+        borrowerName: `${loanData.borrower.firstName} ${loanData.borrower.lastName}`,
+        organizationName: loanData.organization?.name
       });
 
-      // Get borrower's preferred language
+      // Get borrower's preferred language (kept for future template language support)
       const borrowerLanguage: Language = (completeLoans.borrower.preferred_language as Language) || 'en';
       console.log('🌍 Using language for document:', borrowerLanguage);
 
-      // Create DocuSign envelope with language preference
+      // Create DocuSign envelope using template-based approach
       const { envelopesApi, accountId } = await createEnvelopesApi();
-      const envelopeDefinition = createLoanAgreementEnvelopeInline(loanData, borrowerLanguage);
+      const envelopeDefinition = await createTemplateBasedEnvelope(loanData);
 
       console.log('📤 Sending envelope to DocuSign...');
 

@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
-import { createLoanAgreementEnvelopeInline } from '@/utils/docusign/templates-inline';
+import { createTemplateBasedEnvelope, DatabaseLoanData } from '@/utils/docusign/templates';
 import { createEnvelopesApi } from '@/utils/docusign/client';
-import { LoanForDocuSign } from '@/types/loan';
 import { Language } from '@/utils/translations';
 
 export async function POST(request: NextRequest) {
@@ -20,12 +19,14 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient();
 
-    // Get loan and borrower data including vehicle information
+    // Get loan and borrower data including organization and payment schedules
     const { data: loan, error: loanError } = await supabase
       .from('loans')
       .select(`
         *,
-        borrower:borrowers(*)
+        borrower:borrowers(*),
+        organization:organizations(*),
+        payment_schedules(*)
       `)
       .eq('id', loanId)
       .single();
@@ -38,45 +39,67 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Transform data for DocuSign template
-    const loanData: LoanForDocuSign = {
+    // Transform data for DocuSign template (using DatabaseLoanData format)
+    const loanData: DatabaseLoanData = {
+      id: loan.id,
       loanNumber: loan.loan_number,
       principalAmount: parseFloat(loan.principal_amount),
       interestRate: parseFloat(loan.interest_rate),
       termWeeks: loan.term_weeks,
       weeklyPayment: parseFloat(loan.weekly_payment),
-      purpose: loan.purpose || 'General purpose',
-      vehicle: {
-        year: loan.vehicle_year || '',
-        make: loan.vehicle_make || '',
-        model: loan.vehicle_model || '', 
-        vin: loan.vehicle_vin || ''
-      },
+      purpose: loan.purpose,
+      vehicleYear: loan.vehicle_year,
+      vehicleMake: loan.vehicle_make,
+      vehicleModel: loan.vehicle_model,
+      vehicleVin: loan.vehicle_vin,
+      customerFirstName: loan.customer_first_name,
+      customerLastName: loan.customer_last_name,
+      organizationId: loan.organization_id,
       borrower: {
+        id: loan.borrower.id,
         firstName: loan.borrower.first_name,
         lastName: loan.borrower.last_name,
         email: loan.borrower.email,
-        phone: loan.borrower.phone || '',
-        addressLine1: loan.borrower.address_line1 || '',
-        city: loan.borrower.city || '',
-        state: loan.borrower.state || '',
-        zipCode: loan.borrower.zip_code || '',
-        ssn: loan.borrower.ssn || '',
-        dateOfBirth: loan.borrower.date_of_birth || '',
-        employmentStatus: loan.borrower.employment_status || '',
+        phone: loan.borrower.phone,
+        dateOfBirth: loan.borrower.date_of_birth,
+        addressLine1: loan.borrower.address_line1,
+        city: loan.borrower.city,
+        state: loan.borrower.state,
+        zipCode: loan.borrower.zip_code,
+        employmentStatus: loan.borrower.employment_status,
         annualIncome: parseFloat(loan.borrower.annual_income || '0'),
-        currentEmployerName: loan.borrower.current_employer_name || '',
-        timeWithEmployment: loan.borrower.time_with_employment || '',
-        reference1Name: loan.borrower.reference1_name || '',
-        reference1Phone: loan.borrower.reference1_phone || '',
-        reference1Email: loan.borrower.reference1_email || '',
-        reference2Name: loan.borrower.reference2_name || '',
-        reference2Phone: loan.borrower.reference2_phone || '',
-        reference2Email: loan.borrower.reference2_email || '',
-        reference3Name: loan.borrower.reference3_name || '',
-        reference3Phone: loan.borrower.reference3_phone || '',
-        reference3Email: loan.borrower.reference3_email || ''
-      }
+        currentEmployerName: loan.borrower.current_employer_name,
+        timeWithEmployment: loan.borrower.time_with_employment,
+        reference1Name: loan.borrower.reference1_name,
+        reference1Phone: loan.borrower.reference1_phone,
+        reference1Email: loan.borrower.reference1_email,
+        reference2Name: loan.borrower.reference2_name,
+        reference2Phone: loan.borrower.reference2_phone,
+        reference2Email: loan.borrower.reference2_email,
+        reference3Name: loan.borrower.reference3_name,
+        reference3Phone: loan.borrower.reference3_phone,
+        reference3Email: loan.borrower.reference3_email,
+        organizationId: loan.borrower.organization_id
+      },
+      organization: loan.organization ? {
+        id: loan.organization.id,
+        name: loan.organization.name,
+        email: loan.organization.email,
+        phone: loan.organization.phone,
+        address: loan.organization.address,
+        city: loan.organization.city,
+        state: loan.organization.state,
+        zipCode: loan.organization.zip_code
+      } : null,
+      paymentSchedules: (loan.payment_schedules || []).map((ps: Record<string, unknown>) => ({
+        id: ps.id as string,
+        paymentNumber: ps.payment_number as number,
+        dueDate: ps.due_date as string,
+        principalAmount: parseFloat(ps.principal_amount as string),
+        interestAmount: parseFloat(ps.interest_amount as string),
+        totalAmount: parseFloat(ps.total_amount as string),
+        remainingBalance: parseFloat(ps.remaining_balance as string)
+      }))
     };
 
     console.log('📋 Loan data prepared for DocuSign:', {
@@ -89,9 +112,9 @@ export async function POST(request: NextRequest) {
     const borrowerLanguage: Language = (loan.borrower.preferred_language as Language) || 'en';
     console.log('🌍 Using language for document:', borrowerLanguage);
 
-    // Create DocuSign envelope with language preference
+    // Create DocuSign envelope using template-based approach
     const { envelopesApi, accountId } = await createEnvelopesApi();
-    const envelopeDefinition = createLoanAgreementEnvelopeInline(loanData, borrowerLanguage);
+    const envelopeDefinition = await createTemplateBasedEnvelope(loanData);
 
     console.log('📤 Sending envelope to DocuSign...');
     

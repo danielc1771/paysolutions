@@ -1,6 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 
+/**
+ * Determine loan status based on three-stage signing progress
+ */
+function determineLoanStatusFromSigners(signers: Array<Record<string, unknown>>): string {
+  const ipaySignerEmail = 'jhoamadrian@gmail.com';
+  
+  // Find signers by routing order and status
+  const ipayAdmin = signers.find(s => s.email === ipaySignerEmail);
+  const orgOwner = signers.find(s => s.routingOrder === '2');
+  const borrower = signers.find(s => s.routingOrder === '3');
+
+  // Check completion status in signing order
+  const ipayCompleted = ipayAdmin?.status === 'completed';
+  const orgCompleted = orgOwner?.status === 'completed';
+  const borrowerCompleted = borrower?.status === 'completed';
+
+  console.log('📊 Three-stage signing status:', {
+    ipayCompleted,
+    orgCompleted,
+    borrowerCompleted,
+    signers: signers.map(s => ({ email: s.email, status: s.status, routingOrder: s.routingOrder }))
+  });
+
+  if (borrowerCompleted && orgCompleted && ipayCompleted) {
+    return 'fully_signed';
+  } else if (orgCompleted && ipayCompleted) {
+    return 'dealer_approved';
+  } else if (ipayCompleted) {
+    return 'ipay_approved';
+  } else {
+    return 'application_completed'; // Initial state
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const contentType = request.headers.get('content-type') || '';
@@ -165,25 +199,42 @@ export async function POST(request: NextRequest) {
       currentDocuSignStatus: loan.docusign_status 
     });
 
-    // Determine new loan status based on DocuSign status
+    // Determine new loan status based on three-stage signing flow
     let newLoanStatus = loan.status;
     let docusignStatus: string | undefined;
     
-    // Only process status updates if we have a status
-    if (status) {
+    // Handle three-stage signing flow logic
+    if (eventType === 'recipient-completed' && webhookData.data) {
+      // Check individual signer completion for intermediate statuses
+      const data = webhookData.data as Record<string, unknown>;
+      if (data.envelopeSummary && typeof data.envelopeSummary === 'object') {
+        const envelopeSummary = data.envelopeSummary as Record<string, unknown>;
+        if (envelopeSummary.recipients && typeof envelopeSummary.recipients === 'object') {
+          const recipients = envelopeSummary.recipients as Record<string, unknown>;
+          if (recipients.signers && Array.isArray(recipients.signers)) {
+            newLoanStatus = determineLoanStatusFromSigners(recipients.signers);
+            docusignStatus = 'sent'; // Still in progress
+            console.log(`✅ Individual signer completed - updating loan status to: ${newLoanStatus}`);
+          }
+        }
+      }
+    }
+    
+    // Only process other status updates if we have a status
+    else if (status) {
       docusignStatus = status.toLowerCase();
 
       switch (docusignStatus) {
         case 'completed':
         case 'signed':
-          newLoanStatus = 'signed'; // Document is signed, ready for funding
-          docusignStatus = 'signed'; // Normalize to 'signed' for our UI
-          console.log('✅ Document completed/signed - updating loan status to signed');
+          newLoanStatus = 'fully_signed'; // All signers completed
+          docusignStatus = 'completed';
+          console.log('✅ All signers completed - updating loan status to fully_signed');
           break;
         case 'declined':
         case 'voided':
-          newLoanStatus = 'review'; // Back to review if declined/voided
-          console.log('⚠️ Document declined/voided - updating loan status to review');
+          newLoanStatus = 'application_completed'; // Reset to initial state
+          console.log('⚠️ Document declined/voided - resetting loan status');
           break;
         case 'sent':
         case 'delivered':
