@@ -60,7 +60,8 @@ export default function LoanDetail({ params }: LoanDetailProps) {
   const fetchLoanData = async () => {
     try {
       const { id } = await params;
-      const response = await fetch(`/api/loans/${id}`);
+      // Add cache busting to ensure fresh data
+      const response = await fetch(`/api/loans/${id}?t=${Date.now()}`);
       const result = await response.json();
 
       if (response.ok) {
@@ -320,6 +321,16 @@ export default function LoanDetail({ params }: LoanDetailProps) {
                 </p>
               </div>
               <div className="flex items-center space-x-4">
+                {/* Debug info - remove after fixing */}
+                <div className="text-xs text-gray-500 mb-2">
+                  Debug: Status=&quot;{loan.status}&quot; | EnvelopeId={loan.docusign_envelope_id ? 'exists' : 'none'}
+                  <button 
+                    onClick={fetchLoanData}
+                    className="ml-2 text-blue-600 underline"
+                  >
+                    Refresh
+                  </button>
+                </div>
                 <div className="flex space-x-4">
                   {!loan.docusign_envelope_id ? (
                     <button 

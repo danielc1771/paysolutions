@@ -327,6 +327,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ loa
       if (docusignUpdateError) {
         console.error('❌ Error updating loan with DocuSign data:', docusignUpdateError);
         // Don't fail the request since envelope was created successfully
+      } else {
+        console.log('✅ Loan status updated to "new" with envelope ID:', result.envelopeId);
       }
 
       return NextResponse.json({

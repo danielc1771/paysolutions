@@ -239,7 +239,8 @@ export async function POST(request: NextRequest) {
         case 'sent':
         case 'delivered':
           // Document sent/delivered, no loan status change needed
-          console.log('📤 Document sent/delivered - no loan status change');
+          // Keep the current loan status (don't override if it's 'new' for iPay admin signing)
+          console.log('📤 Document sent/delivered - keeping current loan status:', loan.status);
           break;
         default:
           console.log('ℹ️ Unknown DocuSign status:', docusignStatus);
