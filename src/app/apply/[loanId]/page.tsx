@@ -1918,7 +1918,7 @@ function ConsentStep({ formData, setFormData, handleNext, handlePrev, selectedLa
                   type="radio"
                   name="communicationPreferences"
                   value="email"
-                  checked={formData.communicationPreferences === 'email'}
+                  checked={formData.communicationPreferences === '1'}
                   onChange={(e) => setFormData({...formData, communicationPreferences: e.target.value})}
                   className="w-4 h-4 text-purple-600 border-gray-300 focus:ring-purple-500"
                 />

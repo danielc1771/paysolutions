@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { RoleRedirect } from '@/components/auth/RoleRedirect';
 import CustomSelect from '@/components/CustomSelect';
 import { LoanListItem } from '@/types/loan';
+import { Plus, Search, FileText, Calendar, Car, Eye, Trash2, CheckCircle, DollarSign, PenTool, Check } from 'lucide-react';
 
 export default function UserLoans() {
   const [loans, setLoans] = useState<LoanListItem[]>([]);
@@ -16,6 +17,7 @@ export default function UserLoans() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [signingLoans, setSigningLoans] = useState<Set<string>>(new Set());
   const [deleteConfirm, setDeleteConfirm] = useState<{
     isOpen: boolean;
     loanId: string;
@@ -97,8 +99,10 @@ export default function UserLoans() {
       case 'new': return 'bg-blue-100 text-blue-800';
       case 'application_sent': return 'bg-yellow-100 text-yellow-800';
       case 'application_completed': return 'bg-orange-100 text-orange-800';
+      case 'ipay_approved': return 'bg-purple-100 text-purple-800';
+      case 'dealer_approved': return 'bg-indigo-100 text-indigo-800';
+      case 'fully_signed': return 'bg-emerald-100 text-emerald-800';
       case 'review': return 'bg-orange-100 text-orange-800';
-      case 'signed': return 'bg-emerald-100 text-emerald-800';
       case 'funded': return 'bg-green-100 text-green-800';
       case 'active': return 'bg-green-100 text-green-800';
       case 'closed': return 'bg-gray-100 text-gray-800';
@@ -119,8 +123,10 @@ export default function UserLoans() {
       case 'new': return 'New';
       case 'application_sent': return 'Application Sent';
       case 'application_completed': return 'Application Completed';
+      case 'ipay_approved': return 'iPay Approved';
+      case 'dealer_approved': return 'Dealer Approved';
+      case 'fully_signed': return 'Fully Signed';
       case 'review': return 'Under Review';
-      case 'signed': return 'Signed - Ready for Funding';
       case 'funded': return 'Funded';
       case 'active': return 'Active';
       case 'closed': return 'Closed';
@@ -135,9 +141,10 @@ export default function UserLoans() {
     if (filterStatus === 'all') {
       matchesStatus = true;
     } else if (filterStatus === 'action_required') {
-      // Action required: application completed or signed ready for funding
+      // Action required: application completed, needs organization signing, or fully signed ready for funding
       matchesStatus = loan.status === 'application_completed' || 
-                     (loan.docusign_status === 'signed' && loan.status !== 'funded');
+                     loan.status === 'ipay_approved' ||
+                     loan.status === 'fully_signed';
     } else {
       matchesStatus = loan.status === filterStatus;
     }
@@ -222,14 +229,58 @@ export default function UserLoans() {
     setDeleteConfirm({ isOpen: false, loanId: '', loanNumber: '', borrowerName: '' });
   };
 
+  const handleSignDocuSign = async (loanId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    setSigningLoans(prev => new Set(prev).add(loanId));
+    
+    try {
+      console.log('🔗 Getting DocuSign signing URL for organization owner...');
+      
+      const response = await fetch('/api/docusign/signing-url', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          loanId,
+          signerType: 'organization'
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (data.success && data.signingUrl) {
+        console.log('✅ Got signing URL, redirecting...');
+        // Redirect to DocuSign for signing
+        window.location.href = data.signingUrl;
+      } else {
+        console.error('❌ Failed to get signing URL:', data.error);
+        alert('Failed to get DocuSign signing URL: ' + (data.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Error getting DocuSign signing URL:', error);
+      alert('Failed to get DocuSign signing URL');
+    } finally {
+      setSigningLoans(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(loanId);
+        return newSet;
+      });
+    }
+  };
+
   const statusOptions = [
     { value: 'all', label: 'All Loans' },
     { value: 'action_required', label: '🚨 Action Required' },
     { value: 'new', label: 'New' },
     { value: 'application_sent', label: 'Application Sent' },
     { value: 'application_completed', label: 'Application Completed' },
+    { value: 'ipay_approved', label: 'iPay Approved' },
+    { value: 'dealer_approved', label: 'Dealer Approved' },
+    { value: 'fully_signed', label: 'Fully Signed' },
     { value: 'review', label: 'Under Review' },
-    { value: 'signed', label: 'Signed' },
     { value: 'funded', label: 'Funded' },
     { value: 'active', label: 'Active' },
     { value: 'closed', label: 'Closed' },
@@ -253,9 +304,7 @@ export default function UserLoans() {
                   href="/dashboard/loans/create"
                   className="bg-gradient-to-r from-green-500 to-teal-500 text-white px-8 py-4 rounded-2xl font-bold hover:from-green-600 hover:to-teal-600 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center space-x-2"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
+                  <Plus className="w-5 h-5" />
                   <span>Create New Loan</span>
                 </Link>
               </div>
@@ -273,9 +322,7 @@ export default function UserLoans() {
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
                       className="w-full pl-10 pr-4 py-3 rounded-2xl border-0 bg-white/60 backdrop-blur-sm shadow-sm focus:ring-2 focus:ring-green-500 focus:outline-none text-sm text-gray-900 placeholder-gray-500"
                     />
-                    <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
+                    <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
                   </div>
                 </div>
                 <div className="w-full sm:w-64">
@@ -339,9 +386,7 @@ export default function UserLoans() {
               ) : filteredLoans.length === 0 ? (
                 <div className="p-12 text-center">
                   <div className="w-20 h-20 bg-gradient-to-br from-green-100 to-teal-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <svg className="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
+                    <FileText className="w-10 h-10 text-green-500" />
                   </div>
                   <h3 className="text-xl font-bold text-gray-900 mb-3">
                     {searchTerm || filterStatus !== 'all' ? 'No loans match your criteria' : 'No loans yet'}
@@ -357,9 +402,7 @@ export default function UserLoans() {
                       href="/dashboard/loans/create"
                       className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-2xl font-bold hover:from-green-600 hover:to-teal-600 transition-all duration-300 shadow-lg hover:shadow-xl space-x-2"
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                      </svg>
+                      <Plus className="w-5 h-5" />
                       <span>Create Your First Loan</span>
                     </Link>
                   )}
@@ -368,7 +411,10 @@ export default function UserLoans() {
                 <div className="p-6">
                   <div className="space-y-4">
                     {filteredLoans.map((loan) => {
-                      const needsAction = loan.docusign_status === 'signed' && loan.status !== 'funded';
+                      const needsAction = loan.status === 'application_completed' || 
+                                        loan.status === 'ipay_approved' || 
+                                        loan.status === 'fully_signed';
+                      const needsOrgSigning = loan.status === 'ipay_approved';
                       
                       return (
                         <Link
@@ -408,22 +454,16 @@ export default function UserLoans() {
                                 </div>
                                 <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
                                   <span className="flex items-center">
-                                    <svg className="w-4 h-4 mr-1 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                    </svg>
+                                    <FileText className="w-4 h-4 mr-1 text-green-500" />
                                     {loan.loan_number}
                                   </span>
                                   <span className="flex items-center">
-                                    <svg className="w-4 h-4 mr-1 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                    </svg>
+                                    <Calendar className="w-4 h-4 mr-1 text-purple-500" />
                                     {formatDate(loan.created_at)}
                                   </span>
                                   {loan.vehicle_make && (
                                     <span className="flex items-center">
-                                      <svg className="w-4 h-4 mr-1 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                                      </svg>
+                                      <Car className="w-4 h-4 mr-1 text-gray-500" />
                                       {loan.vehicle_year} {loan.vehicle_make} {loan.vehicle_model}
                                     </span>
                                   )}
@@ -452,10 +492,42 @@ export default function UserLoans() {
                                         }}
                                         title="Review Application"
                                       >
-                                        <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
+                                        <CheckCircle className="w-4 h-4 inline mr-1" />
                                         Review
+                                      </button>
+                                    )}
+                                    {needsOrgSigning && (
+                                      <button 
+                                        className="px-4 py-2 bg-purple-100 text-purple-700 rounded-xl text-sm font-medium transition-all duration-300 hover:bg-purple-200 hover:scale-105"
+                                        onClick={(e) => handleSignDocuSign(loan.id, e)}
+                                        disabled={signingLoans.has(loan.id)}
+                                        title="Sign DocuSign Agreement"
+                                      >
+                                        {signingLoans.has(loan.id) ? (
+                                          <div className="flex items-center">
+                                            <div className="animate-spin rounded-full h-3 w-3 border border-purple-700 border-t-transparent mr-1"></div>
+                                            Signing...
+                                          </div>
+                                        ) : (
+                                          <>
+                                            <PenTool className="w-4 h-4 inline mr-1" />
+                                            Sign DocuSign
+                                          </>
+                                        )}
+                                      </button>
+                                    )}
+                                    {loan.status === 'fully_signed' && (
+                                      <button 
+                                        className="px-4 py-2 bg-green-100 text-green-700 rounded-xl text-sm font-medium transition-all duration-300 hover:bg-green-200 hover:scale-105"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          window.location.href = `/dashboard/loans/${loan.id}?action=funding`;
+                                        }}
+                                        title="Ready for Funding"
+                                      >
+                                        <DollarSign className="w-4 h-4 inline mr-1" />
+                                        Ready for Funding
                                       </button>
                                     )}
                                   </>
@@ -470,10 +542,7 @@ export default function UserLoans() {
                                   }}
                                   title="View Details"
                                 >
-                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                  </svg>
+                                  <Eye className="w-5 h-5" />
                                 </button>
                                 
                                 <button 
@@ -485,9 +554,7 @@ export default function UserLoans() {
                                   }}
                                   title="Delete Loan"
                                 >
-                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                  </svg>
+                                  <Trash2 className="w-5 h-5" />
                                 </button>
                               </div>
                             </div>
@@ -508,9 +575,7 @@ export default function UserLoans() {
             <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-8 w-96 border border-white/20">
               <div className="text-center">
                 <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
+                  <Check className="w-8 h-8 text-green-500" />
                 </div>
                 <h2 className="text-xl font-bold text-gray-900 mb-2">Success!</h2>
                 <p className="text-gray-600 mb-6">{successMessage}</p>
@@ -532,9 +597,7 @@ export default function UserLoans() {
           <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-8 w-96 border border-white/20">
             <div className="text-center mb-6">
               <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
+                <Trash2 className="w-8 h-8 text-red-500" />
               </div>
               <h2 className="text-xl font-bold text-gray-900 mb-2">Delete Loan Confirmation</h2>
               <p className="text-gray-600">

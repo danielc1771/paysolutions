@@ -313,13 +313,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ loa
 
       console.log('✅ DocuSign envelope created:', result.envelopeId);
 
-      // Update loan with DocuSign envelope ID and status
+      // Update loan with DocuSign envelope ID and status - set status to 'new' for iPay admin signing
       const { error: docusignUpdateError } = await supabase
         .from('loans')
         .update({
           docusign_envelope_id: result.envelopeId,
           docusign_status: 'sent',
-          docusign_status_updated: new Date().toISOString()
+          docusign_status_updated: new Date().toISOString(),
+          status: 'new'  // Set to 'new' so iPay admin can see the Sign DocuSign button
         })
         .eq('id', loanId);
 

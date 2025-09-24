@@ -161,6 +161,11 @@ export const loans = pgTable("loans", { // Added vehicle fields
 	docusignStatus: varchar("docusign_status", { length: 50 }).default('not_sent'),
 	docusignStatusUpdated: timestamp("docusign_status_updated", { withTimezone: true, mode: 'string' }),
 	docusignCompletedAt: timestamp("docusign_completed_at", { withTimezone: true, mode: 'string' }),
+	// Signing URL cache for three-stage signing flow
+	ipaySigningUrl: text("ipay_signing_url"),
+	organizationSigningUrl: text("organization_signing_url"),
+	borrowerSigningUrl: text("borrower_signing_url"),
+	signingUrlsGeneratedAt: timestamp("signing_urls_generated_at", { withTimezone: true, mode: 'string' }),
 	vehicleYear: varchar("vehicle_year", { length: 4 }).notNull(),
 	vehicleMake: varchar("vehicle_make", { length: 255 }).notNull(),
 	vehicleModel: varchar("vehicle_model", { length: 255 }).notNull(),

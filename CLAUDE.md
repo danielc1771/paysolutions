@@ -57,10 +57,15 @@ The application uses a multi-tenant architecture with the following key entities
 - **organizations** - Financial institutions/dealerships with subscription management
 - **profiles** - User accounts linked to auth.users, with role-based access
 - **borrowers** - Loan applicants with KYC information and references
-- **loans** - Loan applications with vehicle details and DocuSign integration
+- **loans** - Loan applications with vehicle details and three-stage DocuSign signing status
 - **payment_schedules** - Generated weekly payment schedules
 - **payments** - Payment records with Stripe integration
 - **organization_settings** - Configurable organization-specific settings
+
+#### Loan Status Progression (Three-Stage Signing)
+- `new` → `application_sent` → `application_in_progress` → `application_completed`
+- `application_completed` → `ipay_approved` → `dealer_approved` → `fully_signed`
+- `review` → `approved` → `funded` → `closed` → `defaulted`
 
 ### Role-Based Access Control
 Five roles defined in `src/lib/auth/roles.ts`:
@@ -80,10 +85,12 @@ Five roles defined in `src/lib/auth/roles.ts`:
 ### Key Integration Points
 
 #### DocuSign Integration
+- **Three-stage signing workflow**: iPay Admin → Organization Owner → Borrower
 - JWT authentication with RSA key pairs in `src/utils/docusign/`
-- Template-based document generation and envelope management
-- Webhook handling at `/api/docusign/webhook` for status updates
-- Status tracking and audit trails in loans table
+- Template-based document generation using DocuSign template ID: `8b9711f2-c304-4467-aa5c-27ebca4b4cc4`
+- Organization owner lookup via `src/utils/organization/owner-lookup.ts`
+- Webhook handling at `/api/docusign/webhook` for multi-stage status tracking
+- Status progression: `application_completed` → `ipay_approved` → `dealer_approved` → `fully_signed`
 
 #### Stripe Integration
 - Payment method setup and recurring subscription management
@@ -103,11 +110,13 @@ Five roles defined in `src/lib/auth/roles.ts`:
 
 ### Application Flow
 1. **Loan Origination**: Public application via `/apply/[loanId]` with borrower KYC
-2. **Staff Review**: Multi-role dashboard access for loan processing
+2. **Three-Stage Document Signing**:
+   - **Stage 1**: iPay Admin (`jhoamadrian@gmail.com`) approves loan → `ipay_approved`
+   - **Stage 2**: Organization Owner signs agreement → `dealer_approved`
+   - **Stage 3**: Borrower completes final signature → `fully_signed`
 3. **Identity Verification**: Stripe identity + Twilio phone verification
-4. **Document Signing**: DocuSign template-based loan agreements
-5. **Payment Collection**: Automated Stripe recurring payments with schedules
-6. **Multi-Tenant Management**: Organization isolation and team collaboration
+4. **Payment Collection**: Automated Stripe recurring payments with schedules
+5. **Multi-Tenant Management**: Organization isolation and team collaboration
 
 ### File Structure Conventions
 - **API Routes**: `/src/app/api/` - Server-side endpoints with role-based auth
@@ -115,6 +124,7 @@ Five roles defined in `src/lib/auth/roles.ts`:
 - **Database**: `/src/drizzle/` - Schema, migrations, and type-safe queries
 - **Utils**: `/src/utils/` - Third-party integrations (DocuSign, Stripe, Twilio)
 - **Auth**: `/src/lib/auth/` - Role-based access control and middleware
+- **Organization**: `/src/utils/organization/` - Organization owner lookup for DocuSign signing
 - **Server-only**: Server-only modules for secure integrations
 
 ### Environment Variables Required
@@ -161,6 +171,8 @@ NEXTAUTH_URL=
 - Server-only modules must use `'server-only'` imports for DocuSign SDK and sensitive integrations
 - Use Supabase admin client (`src/utils/supabase/admin.ts`) for service role operations
 - Follow resource-based API structure: `/api/[resource]/[id]/[action]` with role-based auth
+- **DocuSign Integration**: Use template-based envelopes only (no HTML inline generation)
+- **Organization Owner Lookup**: Use `getOrganizationOwner()` from `src/utils/organization/owner-lookup.ts`
 - Test with predefined role accounts for comprehensive coverage (see setup guides)
 
 ### Key Architectural Patterns
@@ -170,6 +182,7 @@ NEXTAUTH_URL=
 - **Modular auth protection**: Middleware + client-side + server-side role checks
 - **Resource-based API structure**: `/api/[resource]/[id]/[action]` pattern with role-based auth
 - **Template-based integrations**: DocuSign templates and email templates for consistent workflows
+- **Three-stage DocuSign signing**: iPay Admin → Organization Owner → Borrower workflow with status tracking
 
 ### Testing Setup
 Reference the setup guides for comprehensive testing:
@@ -209,10 +222,29 @@ import { createClient } from '@/utils/supabase/server';
 - **Supabase image optimization**: Configured for Supabase storage bucket image serving
 - **Server-only modules**: Use `'server-only'` imports for DocuSign and sensitive operations
 
+#### DocuSign Three-Stage Signing Workflow
+**Implementation Details:**
+- **Template ID**: `8b9711f2-c304-4467-aa5c-27ebca4b4cc4` (iPay - Acuerdo de Financiamento Personal)
+- **Signing Order**: Sequential routing with automatic progression
+- **Status Tracking**: Real-time webhook updates via `/api/docusign/webhook`
+- **Organization Owner Discovery**: Automatic lookup of organization's `organization_owner` role user
+
+**Signing Flow:**
+| Stage | Signer | Email | Role | Status After Signing |
+|-------|--------|--------|------|---------------------|
+| 1 | iPay Admin | `jhoamadrian@gmail.com` | iPay Representative | `ipay_approved` |
+| 2 | Organization Owner | Dynamic lookup | Organization Representative | `dealer_approved` |
+| 3 | Borrower | From application | Loan Applicant | `fully_signed` |
+
+**Dashboard Views:**
+- **iPay Dashboard**: Shows "Pending Review" → "Approved - Sent to Dealer" → "Dealer Approved" → "Fully Executed"
+- **Organization Dashboard**: Shows "Waiting on Approval" → "Ready to Sign" → "Sent to Borrower" → "Fully Executed"
+- **Borrower View**: Shows "Processing..." → "Processing..." → "Ready to Sign" → "Completed"
+
 #### Database Schema Details
 Key database relationships and constraints:
 - **Multi-tenant isolation**: All tables include `organization_id` foreign keys with RLS policies
-- **Loan lifecycle tracking**: Status progression from `new` → `funding_in_progress` → `funded` → `closed`
+- **Loan lifecycle tracking**: Three-stage signing status progression with enum-based type safety
 - **Payment scheduling**: Weekly payment schedules generated with precise decimal handling (`numeric` columns)
 - **Verification workflows**: Separate Stripe identity and Twilio phone verification tracking
 - **DocuSign integration**: Envelope ID and status tracking with timestamp audit trails

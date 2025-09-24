@@ -49,6 +49,7 @@ export default function LoanDetail({ params }: LoanDetailProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [docusignLoading, setDocusignLoading] = useState(false);
+  const [signingDocusign, setSigningDocusign] = useState(false);
   const [approvingLoan, setApprovingLoan] = useState(false);
   const [settingUpPayments, setSettingUpPayments] = useState(false);
   const [viewingDocuSign, setViewingDocuSign] = useState(false);
@@ -108,6 +109,42 @@ export default function LoanDetail({ params }: LoanDetailProps) {
       alert('Failed to send DocuSign agreement');
     } finally {
       setDocusignLoading(false);
+    }
+  };
+
+  const handleSignDocuSign = async () => {
+    if (!loan) return;
+
+    setSigningDocusign(true);
+    try {
+      console.log('🔗 Getting DocuSign signing URL for iPay admin...');
+      
+      const response = await fetch('/api/docusign/signing-url', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          loanId: loan.id,
+          signerType: 'ipay'
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (data.success && data.signingUrl) {
+        console.log('✅ Got signing URL, redirecting...');
+        // Redirect to DocuSign for signing
+        window.location.href = data.signingUrl;
+      } else {
+        console.error('❌ Failed to get signing URL:', data.error);
+        alert('Failed to get DocuSign signing URL: ' + (data.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Error getting DocuSign signing URL:', error);
+      alert('Failed to get DocuSign signing URL');
+    } finally {
+      setSigningDocusign(false);
     }
   };
 
@@ -219,9 +256,6 @@ export default function LoanDetail({ params }: LoanDetailProps) {
   };
 
 
-  const isDocuSignCompleted = (status: string) => {
-    return status?.toLowerCase() === 'completed' || status?.toLowerCase() === 'signed';
-  };
 
   if (loading) {
     return (
@@ -287,30 +321,49 @@ export default function LoanDetail({ params }: LoanDetailProps) {
               </div>
               <div className="flex items-center space-x-4">
                 <div className="flex space-x-4">
-                  <button 
-                    onClick={handleSendDocuSign}
-                    disabled={docusignLoading || isDocuSignCompleted(loan.docusign_status)}
-                    className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
-                      isDocuSignCompleted(loan.docusign_status) 
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : loan.docusign_status === 'sent'
-                        ? 'bg-blue-100 text-blue-800 cursor-not-allowed'
-                        : 'bg-blue-600 text-white hover:bg-blue-700'
-                    }`}
-                  >
-                    {docusignLoading ? (
-                      <div className="flex items-center">
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                        Sending...
-                      </div>
-                    ) : isDocuSignCompleted(loan.docusign_status) ? (
-                      '✅ Agreement Signed'
-                    ) : loan.docusign_status === 'sent' ? (
-                      '📄 Awaiting Signature'
-                    ) : (
-                      'Send DocuSign Agreement'
-                    )}
-                  </button>
+                  {!loan.docusign_envelope_id ? (
+                    <button 
+                      onClick={handleSendDocuSign}
+                      disabled={docusignLoading}
+                      className="bg-blue-600 text-white hover:bg-blue-700 px-6 py-3 rounded-lg font-semibold transition-colors"
+                    >
+                      {docusignLoading ? (
+                        <div className="flex items-center">
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                          Sending...
+                        </div>
+                      ) : (
+                        'Send DocuSign Agreement'
+                      )}
+                    </button>
+                  ) : loan.status === 'new' ? (
+                    <button 
+                      onClick={handleSignDocuSign}
+                      disabled={signingDocusign}
+                      className="bg-green-600 text-white hover:bg-green-700 px-6 py-3 rounded-lg font-semibold transition-colors"
+                    >
+                      {signingDocusign ? (
+                        <div className="flex items-center">
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                          Opening DocuSign...
+                        </div>
+                      ) : (
+                        '✍️ Sign DocuSign (iPay Admin)'
+                      )}
+                    </button>
+                  ) : loan.status === 'ipay_approved' ? (
+                    <div className="px-6 py-3 bg-yellow-100 text-yellow-800 rounded-lg font-semibold">
+                      📄 Awaiting Organization Owner Signature
+                    </div>
+                  ) : loan.status === 'dealer_approved' ? (
+                    <div className="px-6 py-3 bg-orange-100 text-orange-800 rounded-lg font-semibold">
+                      📄 Awaiting Borrower Signature
+                    </div>
+                  ) : (
+                    <div className="px-6 py-3 bg-green-100 text-green-800 rounded-lg font-semibold">
+                      ✅ Fully Signed
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -391,7 +444,7 @@ export default function LoanDetail({ params }: LoanDetailProps) {
           )}
 
           {/* Admin Approval Section - Moved to top for high visibility */}
-          {isDocuSignCompleted(loan.docusign_status) && loan.status !== 'funded' && (
+          {loan.status === 'fully_signed' && (
             <div className="bg-gradient-to-r from-orange-50 to-red-50 border-l-4 border-orange-400 rounded-xl shadow-lg p-6">
               <div className="flex items-start">
                 <div className="flex-shrink-0">
