@@ -48,7 +48,6 @@ export default function LoanDetail({ params }: LoanDetailProps) {
   const [loan, setLoan] = useState<LoanWithBorrower | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [docusignLoading, setDocusignLoading] = useState(false);
   const [signingDocusign, setSigningDocusign] = useState(false);
   const [approvingLoan, setApprovingLoan] = useState(false);
   const [settingUpPayments, setSettingUpPayments] = useState(false);
@@ -57,8 +56,9 @@ export default function LoanDetail({ params }: LoanDetailProps) {
   const [sendingEmail, setSendingEmail] = useState(false);
 
   // Function to fetch/refetch loan data
-  const fetchLoanData = async () => {
+  const fetchLoanData = async (showLoading = false) => {
     try {
+      if (showLoading) setLoading(true);
       const { id } = await params;
       // Add cache busting to ensure fresh data
       const response = await fetch(`/api/loans/${id}?t=${Date.now()}`);
@@ -84,40 +84,40 @@ export default function LoanDetail({ params }: LoanDetailProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Remove fetchLoanData dependency to prevent infinite loop
 
-  const handleSendDocuSign = async () => {
-    if (!loan) return;
-
-    setDocusignLoading(true);
-    try {
-      const response = await fetch('/api/docusign/envelope', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ loanId: loan.id }),
-      });
-
-      const data = await response.json();
-      
-      if (data.success) {
-        // Refresh the page to show updated status
-        window.location.reload();
-      } else {
-        alert('Failed to send DocuSign agreement: ' + (data.error || 'Unknown error'));
-      }
-    } catch (error) {
-      console.error('Error sending DocuSign:', error);
-      alert('Failed to send DocuSign agreement');
-    } finally {
-      setDocusignLoading(false);
-    }
-  };
 
   const handleSignDocuSign = async () => {
     if (!loan) return;
 
     setSigningDocusign(true);
     try {
+      // First, ensure DocuSign envelope exists
+      if (!loan.docusign_envelope_id) {
+        console.log('📄 No envelope found, creating DocuSign envelope first...');
+        
+        const createResponse = await fetch('/api/docusign/envelope', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ loanId: loan.id }),
+        });
+
+        const createData = await createResponse.json();
+        
+        if (!createData.success) {
+          console.error('❌ Failed to create envelope:', createData.error);
+          alert('Failed to create DocuSign envelope: ' + (createData.error || 'Unknown error'));
+          return;
+        }
+
+        console.log('✅ Envelope created, refreshing loan data...');
+        // Refresh loan data to get the new envelope ID
+        await fetchLoanData();
+        
+        // Small delay to ensure database is updated
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
       console.log('🔗 Getting DocuSign signing URL for iPay admin...');
       
       const response = await fetch('/api/docusign/signing-url', {
@@ -325,29 +325,14 @@ export default function LoanDetail({ params }: LoanDetailProps) {
                 <div className="text-xs text-gray-500 mb-2">
                   Debug: Status=&quot;{loan.status}&quot; | EnvelopeId={loan.docusign_envelope_id ? 'exists' : 'none'}
                   <button 
-                    onClick={fetchLoanData}
-                    className="ml-2 text-blue-600 underline"
+                    onClick={() => fetchLoanData(true)}
+                    className="ml-2 text-blue-600 underline hover:text-blue-800"
                   >
-                    Refresh
+                    🔄 Refresh
                   </button>
                 </div>
                 <div className="flex space-x-4">
-                  {!loan.docusign_envelope_id ? (
-                    <button 
-                      onClick={handleSendDocuSign}
-                      disabled={docusignLoading}
-                      className="bg-blue-600 text-white hover:bg-blue-700 px-6 py-3 rounded-lg font-semibold transition-colors"
-                    >
-                      {docusignLoading ? (
-                        <div className="flex items-center">
-                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                          Sending...
-                        </div>
-                      ) : (
-                        'Send DocuSign Agreement'
-                      )}
-                    </button>
-                  ) : loan.status === 'new' ? (
+                  {(loan.status === 'application_completed' || loan.status === 'new') ? (
                     <button 
                       onClick={handleSignDocuSign}
                       disabled={signingDocusign}
