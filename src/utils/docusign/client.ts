@@ -386,7 +386,72 @@ const TAB_MAPPING: Record<string, string> = {
   'reference3_email': 'reference3Email'
 };
 
-// Map loan data to template tabs
+// Create tabs object with values for template roles (following DocuSign documentation)
+export const createTabsWithValues = (loanData: LoanApplicationData, availableTabLabels: string[]) => {
+  const textTabs: any[] = [];
+  const numberTabs: any[] = [];
+  const dateTabs: any[] = [];
+  const checkboxTabs: any[] = [];
+  
+  console.log('🗺️ Creating tabs with values for template...');
+  console.log('Available tab labels:', availableTabLabels);
+  console.log('Available loan data fields:', Object.keys(loanData));
+  
+  // Iterate through available tab labels and create tab objects with values
+  availableTabLabels.forEach(tabLabel => {
+    const dataField = TAB_MAPPING[tabLabel];
+    
+    console.log(`🔍 Processing tab: "${tabLabel}" -> mapping: "${dataField}"`);
+    
+    if (dataField && loanData[dataField] !== undefined && loanData[dataField] !== null) {
+      const value = loanData[dataField];
+      
+      console.log(`📝 Creating tab ${tabLabel} -> ${dataField}: ${value}`);
+      
+      // Determine tab type based on data type and field name
+      if (typeof value === 'number' || dataField.includes('income') || dataField.includes('amount') || dataField.includes('payment') || dataField.includes('price')) {
+        numberTabs.push((docusign as any).Number.constructFromObject({
+          tabLabel: tabLabel,
+          value: value.toString()
+        }));
+      } else if (dataField.includes('date') || dataField === 'dateOfBirth') {
+        dateTabs.push((docusign as any).Date.constructFromObject({
+          tabLabel: tabLabel,
+          value: value.toString()
+        }));
+      } else if (typeof value === 'boolean') {
+        checkboxTabs.push((docusign as any).Checkbox.constructFromObject({
+          tabLabel: tabLabel,
+          selected: value ? 'true' : 'false'
+        }));
+      } else {
+        textTabs.push((docusign as any).Text.constructFromObject({
+          tabLabel: tabLabel,
+          value: value.toString()
+        }));
+      }
+    } else if (dataField) {
+      console.log(`⚠️ No data found for tab: ${tabLabel} (field: ${dataField}) - data value: ${loanData[dataField]}`);
+    } else {
+      console.log(`⚠️ No mapping found for tab: ${tabLabel}`);
+    }
+  });
+  
+  console.log(`✅ Created ${textTabs.length} text tabs, ${numberTabs.length} number tabs, ${dateTabs.length} date tabs, ${checkboxTabs.length} checkbox tabs`);
+  
+  // Create the tabs object following DocuSign documentation format
+  const tabsData: any = {};
+  if (textTabs.length > 0) tabsData.textTabs = textTabs;
+  if (numberTabs.length > 0) tabsData.numberTabs = numberTabs;
+  if (dateTabs.length > 0) tabsData.dateTabs = dateTabs;
+  if (checkboxTabs.length > 0) tabsData.checkboxTabs = checkboxTabs;
+  
+  console.log('📋 Final tabs object:', JSON.stringify(tabsData, null, 2));
+  
+  return (docusign as any).Tabs.constructFromObject(tabsData);
+};
+
+// Map loan data to template tabs (legacy function - keeping for backward compatibility)
 export const mapLoanDataToTabs = (loanData: LoanApplicationData, availableTabLabels: string[]) => {
   const textTabs: any[] = [];
   const numberTabs: any[] = [];
@@ -450,7 +515,35 @@ export const mapLoanDataToTabs = (loanData: LoanApplicationData, availableTabLab
   };
 };
 
-// Create envelope using template with dynamic tab mapping
+// Create envelope with loan data using makeEnvelope pattern (following DocuSign documentation)
+export const createEnvelopeWithLoanData = async (loanData: LoanApplicationData, templateId?: string): Promise<any> => {
+  const finalTemplateId = templateId || DOCUSIGN_TEMPLATE_ID;
+  
+  if (!finalTemplateId) {
+    throw new Error('No template ID provided and no default template configured');
+  }
+
+  console.log('🚀 Creating envelope with loan data using template:', finalTemplateId);
+
+  // Get available tab labels from template
+  const availableTabLabels = await extractTabLabels(finalTemplateId);
+  
+  // Create tabs object with loan data values
+  const tabs = createTabsWithValues(loanData, availableTabLabels);
+
+  // Use makeEnvelope with tabs
+  const envelopeArgs: MakeEnvelopeArgs = {
+    signerEmail: loanData.borrowerEmail,
+    signerName: loanData.borrowerName,
+    templateId: finalTemplateId,
+    clientUserId: DOCUSIGN_CLIENT_USER_ID,
+    tabs: tabs
+  };
+
+  return makeEnvelope(envelopeArgs);
+};
+
+// Create envelope using template with dynamic tab mapping (legacy function)
 export const createEnvelope = async (loanData: LoanApplicationData): Promise<any> => {
   if (!DOCUSIGN_TEMPLATE_ID || !DOCUSIGN_CLIENT_USER_ID) {
     throw new Error('Missing DocuSign template configuration');
@@ -506,6 +599,8 @@ interface MakeEnvelopeArgs {
   ccEmail?: string;
   ccName?: string;
   templateId: string;
+  clientUserId?: string;
+  tabs?: any; // Tab values to pre-fill
 }
 
 // Interface for sendEnvelopeFromTemplate arguments
@@ -523,12 +618,23 @@ export const makeEnvelope = (args: MakeEnvelopeArgs): any => {
   env.templateId = args.templateId;
 
   // Create template role elements to connect the signer and cc recipients to the template
-  const signer1 = (docusign as any).TemplateRole.constructFromObject({
+  const signerRole: any = {
     email: args.signerEmail,
     name: args.signerName,
     roleName: 'signer',
-  });
+  };
 
+  // Add clientUserId if provided (for embedded signing)
+  if (args.clientUserId) {
+    signerRole.clientUserId = args.clientUserId;
+  }
+
+  // Add tabs if provided (this is where we set the field values)
+  if (args.tabs) {
+    signerRole.tabs = args.tabs;
+  }
+
+  const signer1 = (docusign as any).TemplateRole.constructFromObject(signerRole);
   const templateRoles = [signer1];
 
   // Add CC recipient if provided
