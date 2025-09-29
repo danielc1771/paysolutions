@@ -40,3 +40,11 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .env*.local
+
+# test files
+test-*.js
+debug-*.js
+diagnose-*.js
+*-test.js
+simple-*.js
+capture-*.js

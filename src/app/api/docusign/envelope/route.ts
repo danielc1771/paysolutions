@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
-import { createTemplateBasedEnvelope, DatabaseLoanData } from '@/utils/docusign/templates';
-import { createEnvelopesApi } from '@/utils/docusign/client';
+import { getEnvelopesApi, createEnvelope, createRecipientViewRequest } from '@/utils/docusign/client';
 import { Language } from '@/utils/translations';
 
 export async function POST(request: NextRequest) {
@@ -39,82 +38,68 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Transform data for DocuSign template (using DatabaseLoanData format)
-    const loanData: DatabaseLoanData = {
-      id: loan.id,
-      loanNumber: loan.loan_number,
-      principalAmount: parseFloat(loan.principal_amount),
-      interestRate: parseFloat(loan.interest_rate),
-      termWeeks: loan.term_weeks,
-      weeklyPayment: parseFloat(loan.weekly_payment),
-      purpose: loan.purpose,
+    // Transform data for DocuSign template (using new LoanApplicationData format)
+    const loanData = {
+      // Borrower information
+      borrowerName: `${loan.borrower.first_name} ${loan.borrower.last_name}`,
+      borrowerEmail: loan.borrower.email,
+      borrowerFirstName: loan.borrower.first_name,
+      borrowerLastName: loan.borrower.last_name,
+      dateOfBirth: loan.borrower.date_of_birth,
+      address: loan.borrower.address_line1,
+      city: loan.borrower.city,
+      state: loan.borrower.state,
+      zipCode: loan.borrower.zip_code,
+      phoneNumber: loan.borrower.phone,
+      
+      // Employment information
+      employmentStatus: loan.borrower.employment_status,
+      annualIncome: parseFloat(loan.borrower.annual_income || '0'),
+      currentEmployerName: loan.borrower.current_employer_name,
+      timeWithEmployment: loan.borrower.time_with_employment,
+      
+      // Loan information
+      loanAmount: parseFloat(loan.principal_amount),
+      loanTerm: `${loan.term_weeks} weeks`,
+      interestRate: `${loan.interest_rate}%`,
+      monthlyPayment: parseFloat(loan.weekly_payment) * 4.33, // Convert weekly to monthly
+      
+      // Vehicle information
       vehicleYear: loan.vehicle_year,
       vehicleMake: loan.vehicle_make,
       vehicleModel: loan.vehicle_model,
       vehicleVin: loan.vehicle_vin,
-      customerFirstName: loan.customer_first_name,
-      customerLastName: loan.customer_last_name,
-      organizationId: loan.organization_id,
-      borrower: {
-        id: loan.borrower.id,
-        firstName: loan.borrower.first_name,
-        lastName: loan.borrower.last_name,
-        email: loan.borrower.email,
-        phone: loan.borrower.phone,
-        dateOfBirth: loan.borrower.date_of_birth,
-        addressLine1: loan.borrower.address_line1,
-        city: loan.borrower.city,
-        state: loan.borrower.state,
-        zipCode: loan.borrower.zip_code,
-        employmentStatus: loan.borrower.employment_status,
-        annualIncome: parseFloat(loan.borrower.annual_income || '0'),
-        currentEmployerName: loan.borrower.current_employer_name,
-        timeWithEmployment: loan.borrower.time_with_employment,
-        reference1Name: loan.borrower.reference1_name,
-        reference1Phone: loan.borrower.reference1_phone,
-        reference1Email: loan.borrower.reference1_email,
-        reference2Name: loan.borrower.reference2_name,
-        reference2Phone: loan.borrower.reference2_phone,
-        reference2Email: loan.borrower.reference2_email,
-        reference3Name: loan.borrower.reference3_name,
-        reference3Phone: loan.borrower.reference3_phone,
-        reference3Email: loan.borrower.reference3_email,
-        organizationId: loan.borrower.organization_id
-      },
-      organization: loan.organization ? {
-        id: loan.organization.id,
-        name: loan.organization.name,
-        email: loan.organization.email,
-        phone: loan.organization.phone,
-        address: loan.organization.address,
-        city: loan.organization.city,
-        state: loan.organization.state,
-        zipCode: loan.organization.zip_code
-      } : null,
-      paymentSchedules: (loan.payment_schedules || []).map((ps: Record<string, unknown>) => ({
-        id: ps.id as string,
-        paymentNumber: ps.payment_number as number,
-        dueDate: ps.due_date as string,
-        principalAmount: parseFloat(ps.principal_amount as string),
-        interestAmount: parseFloat(ps.interest_amount as string),
-        totalAmount: parseFloat(ps.total_amount as string),
-        remainingBalance: parseFloat(ps.remaining_balance as string)
-      }))
+      
+      // Dealership information
+      dealershipName: loan.organization?.name || 'PaySolutions',
+      dealershipAddress: loan.organization?.address,
+      dealershipPhone: loan.organization?.phone,
+      
+      // References
+      reference1Name: loan.borrower.reference1_name,
+      reference1Phone: loan.borrower.reference1_phone,
+      reference1Email: loan.borrower.reference1_email,
+      reference2Name: loan.borrower.reference2_name,
+      reference2Phone: loan.borrower.reference2_phone,
+      reference2Email: loan.borrower.reference2_email,
+      reference3Name: loan.borrower.reference3_name,
+      reference3Phone: loan.borrower.reference3_phone,
+      reference3Email: loan.borrower.reference3_email
     };
 
     console.log('📋 Loan data prepared for DocuSign:', {
-      loanNumber: loanData.loanNumber,
-      borrowerEmail: loanData.borrower.email,
-      borrowerName: `${loanData.borrower.firstName} ${loanData.borrower.lastName}`
+      loanNumber: loan.loan_number,
+      borrowerEmail: loanData.borrowerEmail,
+      borrowerName: loanData.borrowerName
     });
 
     // Get borrower's preferred language
     const borrowerLanguage: Language = (loan.borrower.preferred_language as Language) || 'en';
     console.log('🌍 Using language for document:', borrowerLanguage);
 
-    // Create DocuSign envelope using template-based approach
-    const { envelopesApi, accountId } = await createEnvelopesApi();
-    const envelopeDefinition = await createTemplateBasedEnvelope(loanData);
+    // Create DocuSign envelope using new dynamic tab mapping
+    const { envelopesApi, accountId } = await getEnvelopesApi();
+    const envelopeDefinition = await createEnvelope(loanData);
 
     console.log('📤 Sending envelope to DocuSign...');
     
@@ -144,9 +129,31 @@ export async function POST(request: NextRequest) {
         // Don't fail the request since envelope was created successfully
       }
 
+      // Create recipient view for embedded signing
+      let signingUrl = null;
+      try {
+        const returnUrl = new URL('/loan-signing-complete', request.url).toString();
+        const viewRequest = createRecipientViewRequest(
+          loanData.borrowerName,
+          loanData.borrowerEmail,
+          returnUrl
+        );
+        
+        const viewResult = await (envelopesApi as any).createRecipientView(accountId, result.envelopeId, {
+          recipientViewRequest: viewRequest
+        });
+        
+        signingUrl = viewResult.url;
+        console.log('✅ Signing URL created for embedded signing');
+      } catch (viewError) {
+        console.error('⚠️ Failed to create signing URL:', viewError);
+        // Continue without signing URL - envelope was still created
+      }
+
       return NextResponse.json({
         success: true,
         envelopeId: result.envelopeId,
+        signingUrl: signingUrl,
         message: 'Loan agreement sent for signature successfully!'
       });
       
@@ -187,7 +194,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { envelopesApi, accountId } = await createEnvelopesApi();
+    const { envelopesApi, accountId } = await getEnvelopesApi();
 
     if (download === 'true') {
       console.log('📄 Downloading PDF for envelope:', envelopeId);
