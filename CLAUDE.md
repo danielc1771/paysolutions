@@ -54,10 +54,10 @@ This is a **Next.js 15 loan management application** with multi-tenant, role-bas
 ### Core Database Schema
 The application uses a multi-tenant architecture with the following key entities:
 
-- **organizations** - Financial institutions/dealerships with subscription management
+- **organizations** - Financial institutions/dealerships with subscription management (iPay as master organization)
 - **profiles** - User accounts linked to auth.users, with role-based access
 - **borrowers** - Loan applicants with KYC information and references
-- **loans** - Loan applications with vehicle details and three-stage DocuSign signing status
+- **loans** - Loan applications with vehicle details, three-stage DocuSign signing status, and cached signing URLs
 - **payment_schedules** - Generated weekly payment schedules
 - **payments** - Payment records with Stripe integration
 - **organization_settings** - Configurable organization-specific settings
@@ -70,11 +70,16 @@ The application uses a multi-tenant architecture with the following key entities
 ### Role-Based Access Control
 Five roles defined in `src/lib/auth/roles.ts`:
 
-1. **admin**: Full system access across all organizations
+1. **admin**: Full system access across all organizations (iPay super-admin)
 2. **organization_owner**: Full access within their organization + team management
 3. **user**: Dealership staff with organization-scoped access + team management
 4. **team_member**: Limited organization-scoped access (no team management)
 5. **borrower**: Read-only access to their own loan information
+
+#### Organizational Structure
+- **iPay Organization**: Master organization with admin users who oversee all other organizations
+- **Child Organizations**: Individual dealerships/financial institutions (e.g., EasyCar)
+- **Data Isolation**: Child organizations cannot see each other's data, only iPay admins have cross-organization access
 
 **Route Protection**:
 - `/admin/*` - Admin only
@@ -86,11 +91,17 @@ Five roles defined in `src/lib/auth/roles.ts`:
 
 #### DocuSign Integration
 - **Three-stage signing workflow**: iPay Admin → Organization Owner → Borrower
+- **Signing URL Caching**: 24-hour URL cache in database (`ipay_signing_url`, `organization_signing_url`, `borrower_signing_url`)
+- **Smart Envelope Creation**: Automatic envelope creation if missing during signing process
 - JWT authentication with RSA key pairs in `src/utils/docusign/`
 - Template-based document generation using DocuSign template ID: `8b9711f2-c304-4467-aa5c-27ebca4b4cc4`
 - Organization owner lookup via `src/utils/organization/owner-lookup.ts`
 - Webhook handling at `/api/docusign/webhook` for multi-stage status tracking
 - Status progression: `application_completed` → `ipay_approved` → `dealer_approved` → `fully_signed`
+- **API Endpoints**: 
+  - `/api/docusign/envelope` - Create DocuSign envelopes
+  - `/api/docusign/signing-url` - Generate and cache signing URLs
+  - `/api/docusign/webhook` - Handle DocuSign webhook events
 
 #### Stripe Integration
 - Payment method setup and recurring subscription management
@@ -110,13 +121,14 @@ Five roles defined in `src/lib/auth/roles.ts`:
 
 ### Application Flow
 1. **Loan Origination**: Public application via `/apply/[loanId]` with borrower KYC
-2. **Three-Stage Document Signing**:
-   - **Stage 1**: iPay Admin (`jhoamadrian@gmail.com`) approves loan → `ipay_approved`
-   - **Stage 2**: Organization Owner signs agreement → `dealer_approved`
+2. **Automatic DocuSign Envelope Creation**: Upon application completion, envelope is created and loan status set to `application_completed`
+3. **Three-Stage Document Signing**:
+   - **Stage 1**: iPay Admin signs first (via admin dashboard "Sign DocuSign" button) → `ipay_approved`
+   - **Stage 2**: Organization Owner signs second (via dashboard signing button) → `dealer_approved`
    - **Stage 3**: Borrower completes final signature → `fully_signed`
-3. **Identity Verification**: Stripe identity + Twilio phone verification
-4. **Payment Collection**: Automated Stripe recurring payments with schedules
-5. **Multi-Tenant Management**: Organization isolation and team collaboration
+4. **Identity Verification**: Stripe identity + Twilio phone verification (parallel to signing process)
+5. **Payment Collection**: Automated Stripe recurring payments with schedules (after full signing)
+6. **Multi-Tenant Management**: Organization isolation with iPay oversight
 
 ### File Structure Conventions
 - **API Routes**: `/src/app/api/` - Server-side endpoints with role-based auth
@@ -173,6 +185,8 @@ NEXTAUTH_URL=
 - Follow resource-based API structure: `/api/[resource]/[id]/[action]` with role-based auth
 - **DocuSign Integration**: Use template-based envelopes only (no HTML inline generation)
 - **Organization Owner Lookup**: Use `getOrganizationOwner()` from `src/utils/organization/owner-lookup.ts`
+- **Admin Dashboard**: Shows only "Sign DocuSign" button (no "Send DocuSign Agreement" button) - envelope creation is automatic
+- **Signing URL Management**: Use `/api/docusign/signing-url` endpoint with automatic caching and regeneration
 - Test with predefined role accounts for comprehensive coverage (see setup guides)
 
 ### Key Architectural Patterns
@@ -236,15 +250,28 @@ import { createClient } from '@/utils/supabase/server';
 | 2 | Organization Owner | Dynamic lookup | Organization Representative | `dealer_approved` |
 | 3 | Borrower | From application | Loan Applicant | `fully_signed` |
 
-**Dashboard Views:**
-- **iPay Dashboard**: Shows "Pending Review" → "Approved - Sent to Dealer" → "Dealer Approved" → "Fully Executed"
-- **Organization Dashboard**: Shows "Waiting on Approval" → "Ready to Sign" → "Sent to Borrower" → "Fully Executed"
-- **Borrower View**: Shows "Processing..." → "Processing..." → "Ready to Sign" → "Completed"
+**Dashboard Button States:**
+- **Admin Dashboard** (`/admin/loans/[id]`):
+  - Status `application_completed` or `new`: **"✍️ Sign DocuSign (iPay Admin)"** button
+  - Status `ipay_approved`: **"📄 Awaiting Organization Owner Signature"** (informational)
+  - Status `dealer_approved`: **"📄 Awaiting Borrower Signature"** (informational)
+  - Status `fully_signed`: **"✅ Fully Signed"** (informational)
+
+- **Organization Dashboard** (`/dashboard/loans/[id]`):
+  - Status `ipay_approved`: **"Sign DocuSign"** button
+  - Other statuses: Informational displays
+
+- **Signing URL Caching**: All signing URLs are cached for 24 hours in database with automatic regeneration
 
 #### Database Schema Details
 Key database relationships and constraints:
 - **Multi-tenant isolation**: All tables include `organization_id` foreign keys with RLS policies
 - **Loan lifecycle tracking**: Three-stage signing status progression with enum-based type safety
+- **DocuSign signing URL caching**: Fields for caching signing URLs with timestamp tracking
+  - `ipay_signing_url`: Cached URL for iPay admin signing
+  - `organization_signing_url`: Cached URL for organization owner signing  
+  - `borrower_signing_url`: Cached URL for borrower signing
+  - `signing_urls_generated_at`: Timestamp for 24-hour cache invalidation
 - **Payment scheduling**: Weekly payment schedules generated with precise decimal handling (`numeric` columns)
 - **Verification workflows**: Separate Stripe identity and Twilio phone verification tracking
 - **DocuSign integration**: Envelope ID and status tracking with timestamp audit trails
@@ -252,11 +279,14 @@ Key database relationships and constraints:
 #### Role Hierarchy and Permissions
 ```typescript
 // Role-based permission matrix (from src/lib/auth/roles.ts):
-- admin: Cross-organization access, full system management
+- admin: Cross-organization access, full system management (iPay super-admin)
 - organization_owner: Organization-scoped with full team management
 - user: Organization-scoped with team management capabilities  
 - team_member: Organization-scoped, limited to loan/borrower operations
 - borrower: Self-service access to own loan data only
+
+// Current Admin User:
+- jhoamadrian@gmail.com: iPay organization admin with cross-organization access
 ```
 
 #### Webhook Security and Processing
