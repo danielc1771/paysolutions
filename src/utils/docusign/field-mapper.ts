@@ -1,0 +1,235 @@
+/**
+ * DocuSign Field Mapper
+ * 
+ * Maps loan application data from Supabase to DocuSign template field labels
+ * Adjust the field names to match your specific DocuSign template
+ */
+
+export interface PaymentScheduleItem {
+  payment_number: number;
+  due_date: string;
+  principal_amount: number;
+  interest_amount: number;
+  total_amount: number;
+  remaining_balance: number;
+}
+
+export interface LoanApplicationData {
+  // Loan information
+  id: string;
+  amount?: number;
+  loan_type?: string;
+  term_months?: number;
+  term_weeks?: number;
+  interest_rate?: number;
+  monthly_payment?: number;
+  weekly_payment?: number;
+  principal_amount?: number;
+  verified_phone_number?: string;
+  created_at?: string;
+  
+  // Vehicle information
+  vehicle_year?: string;
+  vehicle_make?: string;
+  vehicle_model?: string;
+  vehicle_vin?: string;
+  
+  // Payment schedule (from payment_schedules table)
+  payment_schedule?: PaymentScheduleItem[];
+  
+  // Borrower information (from joined query)
+  borrower: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone?: string;
+    date_of_birth?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    zip_code?: string;
+    country?: string;
+    
+    // Employment
+    employment_status?: string;
+    annual_income?: number;
+    current_employer_name?: string;
+    employer_state?: string;
+    time_with_employment?: string;
+    
+    // References
+    reference1_name?: string;
+    reference1_phone?: string;
+    reference1_email?: string;
+    reference1_country_code?: string;
+    reference2_name?: string;
+    reference2_phone?: string;
+    reference2_email?: string;
+    reference2_country_code?: string;
+    reference3_name?: string;
+    reference3_phone?: string;
+    reference3_email?: string;
+    
+    // Additional fields
+    [key: string]: any;
+  };
+}
+
+/**
+ * Maps loan data to DocuSign template fields for ALL roles (iPay, Borrower, Organization)
+ * Returns an object with field labels as keys and values as strings
+ */
+export function mapLoanDataToDocuSignFields(loan: LoanApplicationData): Record<string, string> {
+  const borrower = loan.borrower;
+  const loanAmount = loan.amount || loan.principal_amount || 0;
+  const interestRate = loan.interest_rate || 0;
+  const termWeeks = loan.term_weeks || 16;
+  
+  // Calculate total with interest
+  const totalInterest = loanAmount * (interestRate / 100);
+  const totalWithInterest = loanAmount + totalInterest;
+  
+  // Calculate first payment date (1 week from creation)
+  const createdDate = loan.created_at ? new Date(loan.created_at) : new Date();
+  const firstPaymentDate = new Date(createdDate);
+  firstPaymentDate.setDate(firstPaymentDate.getDate() + 7);
+  
+  // Create the mapping based on your DocuSign template field labels
+  const fieldMapping: Record<string, string> = {
+    // ===== iPay Fields =====
+    // Loan basic info
+    'loan_amount': loanAmount.toString(),
+    'interest_applied': totalInterest.toFixed(2),
+    'loan_total_with_interest': totalWithInterest.toFixed(2),
+    'loan_term_weeks': termWeeks.toString(),
+    'loan_first_payment_date': firstPaymentDate.toISOString().split('T')[0],
+    'emission_date': createdDate.toISOString().split('T')[0],
+    
+    // Vehicle Information
+    'vehicle_year': loan.vehicle_year || '',
+    'vehicle_make': loan.vehicle_make || '',
+    'vehicle_model': loan.vehicle_model || '',
+    'vehicle_vin': loan.vehicle_vin || '',
+    
+    // iPay Company Info (hardcoded - update as needed)
+    'iPay_name': 'iPay Solutions',
+    'iPay_address_line': '123 Business St',
+    'ipay_city': 'Miami',
+    'ipay_state': 'FL',
+    'ipay_zip_code': '33101',
+    'ipay_country': 'US',
+    'ipay_email': 'architex.development@gmail.com',
+    
+    // Organization Info (hardcoded - update as needed)
+    'dealership_name': 'Easy Carus',
+    'org_name': 'Easy Carus',
+    'org_address_line': '456 Dealer Ave',
+    'org_city': 'Miami',
+    'org_state': 'FL',
+    'org_zip_code': '33102',
+    'org_country': 'US',
+    'org_email': 'jgarcia@easycarus.com',
+    
+    // ===== Borrower Fields =====
+    // Borrower Personal Information
+    'borrower_first_name': borrower.first_name || '',
+    'borrower_last_name': borrower.last_name || '',
+    'borrower_email': borrower.email || '',
+    'borrower_phone_number': loan.verified_phone_number || borrower.phone || '',
+    'borrower_phone_country_code': '+1',
+    'date_of_birth': borrower.date_of_birth || '',
+    
+    // Address Information
+    'borrower_address_line_1': borrower.address || '',
+    'borrower_city': borrower.city || '',
+    'borrower_state': borrower.state || '',
+    'borrower_zip_code': borrower.zip_code || '',
+    'borrower_country': borrower.country || 'US',
+    
+    // Employment Information
+    'employment_status': borrower.employment_status || '',
+    'borrower_employer': borrower.current_employer_name || '',
+    'borrower_employer_state': borrower.employer_state || '',
+    'borrower_employed_time': borrower.time_with_employment || '',
+    'borrower_salary': borrower.annual_income?.toString() || '',
+    'annual_income': borrower.annual_income?.toString() || '',
+    
+    // Loan Information
+    'loan_type': loan.loan_type || '',
+    'loan_term': loan.term_months?.toString() || '',
+    'interest_rate': interestRate.toString(),
+    'monthly_payment': loan.monthly_payment?.toString() || '',
+    
+    // Reference 1
+    'borrower_reference_name_1': borrower.reference1_name || '',
+    'borrower_reference_name_1 _phone': borrower.reference1_phone || '',
+    'borrower_reference_name_1 _country_code': borrower.reference1_country_code || '+1',
+    'reference1_email': borrower.reference1_email || '',
+    'borrower_reference_1': borrower.reference1_name || '',
+    
+    // Reference 2
+    'borrower_reference_name_2': borrower.reference2_name || '',
+    'borrower_reference_name_2_phone': borrower.reference2_phone || '',
+    'borrower_reference_name_2_country_code': borrower.reference2_country_code || '+1',
+    'reference2_email': borrower.reference2_email || '',
+    
+    // Reference 3
+    'borrower_reference_name_3': borrower.reference3_name || '',
+    'borrower_reference_name_3_phone': borrower.reference3_phone || '',
+    'reference3_email': borrower.reference3_email || '',
+  };
+  
+  // Add payment schedule fields (exp_date, principal_amount, payment_amount, balance for 1-16)
+  if (loan.payment_schedule && loan.payment_schedule.length > 0) {
+    loan.payment_schedule.forEach((payment, index) => {
+      const num = index + 1;
+      if (num <= 16) {
+        fieldMapping[`exp_date_${num}`] = payment.due_date || '';
+        fieldMapping[`principal_amount_${num}`] = payment.principal_amount?.toFixed(2) || '';
+        fieldMapping[`payment_amount_${num}`] = payment.total_amount?.toFixed(2) || '';
+        fieldMapping[`balance_${num}`] = payment.remaining_balance?.toFixed(2) || '';
+      }
+    });
+  }
+  
+  // Filter out empty values
+  return Object.fromEntries(
+    Object.entries(fieldMapping).filter(([_, value]) => value !== '' && value !== null && value !== undefined)
+  );
+}
+
+/**
+ * Validates that required fields are present
+ * Returns an array of missing field names
+ */
+export function validateRequiredFields(loan: LoanApplicationData): string[] {
+  const missingFields: string[] = [];
+  
+  const borrower = loan.borrower;
+  
+  // Check required borrower fields
+  if (!borrower.first_name) missingFields.push('First Name');
+  if (!borrower.last_name) missingFields.push('Last Name');
+  if (!borrower.email) missingFields.push('Email');
+  if (!borrower.phone && !loan.verified_phone_number) missingFields.push('Phone Number');
+  
+  // Check required loan fields
+  if (!loan.amount) missingFields.push('Loan Amount');
+  
+  return missingFields;
+}
+
+/**
+ * Gets borrower full name
+ */
+export function getBorrowerFullName(loan: LoanApplicationData): string {
+  return `${loan.borrower.first_name} ${loan.borrower.last_name}`.trim();
+}
+
+/**
+ * Gets borrower email
+ */
+export function getBorrowerEmail(loan: LoanApplicationData): string {
+  return loan.borrower.email;
+}

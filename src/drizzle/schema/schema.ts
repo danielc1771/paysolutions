@@ -64,22 +64,27 @@ export const borrowers = pgTable("borrowers", {
 	email: varchar({ length: 255 }),
 	phone: varchar({ length: 20 }),
 	dateOfBirth: date("date_of_birth"),
+	address: varchar("address", { length: 255 }), // Alias for addressLine1 for DocuSign compatibility
 	addressLine1: varchar("address_line1", { length: 255 }),
 	city: varchar({ length: 100 }),
 	state: varchar({ length: 50 }),
 	zipCode: varchar("zip_code", { length: 10 }),
+	country: varchar("country", { length: 2 }).default('US'), // ISO country code
 	employmentStatus: varchar("employment_status", { length: 50 }),
 	annualIncome: numeric("annual_income", { precision: 12, scale:  2 }),
 	currentEmployerName: varchar("current_employer_name", { length: 255 }),
+	employerState: varchar("employer_state", { length: 50 }), // State where employer is located
 	timeWithEmployment: varchar("time_with_employment", { length: 50 }),
 	kycStatus: varchar("kyc_status", { length: 50 }).default('pending'),
 	preferredLanguage: varchar("preferred_language", { length: 10 }).default('en'),
 	reference1Name: varchar("reference1_name", { length: 255 }),
 	reference1Phone: varchar("reference1_phone", { length: 20 }),
 	reference1Email: varchar("reference1_email", { length: 255 }),
+	reference1CountryCode: varchar("reference1_country_code", { length: 5 }).default('+1'), // Phone country code
 	reference2Name: varchar("reference2_name", { length: 255 }),
 	reference2Phone: varchar("reference2_phone", { length: 20 }),
 	reference2Email: varchar("reference2_email", { length: 255 }),
+	reference2CountryCode: varchar("reference2_country_code", { length: 5 }).default('+1'), // Phone country code
 	reference3Name: varchar("reference3_name", { length: 255 }),
 	reference3Phone: varchar("reference3_phone", { length: 20 }),
 	reference3Email: varchar("reference3_email", { length: 255 }),
@@ -150,9 +155,13 @@ export const loans = pgTable("loans", { // Added vehicle fields
 	loanNumber: varchar("loan_number", { length: 50 }).notNull(),
 	borrowerId: uuid("borrower_id"),
 	principalAmount: numeric("principal_amount", { precision: 12, scale:  2 }).notNull(),
+	amount: numeric("amount", { precision: 12, scale:  2 }), // Alias for principalAmount for DocuSign compatibility
 	interestRate: numeric("interest_rate", { precision: 5, scale:  4 }).notNull(),
 	termWeeks: integer("term_weeks").notNull(),
+	termMonths: integer("term_months"), // Term in months for display/DocuSign
 	weeklyPayment: numeric("weekly_payment", { precision: 10, scale:  2 }).notNull(),
+	monthlyPayment: numeric("monthly_payment", { precision: 10, scale:  2 }), // Monthly payment for display/DocuSign
+	loanType: varchar("loan_type", { length: 100 }), // Type of loan (Auto, Personal, etc.)
 	purpose: text(),
 	status: loanStatusEnum('status').default('new'),
 	fundingDate: date("funding_date"),
