@@ -1677,10 +1677,65 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
         setFormData({...formData, stripeVerificationStatus: 'failed'});
       } else {
         // Verification was submitted successfully to Stripe
-        // Don't set status here - let webhook handle the actual verification result
-        // The realtime subscription will update the status based on webhook events
-        console.log('Verification submitted. Waiting for webhook updates...');
         console.log('🎯 Stripe verification modal completed successfully');
+        console.log('🔄 Polling verification status...');
+        
+        // Poll the verification status (especially important for test mode)
+        const sessionId = session.verification_session_id;
+        let pollAttempts = 0;
+        const maxAttempts = 10;
+        
+        const pollStatus = async () => {
+          try {
+            const statusResponse = await fetch(`/api/stripe/verification-status/${sessionId}`);
+            const statusData = await statusResponse.json();
+            
+            console.log(`📊 Poll attempt ${pollAttempts + 1}: Status =`, statusData.status);
+            
+            if (statusData.status === 'verified') {
+              // Update formData with completed status
+              const updatedData = { 
+                ...formData, 
+                stripeVerificationStatus: 'completed',
+                stripeVerificationSessionId: sessionId 
+              };
+              setFormData(updatedData);
+              
+              // Save to database
+              await saveProgress(5, updatedData);
+              
+              // Also update the loan record directly to ensure database is updated
+              await fetch(`/api/apply/${initialData?.loanId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  stripe_verification_status: 'verified',
+                  stripe_verification_session_id: sessionId
+                })
+              });
+              
+              console.log('✅ Verification completed and saved to database!');
+              return true;
+            } else if (statusData.status === 'requires_input') {
+              // Still processing
+              pollAttempts++;
+              if (pollAttempts < maxAttempts) {
+                setTimeout(pollStatus, 2000); // Poll every 2 seconds
+              } else {
+                console.log('⏱️ Polling timeout - status will update via webhook');
+              }
+            } else if (statusData.status === 'canceled') {
+              setFormData({ ...formData, stripeVerificationStatus: 'failed' });
+              setError('Verification was canceled');
+              return false;
+            }
+          } catch (pollError) {
+            console.error('Error polling verification status:', pollError);
+          }
+        };
+        
+        // Start polling after a short delay
+        setTimeout(pollStatus, 1000);
       }
     } catch (error) {
       console.error('Error starting verification:', error);

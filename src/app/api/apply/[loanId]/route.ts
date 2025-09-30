@@ -2,7 +2,13 @@
 import { createClient } from '@/utils/supabase/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getEnvelopesApi, createEnvelope, createRecipientViewRequest } from '@/utils/docusign/client';
+import { createAndSendEnvelope } from '@/utils/docusign/jwt-client';
+import { 
+  mapLoanDataToDocuSignFields, 
+  getBorrowerFullName, 
+  getBorrowerEmail,
+  type LoanApplicationData 
+} from '@/utils/docusign/field-mapper';
 import { Language } from '@/utils/translations';
 
 const loanApplicationSchema = z.object({
@@ -203,15 +209,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ loa
 
     console.log('✅ Application submitted successfully, now creating DocuSign envelope...');
 
-    // Create DocuSign envelope after successful application submission
+    // Create DocuSign envelope after successful application submission using NEW JWT system
     try {
-      // Fetch loan and borrower data for DocuSign
+      // Fetch loan and borrower data with payment schedule for DocuSign
       const { data: loanData, error: fetchError } = await supabase
         .from('loans')
         .select(`
           *,
-          borrower:borrowers(*),
-          organization:organizations(*)
+          borrower:borrowers(*)
         `)
         .eq('id', loanId)
         .single();
@@ -221,39 +226,45 @@ export async function POST(request: Request, { params }: { params: Promise<{ loa
         throw new Error('Failed to fetch loan data for DocuSign');
       }
 
+      // Fetch payment schedule for this loan
+      const { data: paymentSchedule, error: scheduleError } = await supabase
+        .from('payment_schedules')
+        .select('*')
+        .eq('loan_id', loanId)
+        .order('payment_number', { ascending: true });
+
+      if (scheduleError) {
+        console.warn('⚠️ Failed to fetch payment schedule:', scheduleError);
+      }
+
+      // Add payment schedule to loan data
+      const loanWithSchedule = {
+        ...loanData,
+        payment_schedule: paymentSchedule || []
+      } as LoanApplicationData;
+
       console.log('📋 Loan data prepared for DocuSign:', {
         loanNumber: loanData.loan_number,
         borrowerEmail: loanData.borrower.email,
         borrowerName: `${loanData.borrower.first_name} ${loanData.borrower.last_name}`,
-        organizationName: loanData.organization?.name
+        paymentScheduleEntries: paymentSchedule?.length || 0
       });
 
-      // Create DocuSign envelope using simplified approach
-      const { envelopesApi, accountId } = await getEnvelopesApi();
-      
-      // Prepare loan data for envelope creation
-      const envelopeData = {
-        borrowerName: `${loanData.borrower.first_name} ${loanData.borrower.last_name}`,
-        borrowerEmail: loanData.borrower.email || '',
-        loanAmount: parseFloat(loanData.principal_amount),
-        vehicleYear: loanData.vehicle_year,
-        vehicleMake: loanData.vehicle_make,
-        vehicleModel: loanData.vehicle_model,
-        vehicleVin: loanData.vehicle_vin,
-        dealershipName: loanData.organization?.name || 'PaySolutions'
-      };
+      // Prepare borrower information
+      const borrowerName = getBorrowerFullName(loanWithSchedule);
+      const borrowerEmail = getBorrowerEmail(loanWithSchedule);
 
-      const envelope = createEnvelope(envelopeData);
+      // Map loan data to DocuSign template fields using the field mapper
+      const docusignFields = mapLoanDataToDocuSignFields(loanWithSchedule);
 
-      console.log('📤 Sending envelope to DocuSign...');
+      console.log('📝 Fields to populate:', Object.keys(docusignFields).length);
 
-      const result = await envelopesApi.createEnvelope(accountId, {
-        envelopeDefinition: envelope
-      });
-
-      if (!result || !result.envelopeId) {
-        throw new Error('Failed to create DocuSign envelope');
-      }
+      // Create envelope and send to all signers via email using NEW JWT client
+      const result = await createAndSendEnvelope(
+        borrowerName,
+        borrowerEmail,
+        docusignFields
+      );
 
       console.log('✅ DocuSign envelope created:', result.envelopeId);
 
@@ -306,6 +317,50 @@ export async function POST(request: Request, { params }: { params: Promise<{ loa
 
   } catch (error: unknown) {
     console.error('Error submitting application:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    return new NextResponse(JSON.stringify({ message: errorMessage }), { status: 500 });
+  }
+}
+
+// PATCH handler to update verification status
+export async function PATCH(request: Request, { params }: { params: Promise<{ loanId: string }> }) {
+  const { loanId } = await params;
+  const supabase = await createClient();
+
+  try {
+    const body = await request.json();
+    console.log('📝 PATCH request to update loan:', loanId, body);
+
+    const updates: Record<string, unknown> = {};
+
+    if (body.stripe_verification_status) {
+      updates.stripe_verification_status = body.stripe_verification_status;
+    }
+
+    if (body.stripe_verification_session_id) {
+      updates.stripe_verification_session_id = body.stripe_verification_session_id;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ message: 'No updates provided' }, { status: 400 });
+    }
+
+    const { error } = await supabase
+      .from('loans')
+      .update(updates)
+      .eq('id', loanId);
+
+    if (error) {
+      console.error('Error updating loan:', error);
+      throw error;
+    }
+
+    console.log('✅ Loan updated successfully:', updates);
+
+    return NextResponse.json({ success: true, message: 'Loan updated successfully' });
+
+  } catch (error: unknown) {
+    console.error('Error in PATCH handler:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return new NextResponse(JSON.stringify({ message: errorMessage }), { status: 500 });
   }

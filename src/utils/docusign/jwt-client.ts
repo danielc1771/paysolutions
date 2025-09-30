@@ -155,25 +155,27 @@ export function makeEnvelope(
     console.log(`📝 Created ${textTabs.length} text tabs for pre-filling`);
   }
 
-  // Signer 1: iPay (Routing Order 1) - Email notification
+  // Signer 1: iPay (Routing Order 1) - Email notification with ALL pre-filled tabs
   const iPay = new docusign.TemplateRole();
   iPay.email = IPAY_EMAIL;
   iPay.name = 'iPay Representative';
   iPay.roleName = 'iPay';
   (iPay as any).routingOrder = '1';
+  // Attach all pre-filled tabs to iPay role (they review all information first)
+  if (tabs) {
+    iPay.tabs = tabs;
+  }
 
-  // Signer 2: Borrower (Routing Order 2) - Email notification with pre-filled tabs
+  // Signer 2: Borrower (Routing Order 2) - Email notification (signature only, no pre-filled tabs)
   const borrower = new docusign.TemplateRole();
   borrower.email = borrowerEmail;
   borrower.name = borrowerName;
   borrower.roleName = 'Borrower';
   (borrower as any).routingOrder = '2';
-  if (tabs) {
-    borrower.tabs = tabs;
-  }
+  // NO tabs - borrower only signs, doesn't fill out fields
   // NO clientUserId - borrower will receive email notification
 
-  // Signer 3: Organization (Routing Order 3) - Email notification
+  // Signer 3: Organization (Routing Order 3) - Email notification (signature only)
   const organization = new docusign.TemplateRole();
   organization.email = ORGANIZATION_EMAIL;
   organization.name = 'Organization Representative';
