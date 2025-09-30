@@ -3,7 +3,7 @@ import { createClient } from '@/utils/supabase/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { sendLoanApplicationEmail } from '@/utils/mailer';
-import { calculateLoanPayment, validateLoanTerms } from '@/utils/loan-calculations';
+import { calculateLoanPayment, validateLoanTerms, generateWeeklyPaymentSchedule } from '@/utils/loan-calculations';
 
 const sendApplicationSchema = z.object({
   customerName: z.string().nonempty(),
@@ -171,6 +171,40 @@ export async function POST(request: Request) {
 
     if (loanError) throw loanError;
     if (!loan) throw new Error('Failed to create loan record.');
+
+    console.log('✅ Loan created successfully:', loan.id);
+    console.log('📅 Creating payment schedule...');
+
+    // Generate and save payment schedule
+    try {
+      const paymentSchedule = generateWeeklyPaymentSchedule(loanCalculation);
+
+      // Prepare payment schedule data for database insertion
+      const paymentScheduleData = paymentSchedule.map((payment) => ({
+        loan_id: loan.id,
+        payment_number: payment.paymentNumber,
+        due_date: payment.dueDate,
+        principal_amount: payment.principalAmount,
+        interest_amount: payment.interestAmount,
+        total_amount: payment.totalPayment,
+        remaining_balance: payment.remainingBalance,
+        status: 'pending'
+      }));
+
+      const { error: scheduleError } = await supabase
+        .from('payment_schedules')
+        .insert(paymentScheduleData);
+
+      if (scheduleError) {
+        console.error('❌ Failed to create payment schedule:', scheduleError);
+        // Don't fail the entire request, but log the error
+      } else {
+        console.log(`✅ Created ${paymentSchedule.length} payment schedule entries`);
+      }
+    } catch (scheduleError) {
+      console.error('❌ Error generating payment schedule:', scheduleError);
+      // Don't fail the entire request
+    }
 
     // Construct application URL - use request headers to get the base URL
     const protocol = request.headers.get('x-forwarded-proto') || 'http';

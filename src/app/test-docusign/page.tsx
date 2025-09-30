@@ -130,11 +130,11 @@ export default function TestDocuSignPage() {
           <ol className="text-sm space-y-2 text-gray-700">
             <li className="flex items-start">
               <span className="font-semibold mr-2 text-purple-600">1.</span>
-              <span>Check <strong>jhoamadrian@gmail.com</strong> for iPay email (arrives immediately)</span>
+              <span>Check <strong>architex.development@gmail.com</strong> for iPay email (arrives immediately)</span>
             </li>
             <li className="flex items-start">
               <span className="font-semibold mr-2 text-purple-600">2.</span>
-              <span>Check <strong>testborrower@example.com</strong> for Borrower email (after iPay signs)</span>
+              <span>Check <strong>ssalas.wt@gmail.com</strong> for Borrower email (after iPay signs)</span>
             </li>
             <li className="flex items-start">
               <span className="font-semibold mr-2 text-purple-600">3.</span>

@@ -120,6 +120,50 @@ async function createTestLoan() {
     console.log(`   Type: ${loan.loan_type}`);
     console.log(`   Vehicle: ${loan.vehicle_year} ${loan.vehicle_make} ${loan.vehicle_model}\n`);
 
+    // Step 3: Create payment schedule (amortization table)
+    console.log('📅 Creating payment schedule (16 weeks)...');
+
+    const principalAmount = 25000.00;
+    const interestRate = 5.5 / 100; // 5.5%
+    const termWeeks = 16;
+    const weeklyPayment = 185.50;
+    
+    // Calculate amortization schedule
+    const paymentScheduleData = [];
+    let remainingBalance = principalAmount;
+    const startDate = new Date(loan.created_at);
+    
+    for (let i = 1; i <= termWeeks; i++) {
+      const dueDate = new Date(startDate);
+      dueDate.setDate(dueDate.getDate() + (i * 7)); // Add weeks
+      
+      // Calculate interest and principal for this payment
+      const interestAmount = remainingBalance * (interestRate / 52); // Weekly interest
+      const principalPayment = weeklyPayment - interestAmount;
+      remainingBalance = Math.max(0, remainingBalance - principalPayment);
+      
+      paymentScheduleData.push({
+        loan_id: loan.id,
+        payment_number: i,
+        due_date: dueDate.toISOString().split('T')[0],
+        principal_amount: principalPayment,
+        interest_amount: interestAmount,
+        total_amount: weeklyPayment,
+        remaining_balance: remainingBalance,
+        status: 'pending'
+      });
+    }
+
+    const { error: scheduleError } = await supabase
+      .from('payment_schedules')
+      .insert(paymentScheduleData);
+
+    if (scheduleError) {
+      throw new Error(`Failed to create payment schedule: ${scheduleError.message}`);
+    }
+
+    console.log(`✅ Created ${termWeeks} payment schedule entries\n`);
+
     // Step 3: Display test instructions
     console.log('🎉 Test data created successfully!\n');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -132,9 +176,15 @@ async function createTestLoan() {
     console.log(`   Loan Number: ${loan.loan_number}\n`);
 
     console.log('📧 Email Addresses:');
-    console.log('   1. iPay: jhoamadrian@gmail.com (signs first)');
-    console.log('   2. Borrower: testborrower@example.com (signs second)');
+    console.log('   1. iPay: architex.development@gmail.com (signs first)');
+    console.log('   2. Borrower: ssalas.wt@gmail.com (signs second)');
     console.log('   3. Organization: jgarcia@easycarus.com (signs third)\n');
+    
+    console.log('📅 Payment Schedule:');
+    console.log(`   ${termWeeks} weekly payments of $${weeklyPayment}`);
+    console.log(`   First payment: ${paymentScheduleData[0].due_date}`);
+    console.log(`   Last payment: ${paymentScheduleData[termWeeks - 1].due_date}`);
+    console.log(`   Total interest: $${(principalAmount * interestRate).toFixed(2)}\n`);
 
     console.log('🧪 Test with cURL:');
     console.log(`   curl -X POST http://localhost:3000/api/docusign/create-envelope \\`);
