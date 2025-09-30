@@ -12,7 +12,9 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "test:create-loan": "tsx scripts/create-test-loan.ts",
+    "test:cleanup": "tsx scripts/cleanup-test-data.ts"
   },
   "dependencies": {
     "@stripe/react-stripe-js": "^3.7.0",
@@ -51,6 +53,7 @@
     "eslint-config-next": "15.3.4",
     "prettier": "^3.5.3",
     "tailwindcss": "^4",
+    "tsx": "^4.19.2",
     "typescript": "^5"
   }
 }
