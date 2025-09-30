@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getEnvelopesApi, createEnvelopeWithLoanData, extractTabLabels } from '@/utils/docusign/client';
+import { createAndSendLoanEnvelope, extractTabLabels } from '@/utils/docusign/client';
 
 // Interface for loan application data (matching your existing interface)
 interface LoanApplicationData {
@@ -76,18 +76,8 @@ export async function POST(request: NextRequest) {
 
     console.log('🚀 Creating envelope with loan application data for:', loanData.borrowerEmail);
 
-    // Get the EnvelopesApi instance
-    const { envelopesApi, accountId } = await getEnvelopesApi();
-
-    // Create envelope definition with loan data mapping
-    const envelopeDefinition = await createEnvelopeWithLoanData(loanData);
-
-    console.log('📦 Envelope definition created, sending to DocuSign...');
-
-    // Send the envelope
-    const result = await envelopesApi.createEnvelope(accountId, {
-      envelopeDefinition: envelopeDefinition,
-    });
+    // Create and send envelope using new implementation
+    const result = await createAndSendLoanEnvelope(loanData);
 
     console.log('✅ Loan application envelope sent successfully:', {
       envelopeId: result.envelopeId,

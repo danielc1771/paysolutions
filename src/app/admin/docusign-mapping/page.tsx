@@ -109,7 +109,7 @@ export default function DocuSignMappingPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          signerEmail: 'ssalas.wt@gmail.com',
+          signerEmail: 'architex.development@gmail.com',
           signerName: 'Sebastian Salas',
           templateId: '8b9711f2-c304-4467-aa5c-27ebca4b4cc4', // Using your actual template ID
           // Optional: add CC recipient
@@ -129,7 +129,92 @@ export default function DocuSignMappingPage() {
     }
   };
 
-  // Test loan application envelope with complete data mapping
+  // Test loan application envelope with complete data mapping using new implementation
+  const testLoanApplicationEnvelopeNew = async () => {
+    setIsLoading(true);
+    try {
+      console.log('🚀 Starting loan application envelope test...');
+      
+      // First get available tabs to debug template structure
+      const tabsResponse = await fetch('/api/docusign/loan-envelope?templateId=8b9711f2-c304-4467-aa5c-27ebca4b4cc4');
+      const tabsData = await tabsResponse.json();
+      console.log('📋 Available template tabs:', tabsData);
+
+      // Now send envelope with loan data
+      const response = await fetch('/api/docusign/loan-envelope', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          // Complete test data matching template tab labels
+          borrowerName: 'Sebastian Salas',
+          borrowerEmail: 'architex.development@gmail.com',
+          borrowerFirstName: 'Sebastian',
+          borrowerLastName: 'Salas',
+          dateOfBirth: '1990-01-15',
+          address: '123 Main Street',
+          city: 'Miami',
+          state: 'FL',
+          zipCode: '33101',
+          country: 'United States',
+          phoneNumber: '5551234567',
+          phoneCountryCode: '+1',
+          
+          // Employment
+          employmentStatus: 'Full-time',
+          annualIncome: 85000,
+          currentEmployerName: 'PaySolutions Inc',
+          employerState: 'FL',
+          timeWithEmployment: '2 years',
+          
+          // Loan details
+          loanAmount: 30000,
+          loanType: 'Auto Loan',
+          loanTerm: '60 months',
+          interestRate: '7.5%',
+          monthlyPayment: 595.50,
+          
+          // Vehicle
+          vehicleYear: '2022',
+          vehicleMake: 'Honda',
+          vehicleModel: 'Civic',
+          vehicleVin: '2HGFC2F59NH123456',
+          vehicleMileage: '15000',
+          vehiclePrice: 32000,
+          
+          // Dealership
+          dealershipName: 'Miami Honda',
+          dealershipAddress: '789 Auto Blvd, Miami, FL 33102',
+          dealershipPhone: '(305) 555-0123',
+          
+          // References with country codes
+          reference1Name: 'Maria Garcia',
+          reference1Phone: '5551112222',
+          reference1Email: 'maria.garcia@email.com',
+          reference1CountryCode: '+1',
+          reference2Name: 'Carlos Rodriguez',
+          reference2Phone: '5553334444',
+          reference2Email: 'carlos.rodriguez@email.com',
+          reference2CountryCode: '+1',
+          reference3Name: 'Ana Martinez',
+          reference3Phone: '5555556666',
+          reference3Email: 'ana.martinez@email.com'
+        })
+      });
+
+      const data = await response.json();
+      setEnvelopeTest(data);
+    } catch (error) {
+      setEnvelopeTest({ 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Test loan application envelope with complete data mapping (legacy)
   const testLoanApplicationEnvelope = async () => {
     setIsLoading(true);
     try {
@@ -141,7 +226,7 @@ export default function DocuSignMappingPage() {
         body: JSON.stringify({
           // Complete test data matching template tab labels
           borrowerName: 'Sebastian Salas',
-          borrowerEmail: 'ssalas.wt@gmail.com',
+          borrowerEmail: 'architex.development@gmail.com',
           borrowerFirstName: 'Sebastian',
           borrowerLastName: 'Salas',
           dateOfBirth: '1990-01-15',
@@ -291,25 +376,11 @@ export default function DocuSignMappingPage() {
           </p>
           <div className="flex flex-col gap-3 mb-4">
             <button
-              onClick={testNewEnvelopeCreation}
+              onClick={testLoanApplicationEnvelopeNew}
               disabled={isLoading}
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50 text-lg font-semibold"
             >
-              {isLoading ? 'Creating Envelope...' : 'Test New Envelope Creation (Simple)'}
-            </button>
-            <button
-              onClick={testLoanApplicationEnvelope}
-              disabled={isLoading}
-              className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50"
-            >
-              {isLoading ? 'Creating Envelope...' : '🚀 Test Loan Application Envelope (Complete)'}
-            </button>
-            <button
-              onClick={testEnvelopeWithMapping}
-              disabled={isLoading}
-              className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50"
-            >
-              {isLoading ? 'Creating Envelope...' : 'Test Envelope with Full Data Mapping (Legacy)'}
+              {isLoading ? 'Creating Envelope...' : '🚀 Create Loan Application Envelope with Pre-filled Data'}
             </button>
           </div>
           
