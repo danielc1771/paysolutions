@@ -1,8 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
-import UserLayout from '@/components/UserLayout';
-import { RoleRedirect } from '@/components/auth/RoleRedirect';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { Users, UserPlus, Mail, CheckCircle, Clock, Trash2 } from 'lucide-react';
 
@@ -24,7 +22,7 @@ export default function TeamPage() {
     fullName: '',
     email: ''
   });
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   // Fetch team members
   const fetchTeamMembers = useCallback(async () => {
@@ -156,9 +154,7 @@ export default function TeamPage() {
   }, [fetchTeamMembers]);
 
   return (
-    <RoleRedirect allowedRoles={['admin', 'user', 'organization_owner']}>
-      <UserLayout>
-        <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-teal-100">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-teal-100">
           <div className="p-8">
             {/* Header */}
             <div className="mb-8">
@@ -352,7 +348,5 @@ export default function TeamPage() {
             </div>
           </div>
         </div>
-      </UserLayout>
-    </RoleRedirect>
   );
 }

@@ -1,10 +1,8 @@
 'use client';
 
 import { createClient } from '@/utils/supabase/client';
-import UserLayout from '@/components/UserLayout';
 import Link from 'next/link';
-import React, { useEffect, useState } from 'react';
-import { RoleRedirect } from '@/components/auth/RoleRedirect';
+import React, { useEffect, useState, useMemo } from 'react';
 import CustomSelect from '@/components/CustomSelect';
 
 interface Borrower {
@@ -45,7 +43,7 @@ export default function UserBorrowers() {
     activeLoans: 0
   });
 
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     const fetchBorrowers = async () => {
@@ -201,9 +199,7 @@ export default function UserBorrowers() {
   ];
 
   return (
-    <RoleRedirect allowedRoles={['admin', 'user', 'organization_owner', 'team_member']}>
-      <UserLayout>
-        <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-teal-100">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-teal-100">
           <div className="p-8">
             {/* Header */}
             <div className="mb-8">
@@ -492,7 +488,6 @@ export default function UserBorrowers() {
               )}
             </div>
           </div>
-        </div>
 
         {/* Success Modal */}
         {showSuccessModal && (
@@ -582,7 +577,6 @@ export default function UserBorrowers() {
             </div>
           </div>
         )}
-      </UserLayout>
-    </RoleRedirect>
+    </div>
   );
 }

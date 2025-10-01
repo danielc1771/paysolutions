@@ -1,10 +1,8 @@
 'use client';
 
-import UserLayout from '@/components/UserLayout';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Mail, Phone, MapPin, Briefcase, DollarSign, Shield, Calendar, User, CreditCard } from 'lucide-react';
-import { RoleRedirect } from '@/components/auth/RoleRedirect';
 import { createClient } from '@/utils/supabase/client';
 import { LoanListItem } from '@/types/loan';
 
@@ -142,9 +140,7 @@ export default function BorrowerDetail({ params }: BorrowerDetailProps) {
 
   if (loading) {
     return (
-      <RoleRedirect allowedRoles={['admin', 'user', 'organization_owner', 'team_member']}>
-        <UserLayout>
-          <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen">
             <div className="relative">
               <div className="animate-spin rounded-full h-12 w-12 border-4 border-green-200 border-t-green-500 mx-auto"></div>
               <div className="absolute inset-0 flex items-center justify-center">
@@ -152,16 +148,12 @@ export default function BorrowerDetail({ params }: BorrowerDetailProps) {
               </div>
             </div>
           </div>
-        </UserLayout>
-      </RoleRedirect>
     );
   }
 
   if (error || !borrower) {
     return (
-      <RoleRedirect allowedRoles={['admin', 'user', 'organization_owner', 'team_member']}>
-        <UserLayout>
-          <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen">
             <div className="text-center">
               <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -179,8 +171,6 @@ export default function BorrowerDetail({ params }: BorrowerDetailProps) {
               </Link>
             </div>
           </div>
-        </UserLayout>
-      </RoleRedirect>
     );
   }
 
@@ -190,9 +180,7 @@ export default function BorrowerDetail({ params }: BorrowerDetailProps) {
   const activeLoans = borrower.loans?.filter(loan => loan.status === 'active').length || 0;
 
   return (
-    <RoleRedirect allowedRoles={['admin', 'user', 'organization_owner', 'team_member']}>
-      <UserLayout>
-        <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-teal-100">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-teal-100">
           <div className="px-8 py-8 max-w-7xl mx-auto">
             {/* Back Button */}
             <div className="mb-6">
@@ -477,7 +465,5 @@ export default function BorrowerDetail({ params }: BorrowerDetailProps) {
             </div>
           </div>
         </div>
-      </UserLayout>
-    </RoleRedirect>
   );
 }

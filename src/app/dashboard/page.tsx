@@ -1,10 +1,8 @@
 'use client';
 
 import { createClient } from '@/utils/supabase/client';
-import UserLayout from '@/components/UserLayout';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { RoleRedirect } from '@/components/auth/RoleRedirect';
+import { useEffect, useState, useMemo } from 'react';
 import { LoanListItem } from '@/types/loan';
 
 export default function UserDashboard() {
@@ -12,7 +10,7 @@ export default function UserDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     const fetchLoans = async () => {
@@ -104,9 +102,7 @@ export default function UserDashboard() {
   const totalPrincipal = loans?.reduce((sum, loan) => sum + parseFloat(loan.principal_amount), 0) || 0;
   
   return (
-    <RoleRedirect allowedRoles={['user', 'team_member', 'organization_owner']}>
-      <UserLayout>
-        <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-teal-100">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-teal-100">
           <div className="p-8">
             {/* Dashboard Header */}
             <div className="mb-8">
@@ -369,7 +365,5 @@ export default function UserDashboard() {
             </div>
           </div>
         </div>
-      </UserLayout>
-    </RoleRedirect>
   );
 }

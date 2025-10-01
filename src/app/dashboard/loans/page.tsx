@@ -1,10 +1,8 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import UserLayout from '@/components/UserLayout';
 import Link from 'next/link';
-import { RoleRedirect } from '@/components/auth/RoleRedirect';
 import CustomSelect from '@/components/CustomSelect';
 import { LoanListItem } from '@/types/loan';
 import { Plus, Search, FileText, Calendar, Car, Eye, Trash2, CheckCircle, DollarSign, PenTool, Check } from 'lucide-react';
@@ -30,7 +28,7 @@ export default function UserLoans() {
     borrowerName: ''
   });
 
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     // Check for action_required filter from URL params
@@ -287,9 +285,7 @@ export default function UserLoans() {
   ];
 
   return (
-    <RoleRedirect allowedRoles={['admin', 'user', 'organization_owner', 'team_member']}>
-      <UserLayout>
-        <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-teal-100">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-teal-100">
           <div className="p-8">
             {/* Header */}
             <div className="mb-8">
@@ -566,7 +562,6 @@ export default function UserLoans() {
                 </div>
               )}
             </div>
-          </div>
         </div>
 
         {/* Success Modal */}
@@ -589,7 +584,6 @@ export default function UserLoans() {
             </div>
           </div>
         )}
-      </UserLayout>
 
       {/* Delete Confirmation Dialog */}
       {deleteConfirm.isOpen && (
@@ -622,6 +616,6 @@ export default function UserLoans() {
           </div>
         </div>
       )}
-    </RoleRedirect>
+    </div>
   );
 }

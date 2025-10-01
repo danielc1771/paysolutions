@@ -2,8 +2,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import UserLayout from '@/components/UserLayout';
-import { RoleRedirect } from '@/components/auth/RoleRedirect';
 import { createClient } from '@/utils/supabase/client';
 import { getAvailableTerms, calculateLoanPayment, generateWeeklyPaymentSchedule } from '@/utils/loan-calculations';
 import { getInterestDisplayConfig } from '@/utils/interest-config';
@@ -245,9 +243,7 @@ export default function CreateLoan() {
   };
 
   return (
-    <RoleRedirect allowedRoles={['admin', 'user', 'organization_owner', 'team_member']}>
-      <UserLayout>
-        <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-teal-100">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-teal-100">
           <div className="p-8">
             {/* Header */}
             <div className="mb-8">
@@ -525,7 +521,6 @@ export default function CreateLoan() {
 
             </div>
           </div>
-        </div>
 
         {/* Success Modal */}
         {showSuccessModal && (
@@ -579,7 +574,6 @@ export default function CreateLoan() {
             </div>
           </div>
         )}
-      </UserLayout>
-    </RoleRedirect>
+    </div>
   );
 }
