@@ -24,7 +24,6 @@ export async function POST(request: NextRequest) {
     // Extract envelope information
     const envelopeId = body.data?.envelopeId;
     const status = body.event; // e.g., "envelope-sent", "envelope-completed"
-    const envelopeSummary = body.data?.envelopeSummary;
 
     if (!envelopeId) {
       console.warn('⚠️ Webhook received without envelope ID');
@@ -44,7 +43,7 @@ export async function POST(request: NextRequest) {
     // Update loan record in Supabase
     const supabase = await createClient();
     
-    const updateData: any = {
+    const updateData: Record<string, string> = {
       docusign_status: docusignStatus,
       updated_at: new Date().toISOString()
     };
@@ -71,10 +70,11 @@ export async function POST(request: NextRequest) {
     // Return success to DocuSign
     return NextResponse.json({ received: true });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ Webhook processing failed:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     // Still return 200 to DocuSign to prevent retries
-    return NextResponse.json({ received: true, error: error.message });
+    return NextResponse.json({ received: true, error: errorMessage });
   }
 }
 

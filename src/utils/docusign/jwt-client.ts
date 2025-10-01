@@ -77,14 +77,15 @@ export async function checkToken(): Promise<string> {
     };
 
     return tokenData.access_token;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ JWT token generation failed:', error);
     
-    if (error.response) {
-      console.error('Error response:', error.response.body);
+    if (error && typeof error === 'object' && 'response' in error) {
+      console.error('Error response:', (error as { response?: { body?: unknown } }).response?.body);
     }
     
-    throw new Error(`Failed to obtain JWT token: ${error.message}`);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    throw new Error(`Failed to obtain JWT token: ${errorMessage}`);
   }
 }
 
@@ -130,7 +131,7 @@ export function makeEnvelope(
   // Following official DocuSign documentation pattern for setting tab values
   let tabs;
   if (tabValues && Object.keys(tabValues).length > 0) {
-    const textTabs: any[] = [];
+    const textTabs: docusign.Text[] = [];
     
     // Create text tab objects for each field
     // Note: Using Text tabs for all fields (numbers, dates, etc.) as they're universally compatible
@@ -160,7 +161,7 @@ export function makeEnvelope(
   iPay.email = IPAY_EMAIL;
   iPay.name = 'iPay Representative';
   iPay.roleName = 'iPay';
-  (iPay as any).routingOrder = '1';
+  Object.assign(iPay, { routingOrder: '1' });
   // Attach all pre-filled tabs to iPay role (they review all information first)
   if (tabs) {
     iPay.tabs = tabs;
@@ -171,7 +172,7 @@ export function makeEnvelope(
   borrower.email = borrowerEmail;
   borrower.name = borrowerName;
   borrower.roleName = 'Borrower';
-  (borrower as any).routingOrder = '2';
+  Object.assign(borrower, { routingOrder: '2' });
   // NO tabs - borrower only signs, doesn't fill out fields
   // NO clientUserId - borrower will receive email notification
 
@@ -180,7 +181,7 @@ export function makeEnvelope(
   organization.email = ORGANIZATION_EMAIL;
   organization.name = 'Organization Representative';
   organization.roleName = 'Organization';
-  (organization as any).routingOrder = '3';
+  Object.assign(organization, { routingOrder: '3' });
 
   // Add all three template roles in order
   env.templateRoles = [iPay, borrower, organization];
@@ -267,12 +268,13 @@ export async function createAndSendEnvelope(
       statusDateTime: results.statusDateTime,
       docusignUrl: `https://demo.docusign.net/documents/details/${results.envelopeId}`
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ Failed to create envelope:', error);
-    if (error.response) {
-      console.error('Error details:', error.response.body);
+    if (error && typeof error === 'object' && 'response' in error) {
+      console.error('Error details:', (error as { response?: { body?: unknown } }).response?.body);
     }
-    throw new Error(`DocuSign envelope creation failed: ${error.message}`);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    throw new Error(`DocuSign envelope creation failed: ${errorMessage}`);
   }
 }
 
@@ -294,8 +296,9 @@ export async function getEnvelopeStatus(envelopeId: string) {
       completedDateTime: envelope.completedDateTime,
       envelopeId: envelope.envelopeId
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ Failed to get envelope status:', error);
-    throw new Error(`Failed to get envelope status: ${error.message}`);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    throw new Error(`Failed to get envelope status: ${errorMessage}`);
   }
 }

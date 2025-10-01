@@ -2,9 +2,17 @@
 
 import { useState } from 'react';
 
+interface DocuSignResult {
+  success: boolean;
+  envelopeId?: string;
+  status?: string;
+  message?: string;
+  error?: string;
+}
+
 export default function TestDocuSignPage() {
   const [loanId, setLoanId] = useState('');
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<DocuSignResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,8 +40,9 @@ export default function TestDocuSignPage() {
       }
 
       setResult(data);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+      setError(errorMessage);
       console.error('Full error:', err);
     } finally {
       setLoading(false);

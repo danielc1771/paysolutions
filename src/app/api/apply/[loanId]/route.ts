@@ -9,7 +9,6 @@ import {
   getBorrowerEmail,
   type LoanApplicationData 
 } from '@/utils/docusign/field-mapper';
-import { Language } from '@/utils/translations';
 
 const loanApplicationSchema = z.object({
   dateOfBirth: z.string().min(1, "Date of birth is required"),
