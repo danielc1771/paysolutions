@@ -12,7 +12,7 @@ const API_ACCOUNT_ID = process.env.API_ACCOUNT_ID;
 const OAUTH_SCOPE = 'signature';
 
 // Default signer emails
-const IPAY_EMAIL = 'architex.development@gmail.com';
+const IPAY_EMAIL = 'jhoamadrian@gmail.com';
 const ORGANIZATION_EMAIL = 'jgarcia@easycarus.com';
 
 // Token storage interface
