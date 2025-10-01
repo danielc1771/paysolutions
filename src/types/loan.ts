@@ -57,6 +57,13 @@ export interface BaseLoan {
   docusign_status: string;
   docusign_status_updated?: string;
   docusign_completed_at?: string;
+  // Individual signer tracking fields
+  ipay_signer_status?: string;
+  organization_signer_status?: string;
+  borrower_signer_status?: string;
+  ipay_signed_at?: string;
+  organization_signed_at?: string;
+  borrower_signed_at?: string;
   vehicle_year: string;
   vehicle_make: string;
   vehicle_model: string;
