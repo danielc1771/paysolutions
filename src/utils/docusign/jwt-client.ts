@@ -4,9 +4,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 // DocuSign JWT Configuration
-const INTEGRATION_KEY = process.env.INTEGRATION_KEY;
-const USER_ID = process.env.USER_ID;
-const BASE_PATH = process.env.BASE_PATH;
+const INTEGRATION_KEY = process.env.DOCUSIGN_USER_ID;
+const USER_ID = process.env.DOCUSIGN_USER_ID;
+const BASE_PATH = process.env.DOCUSIGN_USER_ID;
 const TEMPLATE_ID = process.env.TEMPLATE_ID;
 const API_ACCOUNT_ID = process.env.API_ACCOUNT_ID;
 const OAUTH_SCOPE = 'signature';
