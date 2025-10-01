@@ -4,9 +4,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 // DocuSign JWT Configuration
-const INTEGRATION_KEY = process.env.DOCUSIGN_USER_ID;
+const INTEGRATION_KEY = process.env.DOCUSIGN_INTEGRATION_KEY;
 const USER_ID = process.env.DOCUSIGN_USER_ID;
-const BASE_PATH = process.env.DOCUSIGN_USER_ID;
+const BASE_PATH = process.env.DOCUSIGN_BASE_PATH;
 const TEMPLATE_ID = process.env.TEMPLATE_ID;
 const API_ACCOUNT_ID = process.env.API_ACCOUNT_ID;
 const OAUTH_SCOPE = 'signature';
@@ -81,7 +81,7 @@ export async function checkToken(): Promise<string> {
     console.error('❌ JWT token generation failed:', error);
     
     if (error && typeof error === 'object' && 'response' in error) {
-      console.error('Error response:', JSON.stringify((error as { response?: { body?: unknown } }).response));
+      console.error('Error response:', JSON.stringify((error as { response?: { body?: unknown } }).response?.body));
     }
     
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
