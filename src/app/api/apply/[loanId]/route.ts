@@ -273,8 +273,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ loa
         .update({
           docusign_envelope_id: result.envelopeId,
           docusign_status: 'sent',
-          docusign_status_updated: new Date().toISOString(),
-          status: 'pending_signature'
+          docusign_status_updated: new Date().toISOString()
         })
         .eq('id', loanId);
 

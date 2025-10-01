@@ -12,8 +12,12 @@ const API_ACCOUNT_ID = process.env.API_ACCOUNT_ID;
 const OAUTH_SCOPE = 'signature';
 
 // Default signer emails
-const IPAY_EMAIL = 'jhoamadrian@gmail.com';
-const ORGANIZATION_EMAIL = 'jgarcia@easycarus.com';
+// TODO: store this in DB
+// const IPAY_EMAIL = 'jhoamadrian@gmail.com';
+// const ORGANIZATION_EMAIL = 'jgarcia@easycarus.com';
+
+const IPAY_EMAIL = 'architex.development@gmail.com';
+const ORGANIZATION_EMAIL = 'architex.development@gmail.com';
 
 // Token storage interface
 interface TokenData {
@@ -156,32 +160,43 @@ export function makeEnvelope(
     console.log(`📝 Created ${textTabs.length} text tabs for pre-filling`);
   }
 
-  // Signer 1: iPay (Routing Order 1) - Email notification with ALL pre-filled tabs
+  // Signer 1: iPay (Routing Order 1) - Embedded signing (dashboard) + email notification
   const iPay = new docusign.TemplateRole();
   iPay.email = IPAY_EMAIL;
   iPay.name = 'iPay Representative';
   iPay.roleName = 'iPay';
-  Object.assign(iPay, { routingOrder: '1' });
+  Object.assign(iPay, {
+    routingOrder: '1',
+    // Add clientUserId for embedded signing capability while still sending emails
+    clientUserId: INTEGRATION_KEY
+  });
   // Attach all pre-filled tabs to iPay role (they review all information first)
   if (tabs) {
     iPay.tabs = tabs;
   }
 
-  // Signer 2: Borrower (Routing Order 2) - Email notification (signature only, no pre-filled tabs)
+  // Signer 2: Borrower (Routing Order 2) - Email notification only
   const borrower = new docusign.TemplateRole();
   borrower.email = borrowerEmail;
   borrower.name = borrowerName;
   borrower.roleName = 'Borrower';
-  Object.assign(borrower, { routingOrder: '2' });
+  Object.assign(borrower, {
+    routingOrder: '2',
+    // Add clientUserId for potential embedded signing
+    clientUserId: INTEGRATION_KEY
+  });
   // NO tabs - borrower only signs, doesn't fill out fields
-  // NO clientUserId - borrower will receive email notification
 
-  // Signer 3: Organization (Routing Order 3) - Email notification (signature only)
+  // Signer 3: Organization (Routing Order 3) - Embedded signing (dashboard) + email notification
   const organization = new docusign.TemplateRole();
   organization.email = ORGANIZATION_EMAIL;
   organization.name = 'Organization Representative';
   organization.roleName = 'Organization';
-  Object.assign(organization, { routingOrder: '3' });
+  Object.assign(organization, {
+    routingOrder: '3',
+    // Add clientUserId for embedded signing capability
+    clientUserId: INTEGRATION_KEY
+  });
 
   // Add all three template roles in order
   env.templateRoles = [iPay, borrower, organization];
