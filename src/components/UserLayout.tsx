@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -54,7 +54,7 @@ export default function UserLayout({ children }: UserLayoutProps) {
   const [colorTheme, setColorTheme] = useState('default'); // Default theme
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   
   // Use the new role system
   const { profile, loading } = useUserProfile();
@@ -78,7 +78,7 @@ export default function UserLayout({ children }: UserLayoutProps) {
     });
 
     return () => subscription.unsubscribe();
-  }, [supabase.auth, router]);
+  }, [router, supabase]);
   
   // Fetch organization settings
   useEffect(() => {
@@ -117,7 +117,7 @@ export default function UserLayout({ children }: UserLayoutProps) {
     };
     
     fetchOrgSettings();
-  }, [profile, supabase]);
+  }, [profile?.organizationId, supabase]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {

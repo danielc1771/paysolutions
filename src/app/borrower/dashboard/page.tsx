@@ -3,7 +3,7 @@
 import { createClient } from '@/utils/supabase/client';
 import BorrowerLayout from '@/components/BorrowerLayout';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { RoleRedirect } from '@/components/auth/RoleRedirect';
 import { LoanSummary } from '@/types/loan';
 
@@ -23,7 +23,7 @@ export default function BorrowerDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     const fetchBorrowerData = async () => {

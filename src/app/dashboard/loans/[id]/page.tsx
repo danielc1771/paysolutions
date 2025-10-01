@@ -1,10 +1,8 @@
 'use client';
 
-import UserLayout from '@/components/UserLayout';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { CheckCircle, ExternalLink, ArrowLeft, Send, Clock, FileText, DollarSign } from 'lucide-react';
-import { RoleRedirect } from '@/components/auth/RoleRedirect';
+import { CheckCircle, ExternalLink, ArrowLeft, Send, DollarSign } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { LoanWithBorrower } from '@/types/loan';
 import { Invoice } from '@/app/api/loans/[id]/invoices/route';
@@ -286,24 +284,18 @@ export default function LoanDetail({ params }: LoanDetailProps) {
 
   if (loading) {
     return (
-      <RoleRedirect allowedRoles={['admin', 'user', 'organization_owner', 'team_member']}>
-        <UserLayout>
-          <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-teal-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-teal-100 flex items-center justify-center">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-4 border-green-200 border-t-green-500 mx-auto mb-4"></div>
               <p className="text-gray-600 font-medium">Loading loan details...</p>
             </div>
           </div>
-        </UserLayout>
-      </RoleRedirect>
     );
   }
 
   if (error || !loan) {
     return (
-      <RoleRedirect allowedRoles={['admin', 'user', 'organization_owner', 'team_member']}>
-        <UserLayout>
-          <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-teal-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-teal-100 flex items-center justify-center">
             <div className="text-center">
               <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -320,410 +312,454 @@ export default function LoanDetail({ params }: LoanDetailProps) {
               </Link>
             </div>
           </div>
-        </UserLayout>
-      </RoleRedirect>
     );
   }
 
   return (
-    <RoleRedirect allowedRoles={['admin', 'user', 'organization_owner', 'team_member']}>
-      <UserLayout>
-        <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-teal-100">
-          <div className="p-8">
-            {/* Header */}
-            <div className="mb-8">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <Link
-                    href="/dashboard/loans"
-                    className="p-2 bg-white/60 backdrop-blur-sm rounded-xl hover:bg-white/80 transition-all duration-300"
-                  >
-                    <ArrowLeft className="w-5 h-5 text-gray-600" />
-                  </Link>
+    <div className="min-h-screen bg-gray-50">
+          <div className="p-6">
+            {/* Back Button */}
+            <Link
+              href="/dashboard/loans"
+              className="inline-flex items-center text-gray-600 hover:text-gray-900 mb-6 text-sm font-medium"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Loans
+            </Link>
+
+            {/* Borrower Contact Card */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6">
+              <div className="flex items-start justify-between">
+                <div className="flex items-start space-x-4">
+                  {/* Avatar */}
+                  <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-md">
+                    {loan.borrower.first_name[0]}{loan.borrower.last_name[0]}
+                  </div>
+                  
+                  {/* Info */}
                   <div>
-                    <h1 className="text-4xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent mb-2">
-                      {loan.loan_number}
+                    <h1 className="text-2xl font-bold text-gray-900 mb-1">
+                      {loan.borrower.first_name} {loan.borrower.last_name}
                     </h1>
-                    <p className="text-gray-600 text-lg">
-                      {loan.borrower.first_name} {loan.borrower.last_name} • {loan.vehicle_year} {loan.vehicle_make} {loan.vehicle_model}
-                    </p>
+                    <p className="text-sm text-gray-500 mb-3">Loan #{loan.loan_number}</p>
+                    
+                    {/* Quick Actions */}
+                    <div className="flex items-center space-x-2">
+                      <a
+                        href={`mailto:${loan.borrower.email}`}
+                        className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-100 transition-colors flex items-center space-x-1"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        <span>Email</span>
+                      </a>
+                      <a
+                        href={`tel:${loan.borrower.phone}`}
+                        className="px-3 py-1.5 bg-green-50 text-green-700 rounded-lg text-xs font-medium hover:bg-green-100 transition-colors flex items-center space-x-1"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                        </svg>
+                        <span>Call</span>
+                      </a>
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-center space-x-3">
-                  <span className={`inline-flex px-4 py-2 text-sm font-semibold rounded-full ${getStatusColor(loan.status)}`}>
-                    {formatStatus(loan.status)}
-                  </span>
-                </div>
+                
+                {/* Status Badge */}
+                <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getStatusColor(loan.status)}`}>
+                  {formatStatus(loan.status)}
+                </span>
               </div>
             </div>
 
-            {/* Main Content */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Left Column - Loan Details */}
+            {/* Progress Tracker */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 mb-6">
+              <style jsx>{`
+                .loan-progress-tracker {
+                  --marker-size: 48px;
+                  --marker-size-half: calc(var(--marker-size) * 0.5);
+                  --path-height: 4px;
+                  --path-position-block: calc(var(--marker-size-half) - (var(--path-height) * 0.5));
+                  --path-size-inline: calc(100% - var(--marker-size));
+                  --path-position-inline: var(--marker-size);
+                  
+                  --marker-bg: white;
+                  --marker-bg-complete: #3b82f6;
+                  --marker-bg-active: #60a5fa;
+                  --marker-border-color: #d1d5db;
+                  --marker-border-complete: #3b82f6;
+                  --marker-border-active: #60a5fa;
+                  --marker-color: #9ca3af;
+                  --marker-color-complete: white;
+                  --path-bg: #d1d5db;
+                  --path-bg-complete: #3b82f6;
+                  
+                  display: flex;
+                  list-style: none;
+                  margin: 0;
+                  padding: 0;
+                  counter-reset: step;
+                }
+                
+                .loan-progress-step {
+                  position: relative;
+                  display: flex;
+                  flex-direction: column;
+                  flex: 1 1 0%;
+                  margin: 0;
+                  padding: 0;
+                }
+                
+                .loan-progress-step:last-child {
+                  flex-grow: 0;
+                }
+                
+                /* Marker circle */
+                .loan-progress-step::before {
+                  content: counter(step);
+                  counter-increment: step;
+                  position: relative;
+                  z-index: 20;
+                  flex-shrink: 0;
+                  display: flex;
+                  justify-content: center;
+                  align-items: center;
+                  width: var(--marker-size);
+                  height: var(--marker-size);
+                  border-radius: 50%;
+                  background-color: var(--marker-bg);
+                  border: 4px solid var(--marker-border-color);
+                  color: var(--marker-color);
+                  font-weight: 600;
+                  font-size: 1.125rem;
+                  transition: all 0.3s ease;
+                }
+                
+                /* Connecting line */
+                .loan-progress-step:not(:last-child)::after {
+                  content: '';
+                  display: block;
+                  position: absolute;
+                  top: var(--path-position-block);
+                  left: var(--path-position-inline);
+                  width: var(--path-size-inline);
+                  height: var(--path-height);
+                  background-color: var(--path-bg);
+                  transition: background-color 0.5s ease;
+                }
+                
+                /* Complete state */
+                .loan-progress-step.is-complete::before {
+                  content: '✓';
+                  background-color: var(--marker-bg-complete);
+                  border-color: var(--marker-border-complete);
+                  color: var(--marker-color-complete);
+                }
+                
+                .loan-progress-step.is-complete::after {
+                  background-color: var(--path-bg-complete);
+                }
+                
+                /* Active state */
+                .loan-progress-step.is-active::before {
+                  background-color: var(--marker-bg-active);
+                  border-color: var(--marker-border-active);
+                  color: var(--marker-color-complete);
+                  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+                }
+                
+                @keyframes pulse {
+                  0%, 100% {
+                    opacity: 1;
+                  }
+                  50% {
+                    opacity: 0.7;
+                  }
+                }
+                
+                /* Label below marker */
+                .loan-progress-label {
+                  margin-top: 0.75rem;
+                  padding: 0.5rem;
+                  text-align: center;
+                  font-size: 0.75rem;
+                  font-weight: 600;
+                  color: #6b7280;
+                  line-height: 1.2;
+                }
+                
+                .loan-progress-step.is-complete .loan-progress-label {
+                  color: #111827;
+                }
+                
+                .loan-progress-step.is-active .loan-progress-label {
+                  color: #3b82f6;
+                }
+              `}</style>
+              
+              <ol className="loan-progress-tracker">
+                {/* Step 1: Application Sent */}
+                <li className={`loan-progress-step ${
+                  loan.status === 'application_sent' || loan.status === 'application_completed' || loan.docusign_status === 'sent' || loan.status === 'ipay_approved' || loan.status === 'dealer_approved' || loan.status === 'fully_signed' || loan.status === 'funded'
+                    ? 'is-complete'
+                    : ''
+                }`}>
+                  <div className="loan-progress-label">Application<br/>Sent</div>
+                </li>
+
+                {/* Step 2: iPay Signed */}
+                <li className={`loan-progress-step ${
+                  loan.status === 'ipay_approved' || loan.status === 'dealer_approved' || loan.status === 'fully_signed' || loan.status === 'funded'
+                    ? 'is-complete'
+                    : loan.docusign_status === 'sent'
+                    ? 'is-active'
+                    : ''
+                }`}>
+                  <div className="loan-progress-label">iPay<br/>Signed</div>
+                </li>
+
+                {/* Step 3: Organization Signed */}
+                <li className={`loan-progress-step ${
+                  loan.status === 'dealer_approved' || loan.status === 'fully_signed' || loan.status === 'funded'
+                    ? 'is-complete'
+                    : loan.status === 'ipay_approved'
+                    ? 'is-active'
+                    : ''
+                }`}>
+                  <div className="loan-progress-label">Organization<br/>Signed</div>
+                </li>
+
+                {/* Step 4: Borrower Signed */}
+                <li className={`loan-progress-step ${
+                  loan.status === 'fully_signed' || loan.status === 'funded'
+                    ? 'is-complete'
+                    : loan.status === 'dealer_approved'
+                    ? 'is-active'
+                    : ''
+                }`}>
+                  <div className="loan-progress-label">Borrower<br/>Signed</div>
+                </li>
+
+                {/* Step 5: Funded */}
+                <li className={`loan-progress-step ${
+                  loan.status === 'funded'
+                    ? 'is-complete'
+                    : loan.status === 'fully_signed'
+                    ? 'is-active'
+                    : ''
+                }`}>
+                  <div className="loan-progress-label">Funded</div>
+                </li>
+              </ol>
+            </div>
+
+            {/* Action Buttons */}
+            {(loan.docusign_status === 'not_sent' && loan.status === 'application_completed') || loan.status === 'ipay_approved' || loan.status === 'fully_signed' ? (
+              <div className="flex gap-3 mb-6">
+                {loan.docusign_status === 'not_sent' && loan.status === 'application_completed' && (
+                  <button
+                    onClick={handleSendDocuSign}
+                    disabled={docusignLoading}
+                    className="bg-green-600 text-white px-5 py-2.5 rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                  >
+                    {docusignLoading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                        <span>Sending...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        <span>Send Agreement</span>
+                      </>
+                    )}
+                  </button>
+                )}
+                
+                {loan.status === 'ipay_approved' && (
+                  <button
+                    onClick={async () => {
+                      try {
+                        const response = await fetch('/api/docusign/signing-url', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ loanId: loan.id, signerType: 'organization' }),
+                        });
+                        const data = await response.json();
+                        if (data.success && data.signingUrl) {
+                          window.location.href = data.signingUrl;
+                        }
+                      } catch (error) {
+                        console.error('Error:', error);
+                      }
+                    }}
+                    className="bg-blue-600 text-white px-5 py-2.5 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center space-x-2"
+                  >
+                    <Send className="w-4 h-4" />
+                    <span>Sign Agreement Now</span>
+                  </button>
+                )}
+                
+                {loan.status === 'fully_signed' && (
+                  <button
+                    onClick={handleFundLoan}
+                    disabled={fundingLoading}
+                    className="bg-green-600 text-white px-5 py-2.5 rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                  >
+                    {fundingLoading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                        <span>Processing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <DollarSign className="w-4 h-4" />
+                        <span>Fund Loan</span>
+                      </>
+                    )}
+                  </button>
+                )}
+                
+                {loan.docusign_envelope_id && (
+                  <a
+                    href={`https://demo.docusign.net/documents/${loan.docusign_envelope_id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors flex items-center space-x-2"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    <span>View Document</span>
+                  </a>
+                )}
+              </div>
+            ) : null}
+
+            {/* Main Content - 2 Column Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Left Column - 2/3 width */}
               <div className="lg:col-span-2 space-y-6">
                 {/* Loan Information */}
-                <div className="bg-white/70 backdrop-blur-sm rounded-3xl shadow-xl border border-white/20 p-8">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-6">Loan Details</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Principal Amount</label>
-                      <p className="text-2xl font-bold text-green-600">${parseFloat(loan.principal_amount).toLocaleString()}</p>
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+                  <h2 className="text-base font-semibold text-gray-900 mb-4">Loan Details</h2>
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                      <span className="text-sm text-gray-600">Principal Amount</span>
+                      <span className="text-lg font-semibold text-gray-900">${parseFloat(loan.principal_amount).toLocaleString()}</span>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Interest Rate</label>
-                      <p className="text-lg font-semibold text-gray-900">{(parseFloat(loan.interest_rate) * 100).toFixed(2)}%</p>
+                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                      <span className="text-sm text-gray-600">Interest Rate</span>
+                      <span className="text-lg font-semibold text-gray-900">{(parseFloat(loan.interest_rate) * 100).toFixed(2)}%</span>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Term</label>
-                      <p className="text-lg font-semibold text-gray-900">{loan.term_weeks} weeks</p>
+                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                      <span className="text-sm text-gray-600">Term</span>
+                      <span className="text-lg font-semibold text-gray-900">{loan.term_weeks} weeks</span>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Weekly Payment</label>
-                      <p className="text-lg font-semibold text-gray-900">${parseFloat(loan.weekly_payment).toLocaleString()}</p>
+                    <div className="flex justify-between items-center py-2">
+                      <span className="text-sm text-gray-600">Weekly Payment</span>
+                      <span className="text-lg font-semibold text-green-600">${parseFloat(loan.weekly_payment).toLocaleString()}</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Vehicle Information */}
-                <div className="bg-white/70 backdrop-blur-sm rounded-3xl shadow-xl border border-white/20 p-8">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-6">Vehicle Details</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Vehicle</label>
-                      <p className="text-lg font-semibold text-gray-900">{loan.vehicle_year} {loan.vehicle_make} {loan.vehicle_model}</p>
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+                  <h2 className="text-base font-semibold text-gray-900 mb-4">Vehicle Details</h2>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                      <span className="text-sm text-gray-600">Vehicle</span>
+                      <span className="text-sm font-medium text-gray-900">{loan.vehicle_year} {loan.vehicle_make} {loan.vehicle_model}</span>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">VIN</label>
-                      <p className="text-lg font-mono text-gray-900">{loan.vehicle_vin}</p>
+                    <div className="flex justify-between items-center py-2">
+                      <span className="text-sm text-gray-600">VIN</span>
+                      <span className="text-sm font-mono text-gray-900">{loan.vehicle_vin}</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Borrower Information */}
-                <div className="bg-white/70 backdrop-blur-sm rounded-3xl shadow-xl border border-white/20 p-8">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-6">Borrower Information</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              </div>
+
+              {/* Right Column - 1/3 width */}
+              <div className="space-y-6">
+                {/* Borrower Details */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+                  <h2 className="text-base font-semibold text-gray-900 mb-4">Borrower Details</h2>
+                  <div className="space-y-3">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
-                      <p className="text-lg font-semibold text-gray-900">{loan.borrower.first_name} {loan.borrower.last_name}</p>
+                      <label className="text-xs text-gray-500 uppercase tracking-wide">Email</label>
+                      <p className="text-sm text-gray-900 mt-1">{loan.borrower.email}</p>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
-                      <p className="text-lg text-gray-900">{loan.borrower.phone}</p>
+                      <label className="text-xs text-gray-500 uppercase tracking-wide">Phone</label>
+                      <p className="text-sm text-gray-900 mt-1">{loan.borrower.phone}</p>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Email (Application Sent To)</label>
-                      <p className="text-lg text-gray-900 text-blue-600 font-medium">{loan.borrower.email}</p>
+                      <label className="text-xs text-gray-500 uppercase tracking-wide">Date of Birth</label>
+                      <p className="text-sm text-gray-900 mt-1">{loan.borrower.date_of_birth ? new Date(loan.borrower.date_of_birth).toLocaleDateString() : 'Not provided'}</p>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Date of Birth</label>
-                      <p className="text-lg text-gray-900">{loan.borrower.date_of_birth ? new Date(loan.borrower.date_of_birth).toLocaleDateString() : 'Not provided'}</p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
-                      <p className="text-lg text-gray-900">
+                      <label className="text-xs text-gray-500 uppercase tracking-wide">Address</label>
+                      <p className="text-sm text-gray-900 mt-1">
                         {loan.borrower.address_line1}<br />
                         {loan.borrower.city}, {loan.borrower.state} {loan.borrower.zip_code}
                       </p>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Employment Status</label>
-                      <p className="text-lg text-gray-900">{loan.borrower.employment_status}</p>
+                      <label className="text-xs text-gray-500 uppercase tracking-wide">Employment</label>
+                      <p className="text-sm text-gray-900 mt-1">{loan.borrower.employment_status}</p>
+                      {loan.borrower.current_employer_name && (
+                        <p className="text-xs text-gray-600 mt-1">{loan.borrower.current_employer_name}</p>
+                      )}
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Annual Income</label>
-                      <p className="text-lg text-gray-900">${parseFloat(loan.borrower.annual_income ?? "0").toLocaleString()}</p>
+                      <label className="text-xs text-gray-500 uppercase tracking-wide">Annual Income</label>
+                      <p className="text-sm font-semibold text-gray-900 mt-1">${parseFloat(loan.borrower.annual_income ?? "0").toLocaleString()}</p>
                     </div>
                   </div>
                 </div>
 
-                {/* Employment Details */}
-                {(loan.borrower.current_employer_name || loan.borrower.time_with_employment) && (
-                  <div className="bg-white/70 backdrop-blur-sm rounded-3xl shadow-xl border border-white/20 p-8">
-                    <h2 className="text-2xl font-bold text-gray-900 mb-6">Employment Details</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {loan.borrower.current_employer_name && (
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Current Employer</label>
-                          <p className="text-lg text-gray-900">{loan.borrower.current_employer_name}</p>
-                        </div>
-                      )}
-                      {loan.borrower.time_with_employment && (
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Time with Employment</label>
-                          <p className="text-lg text-gray-900">{loan.borrower.time_with_employment}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
                 {/* References */}
                 {(loan.borrower.reference1_name || loan.borrower.reference2_name || loan.borrower.reference3_name) && (
-                  <div className="bg-white/70 backdrop-blur-sm rounded-3xl shadow-xl border border-white/20 p-8">
-                    <h2 className="text-2xl font-bold text-gray-900 mb-6">References</h2>
-                    <div className="space-y-6">
+                  <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+                    <h2 className="text-base font-semibold text-gray-900 mb-4">References</h2>
+                    <div className="space-y-4">
                       {loan.borrower.reference1_name && (
-                        <div className="border-b border-gray-200 pb-4">
-                          <h3 className="text-lg font-semibold text-gray-900 mb-3">Reference 1</h3>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-                              <p className="text-gray-900">{loan.borrower.reference1_name}</p>
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                              <p className="text-gray-900">{loan.borrower.reference1_phone || 'Not provided'}</p>
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                              <p className="text-gray-900">{loan.borrower.reference1_email || 'Not provided'}</p>
-                            </div>
-                          </div>
+                        <div className="pb-3 border-b border-gray-100">
+                          <p className="text-sm font-medium text-gray-900 mb-1">{loan.borrower.reference1_name}</p>
+                          <p className="text-xs text-gray-600">{loan.borrower.reference1_phone || 'No phone'}</p>
+                          {loan.borrower.reference1_email && (
+                            <p className="text-xs text-gray-600">{loan.borrower.reference1_email}</p>
+                          )}
                         </div>
                       )}
                       {loan.borrower.reference2_name && (
-                        <div className="border-b border-gray-200 pb-4">
-                          <h3 className="text-lg font-semibold text-gray-900 mb-3">Reference 2</h3>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-                              <p className="text-gray-900">{loan.borrower.reference2_name}</p>
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                              <p className="text-gray-900">{loan.borrower.reference2_phone || 'Not provided'}</p>
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                              <p className="text-gray-900">{loan.borrower.reference2_email || 'Not provided'}</p>
-                            </div>
-                          </div>
+                        <div className="pb-3 border-b border-gray-100">
+                          <p className="text-sm font-medium text-gray-900 mb-1">{loan.borrower.reference2_name}</p>
+                          <p className="text-xs text-gray-600">{loan.borrower.reference2_phone || 'No phone'}</p>
+                          {loan.borrower.reference2_email && (
+                            <p className="text-xs text-gray-600">{loan.borrower.reference2_email}</p>
+                          )}
                         </div>
                       )}
                       {loan.borrower.reference3_name && (
                         <div>
-                          <h3 className="text-lg font-semibold text-gray-900 mb-3">Reference 3</h3>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-                              <p className="text-gray-900">{loan.borrower.reference3_name}</p>
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                              <p className="text-gray-900">{loan.borrower.reference3_phone || 'Not provided'}</p>
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                              <p className="text-gray-900">{loan.borrower.reference3_email || 'Not provided'}</p>
-                            </div>
-                          </div>
+                          <p className="text-sm font-medium text-gray-900 mb-1">{loan.borrower.reference3_name}</p>
+                          <p className="text-xs text-gray-600">{loan.borrower.reference3_phone || 'No phone'}</p>
+                          {loan.borrower.reference3_email && (
+                            <p className="text-xs text-gray-600">{loan.borrower.reference3_email}</p>
+                          )}
                         </div>
                       )}
                     </div>
                   </div>
                 )}
               </div>
+            </div>
 
-              {/* Right Column - Actions */}
-              <div className="space-y-6">
-                {/* DocuSign Actions */}
-                <div className="bg-white/70 backdrop-blur-sm rounded-3xl shadow-xl border border-white/20 p-6">
-                  <h3 className="text-xl font-bold text-gray-900 mb-4">Document Management</h3>
-                  
-                  {loan.docusign_status === 'not_sent' && (
-                    <div className="space-y-4">
-                      {loan.status === 'application_completed' ? (
-                        <>
-                          <p className="text-sm text-gray-600">Application complete. Ready to send loan agreement for signature</p>
-                          <button
-                            onClick={handleSendDocuSign}
-                            disabled={docusignLoading}
-                            className="w-full bg-gradient-to-r from-green-500 to-teal-500 text-white px-6 py-3 rounded-2xl font-semibold hover:from-green-600 hover:to-teal-600 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
-                          >
-                            {docusignLoading ? (
-                              <>
-                                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                                <span>Sending...</span>
-                              </>
-                            ) : (
-                              <>
-                                <Send className="w-4 h-4" />
-                                <span>Send DocuSign Agreement</span>
-                              </>
-                            )}
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <p className="text-sm text-amber-600 bg-amber-50 p-3 rounded-lg">Application must be completed before sending DocuSign agreement</p>
-                          <button
-                            disabled
-                            className="w-full bg-gray-300 text-gray-500 px-6 py-3 rounded-2xl font-semibold cursor-not-allowed flex items-center justify-center space-x-2"
-                          >
-                            <Send className="w-4 h-4" />
-                            <span>Send DocuSign Agreement</span>
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  )}
-
-                  {loan.docusign_status === 'sent' && (
-                    <div className="space-y-4">
-                      <div className="flex items-center space-x-2 text-yellow-600">
-                        <Clock className="w-4 h-4" />
-                        <span className="text-sm font-medium">Waiting for signature</span>
-                      </div>
-                      <p className="text-sm text-gray-600">Agreement sent to borrower. Awaiting their signature.</p>
-                    </div>
-                  )}
-
-                  {loan.docusign_status === 'signed' && (
-                    <div className="space-y-4">
-                      <div className="flex items-center space-x-2 text-green-600">
-                        <CheckCircle className="w-4 h-4" />
-                        <span className="text-sm font-medium">Document signed</span>
-                      </div>
-                      <p className="text-sm text-gray-600">Agreement has been signed by the borrower.</p>
-                      {loan.docusign_envelope_id && (
-                        <a
-                          href={`https://demo.docusign.net/documents/${loan.docusign_envelope_id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center space-x-2 text-blue-600 hover:text-blue-800 text-sm"
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                          <span>View in DocuSign</span>
-                        </a>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Loan Funding */}
-                <div className="bg-white/70 backdrop-blur-sm rounded-3xl shadow-xl border border-white/20 p-6">
-                  <h3 className="text-xl font-bold text-gray-900 mb-4">Loan Funding</h3>
-                  
-                  {loan.docusign_status === 'signed' && loan.status !== 'funded' && (
-                    <div className="space-y-4">
-                      <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-                        <div className="flex items-center space-x-2 text-green-700 mb-2">
-                          <CheckCircle className="w-4 h-4" />
-                          <span className="text-sm font-medium">Ready to fund</span>
-                        </div>
-                        <p className="text-sm text-green-600">
-                          Document has been signed. You can now fund this loan and charge the customer.
-                        </p>
-                      </div>
-                      
-                      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                        <h4 className="font-semibold text-blue-900 mb-2">Funding Details:</h4>
-                        <ul className="text-sm text-blue-700 space-y-1">
-                          <li>• Customer will be charged ${parseFloat(loan.weekly_payment).toLocaleString()} weekly</li>
-                          <li>• First payment will be processed immediately</li>
-                          <li>• Remaining {loan.term_weeks - 1} payments will be scheduled</li>
-                          <li>• Total loan amount: ${parseFloat(loan.principal_amount).toLocaleString()}</li>
-                        </ul>
-                      </div>
-
-                      <button
-                        onClick={handleFundLoan}
-                        disabled={fundingLoading}
-                        className="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-3 rounded-2xl font-semibold hover:from-green-600 hover:to-emerald-600 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
-                      >
-                        {fundingLoading ? (
-                          <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                            <span>Processing...</span>
-                          </>
-                        ) : (
-                          <>
-                            <DollarSign className="w-4 h-4" />
-                            <span>Fund Loan & Charge Customer</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  )}
-
-                  {loan.docusign_status !== 'signed' && (
-                    <div className="space-y-4">
-                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                        <p className="text-sm text-amber-700">
-                          Document must be signed before funding can proceed.
-                        </p>
-                      </div>
-                      <button
-                        disabled
-                        className="w-full bg-gray-300 text-gray-500 px-6 py-3 rounded-2xl font-semibold cursor-not-allowed flex items-center justify-center space-x-2"
-                      >
-                        <DollarSign className="w-4 h-4" />
-                        <span>Fund Loan & Charge Customer</span>
-                      </button>
-                    </div>
-                  )}
-
-                  {loan.status === 'funded' && (
-                    <div className="space-y-4">
-                      <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-                        <div className="flex items-center space-x-2 text-green-700 mb-2">
-                          <CheckCircle className="w-4 h-4" />
-                          <span className="text-sm font-medium">Loan funded</span>
-                        </div>
-                        <p className="text-sm text-green-600">
-                          This loan has been successfully funded and customer billing is active.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Loan Timeline */}
-                <div className="bg-white/70 backdrop-blur-sm rounded-3xl shadow-xl border border-white/20 p-6">
-                  <h3 className="text-xl font-bold text-gray-900 mb-4">Loan Timeline</h3>
-                  <div className="space-y-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                        <CheckCircle className="w-4 h-4 text-green-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">Loan Created</p>
-                        <p className="text-xs text-gray-500">
-                          {new Date(loan.created_at).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    {loan.docusign_status !== 'not_sent' && (
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
-                          <FileText className="w-4 h-4 text-yellow-600" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">Agreement Sent</p>
-                          <p className="text-xs text-gray-500">DocuSign envelope created</p>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {loan.docusign_status === 'signed' && (
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                          <CheckCircle className="w-4 h-4 text-purple-600" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">Document Signed</p>
-                          <p className="text-xs text-gray-500">Ready for funding</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                
-                {/* Payment History */}
-                {loan.status === 'funded' && (
-                  <div className="bg-white/70 backdrop-blur-sm rounded-3xl shadow-xl border border-white/20 p-6">
+            {/* Payment History - Full Width */}
+            {loan.status === 'funded' && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
                     <h3 className="text-xl font-bold text-gray-900 mb-4">Payment History</h3>
                     
                     {invoicesLoading ? (
@@ -818,36 +854,30 @@ export default function LoanDetail({ params }: LoanDetailProps) {
                         )}
                       </div>
                     )}
+              </div>
+            )}
+
+            {/* Success Modal */}
+            {showSuccessModal && (
+              <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm flex items-center justify-center z-50">
+                <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-8 w-96 border border-white/20">
+                  <div className="text-center">
+                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <CheckCircle className="w-8 h-8 text-green-500" />
+                    </div>
+                    <h2 className="text-xl font-bold text-gray-900 mb-2">Success!</h2>
+                    <p className="text-gray-600 mb-6">{successMessage}</p>
+                    <button
+                      className="w-full bg-gradient-to-r from-green-500 to-teal-500 text-white font-semibold py-3 px-6 rounded-2xl hover:from-green-600 hover:to-teal-600 transition-all duration-300"
+                      onClick={() => setShowSuccessModal(false)}
+                    >
+                      Close
+                    </button>
                   </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Success Modal */}
-        {showSuccessModal && (
-          <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm flex items-center justify-center z-50">
-            <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-8 w-96 border border-white/20">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <CheckCircle className="w-8 h-8 text-green-500" />
                 </div>
-                <h2 className="text-xl font-bold text-gray-900 mb-2">Success!</h2>
-                <p className="text-gray-600 mb-6">{successMessage}</p>
-                <button
-                  className="w-full bg-gradient-to-r from-green-500 to-teal-500 text-white font-semibold py-3 px-6 rounded-2xl hover:from-green-600 hover:to-teal-600 transition-all duration-300"
-                  onClick={() => setShowSuccessModal(false)}
-                >
-                  Close
-                </button>
               </div>
-            </div>
+            )}
           </div>
-        )}
-
-
-      </UserLayout>
-    </RoleRedirect>
+    </div>
   );
 }

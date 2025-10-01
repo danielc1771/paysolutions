@@ -4,8 +4,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { createClient } from '@/utils/supabase/client';
-import UserLayout from '@/components/UserLayout';
-import { RoleRedirect } from '@/components/auth/RoleRedirect';
 import { useUserProfile } from '@/components/auth/RoleRedirect';
 
 // Color theme options with their gradient values
@@ -293,9 +291,7 @@ export default function OrganizationSettings() {
   };
 
   return (
-    <RoleRedirect allowedRoles={['admin', 'user', 'organization_owner']}>
-      <UserLayout>
-        <div className="p-8">
+    <div className="p-8">
           <div className="max-w-4xl mx-auto">
             <h1 className="text-2xl font-bold text-gray-800 mb-6">Organization Settings</h1>
             
@@ -449,7 +445,5 @@ export default function OrganizationSettings() {
             )}
           </div>
         </div>
-      </UserLayout>
-    </RoleRedirect>
   );
 }
