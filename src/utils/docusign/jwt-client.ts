@@ -81,7 +81,7 @@ export async function checkToken(): Promise<string> {
     console.error('❌ JWT token generation failed:', error);
     
     if (error && typeof error === 'object' && 'response' in error) {
-      console.error('Error response:', (error as { response?: { body?: unknown } }).response?.body);
+      console.error('Error response:', JSON.stringify((error as { response?: { body?: unknown } }).response));
     }
     
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
