@@ -6,6 +6,7 @@ import Link from 'next/link';
 import CustomSelect from '@/components/CustomSelect';
 import { LoanListItem } from '@/types/loan';
 import { Plus, Search, FileText, Calendar, Car, Eye, Trash2, CheckCircle, DollarSign, PenTool, Check } from 'lucide-react';
+import { SigningProgressDots, getSigningProgressText } from '@/components/SigningProgressIndicator';
 
 export default function UserLoans() {
   const [loans, setLoans] = useState<LoanListItem[]>([]);
@@ -442,6 +443,22 @@ export default function UserLoans() {
                                   <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${getStatusColor(loan.status)}`}>
                                     {formatStatus(loan.status)}
                                   </span>
+                                  {/* Show signing progress for loans in signing stages */}
+                                  {(loan.status === 'application_completed' ||
+                                    loan.status === 'ipay_approved' ||
+                                    loan.status === 'dealer_approved' ||
+                                    loan.status === 'fully_signed') && (
+                                    <div className="flex items-center space-x-2">
+                                      <SigningProgressDots
+                                        ipayComplete={loan.status === 'ipay_approved' || loan.status === 'dealer_approved' || loan.status === 'fully_signed'}
+                                        organizationComplete={loan.status === 'dealer_approved' || loan.status === 'fully_signed'}
+                                        borrowerComplete={loan.status === 'fully_signed'}
+                                      />
+                                      <span className="text-xs text-gray-600">
+                                        {getSigningProgressText(loan.status)}
+                                      </span>
+                                    </div>
+                                  )}
                                   {needsAction && (
                                     <span className="inline-flex items-center px-3 py-1 text-xs font-bold rounded-full bg-orange-100 text-orange-800 border border-orange-300">
                                       🚨 Action Required

@@ -6,6 +6,7 @@ import { CheckCircle, ExternalLink, ArrowLeft, Send, DollarSign } from 'lucide-r
 import { createClient } from '@/utils/supabase/client';
 import { LoanWithBorrower } from '@/types/loan';
 import { Invoice } from '@/app/api/loans/[id]/invoices/route';
+import { SigningProgressIndicator } from '@/components/SigningProgressIndicator';
 
 interface LoanDetailProps {
   params: Promise<{ id: string }>;
@@ -51,6 +52,12 @@ export default function LoanDetail({ params }: LoanDetailProps) {
           .from('loans')
           .select(`
             *,
+            ipay_signer_status,
+            organization_signer_status,
+            borrower_signer_status,
+            ipay_signed_at,
+            organization_signed_at,
+            borrower_signed_at,
             borrower:borrowers(
               first_name,
               last_name,
@@ -374,8 +381,59 @@ export default function LoanDetail({ params }: LoanDetailProps) {
               </div>
             </div>
 
-            {/* Progress Tracker */}
+            {/* Enhanced Three-Stage Signing Progress Tracker */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 mb-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-6">Document Signing Progress</h3>
+              <SigningProgressIndicator
+                ipayStatus={loan.status === 'ipay_approved' || loan.status === 'dealer_approved' || loan.status === 'fully_signed' ? 'completed' : 'pending'}
+                organizationStatus={loan.status === 'dealer_approved' || loan.status === 'fully_signed' ? 'completed' : 'pending'}
+                borrowerStatus={loan.status === 'fully_signed' ? 'completed' : 'pending'}
+                showLabels={true}
+                size="lg"
+              />
+
+              {/* Additional status information */}
+              <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                <div className="text-sm text-gray-600">
+                  {loan.status === 'application_completed' && (
+                    <p>✉️ Awaiting iPay Admin signature. DocuSign has been sent to jhoamadrian@gmail.com</p>
+                  )}
+                  {loan.status === 'ipay_approved' && (
+                    <p>✉️ Awaiting Organization Owner signature. DocuSign has been sent to jgarcia@easycarus.com</p>
+                  )}
+                  {loan.status === 'dealer_approved' && (
+                    <p>✉️ Awaiting Borrower signature. DocuSign has been sent to {loan.borrower?.email}</p>
+                  )}
+                  {loan.status === 'fully_signed' && (
+                    <p>✅ All parties have signed. Document is fully executed and ready for funding.</p>
+                  )}
+                </div>
+
+                {/* Show signing timestamps if available */}
+                {(loan.ipay_signed_at || loan.organization_signed_at || loan.borrower_signed_at) && (
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    <p className="text-xs text-gray-500 font-semibold mb-1">Signature Timeline:</p>
+                    {loan.ipay_signed_at && (
+                      <p className="text-xs text-gray-500">
+                        iPay Admin: {new Date(loan.ipay_signed_at).toLocaleString()}
+                      </p>
+                    )}
+                    {loan.organization_signed_at && (
+                      <p className="text-xs text-gray-500">
+                        Organization: {new Date(loan.organization_signed_at).toLocaleString()}
+                      </p>
+                    )}
+                    {loan.borrower_signed_at && (
+                      <p className="text-xs text-gray-500">
+                        Borrower: {new Date(loan.borrower_signed_at).toLocaleString()}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Legacy Progress Tracker - Hidden but preserved for reference */}
+              <div className="hidden">
               <style jsx>{`
                 .loan-progress-tracker {
                   --marker-size: 48px;
@@ -553,6 +611,7 @@ export default function LoanDetail({ params }: LoanDetailProps) {
                   <div className="loan-progress-label">Funded</div>
                 </li>
               </ol>
+              </div>
             </div>
 
             {/* Action Buttons */}
