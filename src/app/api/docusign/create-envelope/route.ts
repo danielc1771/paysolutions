@@ -118,10 +118,11 @@ export async function POST(request: NextRequest) {
       message: 'Envelope sent successfully. All signers will receive email notifications in sequential order.'
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ DocuSign envelope creation failed:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to create DocuSign envelope';
     return NextResponse.json(
-      { error: error.message || 'Failed to create DocuSign envelope' },
+      { error: errorMessage },
       { status: 500 }
     );
   }

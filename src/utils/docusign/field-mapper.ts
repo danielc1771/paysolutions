@@ -72,7 +72,7 @@ export interface LoanApplicationData {
     reference3_email?: string;
     
     // Additional fields
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 
@@ -195,7 +195,7 @@ export function mapLoanDataToDocuSignFields(loan: LoanApplicationData): Record<s
   
   // Filter out empty values
   return Object.fromEntries(
-    Object.entries(fieldMapping).filter(([_, value]) => value !== '' && value !== null && value !== undefined)
+    Object.entries(fieldMapping).filter(([, value]) => value !== '' && value !== null && value !== undefined)
   );
 }
 
