@@ -4,7 +4,8 @@ import { getEnvelopesApi, makeRecipientViewRequest } from '@/utils/docusign/jwt-
 
 const IPAY_EMAIL = 'architex.development@gmail.com';
 const ORGANIZATION_EMAIL = 'architex.development@gmail.com';
-const CLIENT_USER_ID = process.env.DOCUSIGN_INTEGRATION_KEY || '';
+const INTEGRATION_KEY = process.env.INTEGRATION_KEY || '';
+const DOCUSIGN_RETURN_URL = process.env.DOCUSIGN_RETURN_URL || 'http://localhost:3000';
 
 /**
  * POST /api/docusign/signing-url
@@ -68,18 +69,25 @@ export async function POST(request: NextRequest) {
     // Generate new signing URL
     console.log(`🔄 Generating new signing URL for ${signerType}`);
 
-    // Determine signer details based on type
+    const envelopesApi = await getEnvelopesApi();
+    const returnUrl = `${DOCUSIGN_RETURN_URL}/admin/loans/${loanId}?signed=true`;
+
+    // iPay and Organization use recipient view (embedded signing)
+    // Borrower uses email-based signing
     let signerEmail = '';
     let signerName = '';
+    let clientUserId = '';
 
     switch (signerType) {
       case 'ipay':
         signerEmail = IPAY_EMAIL;
         signerName = 'iPay Representative';
+        clientUserId = `${INTEGRATION_KEY}-ipay`;
         break;
       case 'organization':
         signerEmail = ORGANIZATION_EMAIL;
         signerName = 'Organization Representative';
+        clientUserId = `${INTEGRATION_KEY}-organization`;
         break;
       case 'borrower':
         // For borrower, we need to fetch their details
@@ -98,7 +106,11 @@ export async function POST(request: NextRequest) {
 
         signerEmail = borrower.email;
         signerName = `${borrower.first_name} ${borrower.last_name}`;
-        break;
+        // Borrower signs via email, not embedded
+        return NextResponse.json({
+          success: false,
+          error: 'Borrower signs via email link, not embedded view.'
+        }, { status: 400 });
       default:
         return NextResponse.json({
           success: false,
@@ -106,15 +118,15 @@ export async function POST(request: NextRequest) {
         }, { status: 400 });
     }
 
-    // Create recipient view request
-    const returnUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard/loans/${loanId}?signed=true`;
+    // Create recipient view request for iPay and organization
+    const viewRequest = makeRecipientViewRequest(signerName, signerEmail, clientUserId, returnUrl);
 
-    const envelopesApi = await getEnvelopesApi();
-    const viewRequest = makeRecipientViewRequest(signerName, signerEmail, returnUrl);
-
-    // IMPORTANT: For embedded signing, we need to set clientUserId
-    // This should match what was set when creating the envelope
-    viewRequest.clientUserId = CLIENT_USER_ID;
+    console.log(`📝 Creating recipient view for ${signerType}:`, {
+      envelopeId: loan.docusign_envelope_id,
+      signerEmail,
+      signerName,
+      clientUserId
+    });
 
     try {
       const result = await envelopesApi.createRecipientView(
@@ -126,17 +138,15 @@ export async function POST(request: NextRequest) {
       const signingUrl = result.url;
 
       // Cache the signing URL in database
-      const updateData: Record<string, string> = {
-        [urlField]: signingUrl ?? "",
-        signing_urls_generated_at: new Date().toISOString()
-      };
-
       await supabase
         .from('loans')
-        .update(updateData)
+        .update({
+          [urlField]: signingUrl ?? "",
+          signing_urls_generated_at: new Date().toISOString()
+        })
         .eq('id', loanId);
 
-      console.log(`✅ Signing URL generated and cached for ${signerType}`);
+      console.log(`✅ Recipient view URL generated and cached for ${signerType}`);
 
       return NextResponse.json({
         success: true,
@@ -144,14 +154,20 @@ export async function POST(request: NextRequest) {
         cached: false
       });
     } catch (embedError: unknown) {
-      console.warn('⚠️ Embedded signing failed, recipient may need to sign via email:', (embedError as Error)?.message);
+      console.error('⚠️ Recipient view failed for', signerType);
+      console.error('Error details:', embedError);
+      
+      // Log more details if available
+      if (embedError && typeof embedError === 'object' && 'response' in embedError) {
+        const errorResponse = (embedError as { response?: { body?: unknown } }).response;
+        console.error('DocuSign API response:', JSON.stringify(errorResponse?.body, null, 2));
+      }
 
-      // If embedded signing fails, return a message that the user should check their email
       return NextResponse.json({
         success: false,
-        error: 'Embedded signing not available. Please check your email for the DocuSign link.',
-        emailSent: true
-      }, { status: 200 });
+        error: 'Embedded signing not available. Please check envelope status.',
+        emailSent: false
+      }, { status: 400 });
     }
 
   } catch (error: unknown) {

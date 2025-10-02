@@ -13,12 +13,16 @@ export const loanStatusEnum = pgEnum('loan_status', [
   'application_sent', 
   'application_in_progress', 
   'application_completed',
+  'pending_ipay_signature',
+  'pending_org_signature',
+  'pending_borrower_signature',
   'ipay_approved',
   'dealer_approved', 
   'fully_signed',
   'review',
   'approved', 
   'funded', 
+  'active',
   'closed', 
   'defaulted'
 ]);
@@ -167,18 +171,13 @@ export const loans = pgTable("loans", { // Added vehicle fields
 	fundingDate: date("funding_date"),
 	remainingBalance: numeric("remaining_balance", { precision: 12, scale:  2 }),
 	docusignEnvelopeId: varchar("docusign_envelope_id", { length: 255 }),
-	docusignStatus: varchar("docusign_status", { length: 50 }).default('not_sent'),
-	docusignStatusUpdated: timestamp("docusign_status_updated", { withTimezone: true, mode: 'string' }),
 	docusignCompletedAt: timestamp("docusign_completed_at", { withTimezone: true, mode: 'string' }),
-	// Signing URL cache for three-stage signing flow
+	// Signing URL cache for embedded signing flow (24-hour validity)
 	ipaySigningUrl: text("ipay_signing_url"),
 	organizationSigningUrl: text("organization_signing_url"),
 	borrowerSigningUrl: text("borrower_signing_url"),
 	signingUrlsGeneratedAt: timestamp("signing_urls_generated_at", { withTimezone: true, mode: 'string' }),
-	// Individual signer status tracking for three-stage signing
-	ipaySignerStatus: varchar("ipay_signer_status", { length: 50 }).default('pending'),
-	organizationSignerStatus: varchar("organization_signer_status", { length: 50 }).default('pending'),
-	borrowerSignerStatus: varchar("borrower_signer_status", { length: 50 }).default('pending'),
+	// Signature timestamps (single source of truth for signer status)
 	ipaySignedAt: timestamp("ipay_signed_at", { withTimezone: true, mode: 'string' }),
 	organizationSignedAt: timestamp("organization_signed_at", { withTimezone: true, mode: 'string' }),
 	borrowerSignedAt: timestamp("borrower_signed_at", { withTimezone: true, mode: 'string' }),

@@ -49,9 +49,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ loan
   const supabase = await createClient();
 
   try {
+    // First, get the loan data without joins to ensure we get the loan
     const { data: loan, error: loanError } = await supabase
       .from('loans')
       .select(`
+        id,
+        borrower_id,
+        organization_id,
         principal_amount,
         status,
         vehicle_year,
@@ -65,26 +69,47 @@ export async function GET(request: Request, { params }: { params: Promise<{ loan
         stripe_verification_status,
         phone_verification_session_id,
         phone_verification_status,
-        verified_phone_number,
-        borrowers(
-          id,
-          email,
-          kyc_status
-        ),
-        organizations(name)
+        verified_phone_number
       `)
       .eq('id', loanId)
       .single();
 
     if (loanError)  {
-      console.log(loanError);
+      console.log('❌ Loan query error:', loanError);
       throw new Error('Loan not found');
     }
+    
+    if (!loan) {
+      throw new Error('Loan not found');
+    }
+
     if (loan.status !== 'application_sent' && loan.status !== 'application_in_progress') {
       throw new Error('This application has already been submitted or is invalid.');
     }
 
-    console.log(loan);
+    console.log('✅ Loan found:', loan.id);
+
+    // Get borrower data if borrower_id exists
+    let borrowerData = null;
+    if (loan.borrower_id) {
+      const { data: borrower } = await supabase
+        .from('borrowers')
+        .select('id, email, kyc_status')
+        .eq('id', loan.borrower_id)
+        .single();
+      borrowerData = borrower;
+    }
+
+    // Get organization data if organization_id exists
+    let organizationName = null;
+    if (loan.organization_id) {
+      const { data: org } = await supabase
+        .from('organizations')
+        .select('name')
+        .eq('id', loan.organization_id)
+        .single();
+      organizationName = org?.name;
+    }
 
     return NextResponse.json({
       loan: {
@@ -101,11 +126,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ loan
         verifiedPhoneNumber: loan.verified_phone_number,
       },
       borrower: {
-        ...loan.borrowers,
+        ...(borrowerData || {}),
         first_name: loan.customer_first_name,
         last_name: loan.customer_last_name,
       },
-      dealerName: (loan.organizations as unknown as Record<string, unknown>)?.name,
+      dealerName: organizationName,
     });
 
   } catch (error: unknown) {
@@ -273,7 +298,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ loa
         .update({
           docusign_envelope_id: result.envelopeId,
           docusign_status: 'sent',
-          docusign_status_updated: new Date().toISOString()
+          docusign_status_updated: new Date().toISOString(),
+          status: 'pending_ipay_signature'
         })
         .eq('id', loanId);
 

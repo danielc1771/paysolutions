@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { CheckCircle, ExternalLink, CreditCard, Copy, Mail } from 'lucide-react';
 import { LoanWithBorrower } from '@/types/loan';
+import { formatLoanStatus } from '@/utils/formatters';
 
 interface LoanDetailProps {
   params: Promise<{ id: string }>;
@@ -92,9 +93,8 @@ export default function LoanDetail({ params }: LoanDetailProps) {
     try {
       // First, ensure DocuSign envelope exists
       if (!loan.docusign_envelope_id) {
-        console.log('📄 No envelope found, creating DocuSign envelope first...');
-        
-        const createResponse = await fetch('/api/docusign/envelope', {
+        console.log('📝 No envelope found, creating new envelope...');
+        const createResponse = await fetch('/api/docusign/create-envelope', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -105,21 +105,31 @@ export default function LoanDetail({ params }: LoanDetailProps) {
         const createData = await createResponse.json();
         
         if (!createData.success) {
-          console.error('❌ Failed to create envelope:', createData.error);
           alert('Failed to create DocuSign envelope: ' + (createData.error || 'Unknown error'));
           return;
         }
 
-        console.log('✅ Envelope created, refreshing loan data...');
+        console.log('✅ Envelope created:', createData.envelopeId);
+
         // Refresh loan data to get the new envelope ID
         await fetchLoanData();
         
         // Small delay to ensure database is updated
         await new Promise(resolve => setTimeout(resolve, 1000));
+      } else {
+        console.log('📋 Envelope already exists:', loan.docusign_envelope_id);
+        
+        // Check envelope status for debugging
+        try {
+          const statusResponse = await fetch(`/api/docusign/envelope/${loan.docusign_envelope_id}/status`);
+          const statusData = await statusResponse.json();
+          console.log('📊 Envelope status:', statusData);
+        } catch (statusError) {
+          console.error('⚠️ Could not fetch envelope status:', statusError);
+        }
       }
-
-      console.log('🔗 Getting DocuSign signing URL for iPay admin...');
       
+      console.log('🔗 Requesting signing URL for iPay...');
       const response = await fetch('/api/docusign/signing-url', {
         method: 'POST',
         headers: {
@@ -132,13 +142,14 @@ export default function LoanDetail({ params }: LoanDetailProps) {
       });
 
       const data = await response.json();
+      console.log('📬 Signing URL response:', data);
       
       if (data.success && data.signingUrl) {
-        console.log('✅ Got signing URL, redirecting...');
-        // Redirect to DocuSign for signing
+        console.log('✅ Redirecting to DocuSign...');
+        // Redirect to DocuSign embedded recipient view
         window.location.href = data.signingUrl;
       } else {
-        console.error('❌ Failed to get signing URL:', data.error);
+        console.error('❌ Failed to get signing URL:', data);
         alert('Failed to get DocuSign signing URL: ' + (data.error || 'Unknown error'));
       }
     } catch (error) {
@@ -321,22 +332,16 @@ export default function LoanDetail({ params }: LoanDetailProps) {
                 </p>
               </div>
               <div className="flex items-center space-x-4">
-                {/* Debug info - remove after fixing */}
-                <div className="text-xs text-gray-500 mb-2">
-                  Debug: Status=&quot;{loan.status}&quot; | EnvelopeId={loan.docusign_envelope_id ? 'exists' : 'none'}
-                  <button 
-                    onClick={() => fetchLoanData(true)}
-                    className="ml-2 text-blue-600 underline hover:text-blue-800"
-                  >
-                    🔄 Refresh
-                  </button>
-                </div>
                 <div className="flex space-x-4">
-                  {(loan.status === 'application_completed' || loan.status === 'new') ? (
+                  {loan.status === 'application_sent' || loan.status === 'application_in_progress' ? (
+                    <div className="px-6 py-3 bg-yellow-100 text-yellow-800 rounded-lg font-semibold">
+                      📧 Awaiting Borrower to Complete Application
+                    </div>
+                  ) : (loan.status === 'application_completed' || loan.status === 'pending_ipay_signature') ? (
                     <button 
                       onClick={handleSignDocuSign}
                       disabled={signingDocusign}
-                      className="bg-green-600 text-white hover:bg-green-700 px-6 py-3 rounded-lg font-semibold transition-colors"
+                      className="bg-green-600 text-white hover:bg-green-700 px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-50"
                     >
                       {signingDocusign ? (
                         <div className="flex items-center">
@@ -344,20 +349,28 @@ export default function LoanDetail({ params }: LoanDetailProps) {
                           Opening DocuSign...
                         </div>
                       ) : (
-                        '✍️ Sign DocuSign (iPay Admin)'
+                        '✍️ Sign & Send Agreement'
                       )}
                     </button>
-                  ) : loan.status === 'ipay_approved' ? (
+                  ) : loan.status === 'pending_org_signature' ? (
                     <div className="px-6 py-3 bg-yellow-100 text-yellow-800 rounded-lg font-semibold">
-                      📄 Awaiting Organization Owner Signature
+                      📄 Awaiting Organization Signature
                     </div>
-                  ) : loan.status === 'dealer_approved' ? (
+                  ) : loan.status === 'pending_borrower_signature' ? (
                     <div className="px-6 py-3 bg-orange-100 text-orange-800 rounded-lg font-semibold">
                       📄 Awaiting Borrower Signature
                     </div>
-                  ) : (
+                  ) : loan.status === 'fully_signed' ? (
                     <div className="px-6 py-3 bg-green-100 text-green-800 rounded-lg font-semibold">
-                      ✅ Fully Signed
+                      ✅ Fully Signed - Ready to Fund
+                    </div>
+                  ) : loan.status === 'funded' ? (
+                    <div className="px-6 py-3 bg-blue-100 text-blue-800 rounded-lg font-semibold">
+                      💵 Funded
+                    </div>
+                  ) : (
+                    <div className="px-6 py-3 bg-gray-100 text-gray-800 rounded-lg font-semibold">
+                      {formatLoanStatus(loan.status)}
                     </div>
                   )}
                 </div>

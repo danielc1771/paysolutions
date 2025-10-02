@@ -91,31 +91,32 @@ export async function POST(request: NextRequest) {
     console.log('📝 Fields to populate:', Object.keys(filteredLoanData).length);
     console.log('📅 Payment schedule entries:', paymentSchedule?.length || 0);
 
-    // Create envelope and send to all signers via email
+    // Create SENT envelope for embedded signing flow (recipient view requires sent status)
     const result = await createAndSendEnvelope(
       borrowerName,
       borrowerEmail,
-      filteredLoanData
+      filteredLoanData,
+      'sent' // Create as sent so iPay can sign via recipient view
     );
 
-    // Update loan record with envelope ID
+    // Update loan record with envelope ID and set status to pending_ipay_signature
     await supabase
       .from('loans')
       .update({
         docusign_envelope_id: result.envelopeId,
-        docusign_status: 'sent',
+        status: 'pending_ipay_signature',
         updated_at: new Date().toISOString()
       })
       .eq('id', loanId);
 
-    console.log('✅ Envelope created successfully:', result.envelopeId);
-    console.log('📧 All signers will receive email notifications in order');
+    console.log('✅ Envelope created and sent:', result.envelopeId);
+    console.log('📝 iPay can now sign via embedded recipient view');
 
     return NextResponse.json({
       success: true,
       envelopeId: result.envelopeId,
       status: result.status,
-      message: 'Envelope sent successfully. All signers will receive email notifications in sequential order.'
+      message: 'Envelope created and sent successfully. iPay can now sign via embedded recipient view.'
     });
 
   } catch (error: unknown) {

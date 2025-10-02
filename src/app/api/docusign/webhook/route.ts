@@ -30,11 +30,11 @@ function identifySignerType(email: string): 'ipay' | 'organization' | 'borrower'
  */
 function getStatusLabel(status: string): string {
   switch (status) {
-    case 'application_completed':
+    case 'pending_ipay_signature':
       return 'Awaiting iPay Signature';
-    case 'ipay_approved':
+    case 'pending_org_signature':
       return 'Awaiting Organization Signature';
-    case 'dealer_approved':
+    case 'pending_borrower_signature':
       return 'Awaiting Borrower Signature';
     case 'fully_signed':
       return 'Fully Signed';
@@ -114,9 +114,8 @@ export async function POST(request: NextRequest) {
             console.log('✅ iPay Admin completed signing');
             updateData = {
               ...updateData,
-              status: 'ipay_approved',
-              ipay_signed_at: completedTime,
-              ipay_signer_status: 'completed'
+              status: 'pending_org_signature',
+              ipay_signed_at: completedTime
             };
             break;
 
@@ -124,9 +123,8 @@ export async function POST(request: NextRequest) {
             console.log('✅ Organization Owner completed signing');
             updateData = {
               ...updateData,
-              status: 'dealer_approved',
-              organization_signed_at: completedTime,
-              organization_signer_status: 'completed'
+              status: 'pending_borrower_signature',
+              organization_signed_at: completedTime
             };
             break;
 
@@ -136,8 +134,6 @@ export async function POST(request: NextRequest) {
               ...updateData,
               status: 'fully_signed',
               borrower_signed_at: completedTime,
-              borrower_signer_status: 'completed',
-              docusign_status: 'completed',
               docusign_completed_at: completedTime
             };
             break;
@@ -161,10 +157,10 @@ export async function POST(request: NextRequest) {
 
           // Log next expected signer
           switch (updatedLoan.status) {
-            case 'ipay_approved':
-              console.log('📧 Next: Organization Owner will receive signing email');
+            case 'pending_org_signature':
+              console.log('📧 Next: Organization Owner can sign via embedded view');
               break;
-            case 'dealer_approved':
+            case 'pending_borrower_signature':
               console.log('📧 Next: Borrower will receive signing email');
               break;
             case 'fully_signed':
@@ -177,28 +173,16 @@ export async function POST(request: NextRequest) {
 
     // Handle envelope-level events
     else if (event.includes('envelope-')) {
-      let docusignStatus = 'unknown';
-
-      if (event.includes('sent')) docusignStatus = 'sent';
-      else if (event.includes('delivered')) docusignStatus = 'delivered';
-      else if (event.includes('completed')) {
-        docusignStatus = 'completed';
-        console.log('🎉 Entire envelope completed - all signers have signed');
-      }
-      else if (event.includes('declined')) docusignStatus = 'declined';
-      else if (event.includes('voided')) docusignStatus = 'voided';
-
       console.log('📋 Envelope event:', event);
-      console.log('📝 Updating DocuSign status to:', docusignStatus);
 
       const updateData: Record<string, string> = {
-        docusign_status: docusignStatus,
-        docusign_status_updated: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
 
       // Only update to fully_signed if envelope is completed and not already set
-      if (docusignStatus === 'completed') {
+      if (event.includes('completed')) {
+        console.log('🎉 Entire envelope completed - all signers have signed');
+        
         const { data: currentLoan } = await supabase
           .from('loans')
           .select('status')
@@ -219,7 +203,7 @@ export async function POST(request: NextRequest) {
       if (error) {
         console.error('❌ Failed to update loan:', error);
       } else {
-        console.log('✅ Loan DocuSign status updated successfully');
+        console.log('✅ Loan updated successfully');
       }
     }
 
