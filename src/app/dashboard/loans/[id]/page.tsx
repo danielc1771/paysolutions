@@ -7,6 +7,7 @@ import { createClient } from '@/utils/supabase/client';
 import { LoanWithBorrower } from '@/types/loan';
 import { Invoice } from '@/app/api/loans/[id]/invoices/route';
 import { SigningProgressIndicator } from '@/components/SigningProgressIndicator';
+import { formatLoanStatus } from '@/utils/formatters';
 
 interface LoanDetailProps {
   params: Promise<{ id: string }>;
@@ -52,12 +53,6 @@ export default function LoanDetail({ params }: LoanDetailProps) {
           .from('loans')
           .select(`
             *,
-            ipay_signer_status,
-            organization_signer_status,
-            borrower_signer_status,
-            ipay_signed_at,
-            organization_signed_at,
-            borrower_signed_at,
             borrower:borrowers(
               first_name,
               last_name,
@@ -126,68 +121,33 @@ export default function LoanDetail({ params }: LoanDetailProps) {
     fetchInvoices();
   }, [loan]);
 
-  const handleSendDocuSign = async () => {
+  const handleSignDocuSign = async () => {
     if (!loan) return;
 
     setDocusignLoading(true);
     try {
-      const response = await fetch('/api/docusign/envelope', {
+      const response = await fetch('/api/docusign/signing-url', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ loanId: loan.id }),
+        body: JSON.stringify({ 
+          loanId: loan.id,
+          signerType: 'organization'
+        }),
       });
 
       const data = await response.json();
       
-      if (data.success) {
-        setSuccessMessage('DocuSign agreement sent successfully! The borrower will receive an email with the document to sign.');
-        setShowSuccessModal(true);
-        
-        // Refresh loan data
-        const { data: updatedLoan } = await supabase
-          .from('loans')
-          .select(`
-            *,
-            borrower:borrowers(
-              first_name,
-              last_name,
-              email,
-              phone,
-              date_of_birth,
-              address_line1,
-              city,
-              state,
-              zip_code,
-              employment_status,
-              annual_income,
-              current_employer_name,
-              time_with_employment,
-              reference1_name,
-              reference1_phone,
-              reference1_email,
-              reference2_name,
-              reference2_phone,
-              reference2_email,
-              reference3_name,
-              reference3_phone,
-              reference3_email,
-              kyc_status
-            )
-          `)
-          .eq('id', loan.id)
-          .single();
-        
-        if (updatedLoan) {
-          setLoan(updatedLoan);
-        }
+      if (data.success && data.signingUrl) {
+        // Redirect to DocuSign embedded recipient view
+        window.location.href = data.signingUrl;
       } else {
-        alert('Failed to send DocuSign agreement: ' + (data.error || 'Unknown error'));
+        alert('Failed to get DocuSign signing URL: ' + (data.error || 'Unknown error'));
       }
     } catch (error) {
-      console.error('Error sending DocuSign:', error);
-      alert('Failed to send DocuSign agreement');
+      console.error('Error getting DocuSign signing URL:', error);
+      alert('Failed to get DocuSign signing URL');
     } finally {
       setDocusignLoading(false);
     }
@@ -257,20 +217,6 @@ export default function LoanDetail({ params }: LoanDetailProps) {
       alert('Failed to fund loan. Please try again.');
     } finally {
       setFundingLoading(false);
-    }
-  };
-
-  const formatStatus = (status: string) => {
-    switch (status) {
-      case 'new': return 'New';
-      case 'application_sent': return 'Application Sent';
-      case 'application_completed': return 'Application Completed';
-      case 'review': return 'Under Review';
-      case 'signed': return 'Signed - Ready for Funding';
-      case 'funded': return 'Funded';
-      case 'active': return 'Active';
-      case 'closed': return 'Closed';
-      default: return status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ');
     }
   };
 
@@ -376,7 +322,7 @@ export default function LoanDetail({ params }: LoanDetailProps) {
                 
                 {/* Status Badge */}
                 <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getStatusColor(loan.status)}`}>
-                  {formatStatus(loan.status)}
+                  {formatLoanStatus(loan.status)}
                 </span>
               </div>
             </div>
@@ -385,9 +331,9 @@ export default function LoanDetail({ params }: LoanDetailProps) {
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 mb-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-6">Document Signing Progress</h3>
               <SigningProgressIndicator
-                ipayStatus={loan.status === 'ipay_approved' || loan.status === 'dealer_approved' || loan.status === 'fully_signed' ? 'completed' : 'pending'}
-                organizationStatus={loan.status === 'dealer_approved' || loan.status === 'fully_signed' ? 'completed' : 'pending'}
-                borrowerStatus={loan.status === 'fully_signed' ? 'completed' : 'pending'}
+                ipayStatus={loan.ipay_signed_at ? 'completed' : loan.status === 'pending_ipay_signature' ? 'pending' : 'pending'}
+                organizationStatus={loan.organization_signed_at ? 'completed' : loan.status === 'pending_org_signature' ? 'pending' : 'pending'}
+                borrowerStatus={loan.borrower_signed_at ? 'completed' : loan.status === 'pending_borrower_signature' ? 'pending' : 'pending'}
                 showLabels={true}
                 size="lg"
               />
@@ -395,14 +341,14 @@ export default function LoanDetail({ params }: LoanDetailProps) {
               {/* Additional status information */}
               <div className="mt-6 p-4 bg-gray-50 rounded-lg">
                 <div className="text-sm text-gray-600">
-                  {loan.status === 'application_completed' && (
-                    <p>✉️ Awaiting iPay Admin signature. DocuSign has been sent to jhoamadrian@gmail.com</p>
+                  {loan.status === 'pending_ipay_signature' && (
+                    <p>📝 Awaiting iPay Admin to sign and send the agreement.</p>
                   )}
-                  {loan.status === 'ipay_approved' && (
-                    <p>✉️ Awaiting Organization Owner signature. DocuSign has been sent to jgarcia@easycarus.com</p>
+                  {loan.status === 'pending_org_signature' && (
+                    <p>✍️ Ready for your signature! Click &quot;Sign Agreement Now&quot; above to sign in your dashboard.</p>
                   )}
-                  {loan.status === 'dealer_approved' && (
-                    <p>✉️ Awaiting Borrower signature. DocuSign has been sent to {loan.borrower?.email}</p>
+                  {loan.status === 'pending_borrower_signature' && (
+                    <p>✉️ Awaiting Borrower signature. Email has been sent to {loan.borrower?.email}</p>
                   )}
                   {loan.status === 'fully_signed' && (
                     <p>✅ All parties have signed. Document is fully executed and ready for funding.</p>
@@ -615,49 +561,25 @@ export default function LoanDetail({ params }: LoanDetailProps) {
             </div>
 
             {/* Action Buttons */}
-            {(loan.docusign_status === 'not_sent' && loan.status === 'application_completed') || loan.status === 'ipay_approved' || loan.status === 'fully_signed' ? (
+            {(loan.status === 'pending_org_signature' || loan.status === 'fully_signed') && (
               <div className="flex gap-3 mb-6">
-                {loan.docusign_status === 'not_sent' && loan.status === 'application_completed' && (
+                {loan.status === 'pending_org_signature' && (
                   <button
-                    onClick={handleSendDocuSign}
+                    onClick={handleSignDocuSign}
                     disabled={docusignLoading}
                     className="bg-green-600 text-white px-5 py-2.5 rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                   >
                     {docusignLoading ? (
                       <>
                         <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                        <span>Sending...</span>
+                        <span>Opening...</span>
                       </>
                     ) : (
                       <>
                         <Send className="w-4 h-4" />
-                        <span>Send Agreement</span>
+                        <span>Sign Agreement Now</span>
                       </>
                     )}
-                  </button>
-                )}
-                
-                {loan.status === 'ipay_approved' && (
-                  <button
-                    onClick={async () => {
-                      try {
-                        const response = await fetch('/api/docusign/signing-url', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ loanId: loan.id, signerType: 'organization' }),
-                        });
-                        const data = await response.json();
-                        if (data.success && data.signingUrl) {
-                          window.location.href = data.signingUrl;
-                        }
-                      } catch (error) {
-                        console.error('Error:', error);
-                      }
-                    }}
-                    className="bg-blue-600 text-white px-5 py-2.5 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center space-x-2"
-                  >
-                    <Send className="w-4 h-4" />
-                    <span>Sign Agreement Now</span>
                   </button>
                 )}
                 
@@ -693,7 +615,7 @@ export default function LoanDetail({ params }: LoanDetailProps) {
                   </a>
                 )}
               </div>
-            ) : null}
+            )}
 
             {/* Main Content - 2 Column Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

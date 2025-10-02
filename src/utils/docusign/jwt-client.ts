@@ -4,9 +4,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 // DocuSign JWT Configuration
-const INTEGRATION_KEY = process.env.DOCUSIGN_INTEGRATION_KEY;
-const USER_ID = process.env.DOCUSIGN_USER_ID;
-const BASE_PATH = process.env.DOCUSIGN_BASE_PATH;
+const INTEGRATION_KEY = process.env.INTEGRATION_KEY;
+const USER_ID = process.env.USER_ID;
+const BASE_PATH = process.env.BASE_PATH;
 const TEMPLATE_ID = process.env.TEMPLATE_ID;
 const API_ACCOUNT_ID = process.env.API_ACCOUNT_ID;
 const OAUTH_SCOPE = 'signature';
@@ -114,15 +114,21 @@ export async function getEnvelopesApi() {
  * Create envelope definition with loan data and all three signers
  * Following the official DocuSign documentation pattern
  * 
- * Signing Order (all via email):
- * 1. iPay (jhoamadrian@gmail.com)
- * 2. Borrower (from application)
- * 3. Organization (jgarcia@easycarus.com)
+ * Signing Order (All Embedded + Email):
+ * 1. iPay (embedded recipient view - signs)
+ * 2. Organization (embedded recipient view - signs)
+ * 3. Borrower (email recipient view - signs via email)
+ * 
+ * @param borrowerName - Full name of the borrower
+ * @param borrowerEmail - Email address of the borrower
+ * @param tabValues - Pre-filled form field values
+ * @param status - Envelope status: 'created' for draft (embedded), 'sent' for immediate send
  */
 export function makeEnvelope(
   borrowerName: string, 
   borrowerEmail: string, 
-  tabValues?: Record<string, string>
+  tabValues?: Record<string, string>,
+  status: 'created' | 'sent' = 'created'
 ) {
   if (!TEMPLATE_ID) {
     throw new Error('Missing TEMPLATE_ID in environment variables');
@@ -160,65 +166,88 @@ export function makeEnvelope(
     console.log(`📝 Created ${textTabs.length} text tabs for pre-filling`);
   }
 
-  // Signer 1: iPay (Routing Order 1) - Embedded signing (dashboard) + email notification
+  // Signer 1: iPay (Routing Order 1) - Embedded recipient view (signs)
   const iPay = new docusign.TemplateRole();
   iPay.email = IPAY_EMAIL;
   iPay.name = 'iPay Representative';
   iPay.roleName = 'iPay';
   Object.assign(iPay, {
     routingOrder: '1',
-    // Add clientUserId for embedded signing capability while still sending emails
-    clientUserId: INTEGRATION_KEY
+    // clientUserId enables embedded signing
+    clientUserId: `${INTEGRATION_KEY}-ipay`
   });
   // Attach all pre-filled tabs to iPay role (they review all information first)
   if (tabs) {
     iPay.tabs = tabs;
   }
 
-  // Signer 2: Borrower (Routing Order 2) - Email notification only
-  const borrower = new docusign.TemplateRole();
-  borrower.email = borrowerEmail;
-  borrower.name = borrowerName;
-  borrower.roleName = 'Borrower';
-  Object.assign(borrower, {
-    routingOrder: '2',
-    // Add clientUserId for potential embedded signing
-    clientUserId: INTEGRATION_KEY
-  });
-  // NO tabs - borrower only signs, doesn't fill out fields
-
-  // Signer 3: Organization (Routing Order 3) - Embedded signing (dashboard) + email notification
+  // Signer 2: Organization (Routing Order 2) - Embedded recipient view (signs in dashboard)
   const organization = new docusign.TemplateRole();
   organization.email = ORGANIZATION_EMAIL;
   organization.name = 'Organization Representative';
   organization.roleName = 'Organization';
   Object.assign(organization, {
-    routingOrder: '3',
-    // Add clientUserId for embedded signing capability
-    clientUserId: INTEGRATION_KEY
+    routingOrder: '2',
+    // clientUserId enables embedded signing
+    clientUserId: `${INTEGRATION_KEY}-organization`
   });
 
-  // Add all three template roles in order
-  env.templateRoles = [iPay, borrower, organization];
-  env.status = 'sent';
+  // Signer 3: Borrower (Routing Order 3) - Email notification (signs via email link)
+  const borrower = new docusign.TemplateRole();
+  borrower.email = borrowerEmail;
+  borrower.name = borrowerName;
+  borrower.roleName = 'Borrower';
+  Object.assign(borrower, {
+    routingOrder: '3'
+    // NO clientUserId - borrower signs via email link
+  });
+  // NO tabs - borrower only signs, doesn't fill out fields
 
-  console.log('📋 Envelope created with 3 signers (all via email):');
-  console.log('  1. iPay:', IPAY_EMAIL, '(will receive email first)');
-  console.log('  2. Borrower:', borrowerEmail, '(will receive email after iPay signs)');
-  console.log('  3. Organization:', ORGANIZATION_EMAIL, '(will receive email after Borrower signs)');
+  // Add all three template roles in correct order
+  env.templateRoles = [iPay, organization, borrower];
+  env.status = status; // 'created' for draft or 'sent' for immediate send
+
+  console.log('📋 Envelope created with 3 signers (embedded + email):');
+  console.log('  1. iPay:', IPAY_EMAIL, '(embedded recipient view - signs)');
+  console.log('  2. Organization:', ORGANIZATION_EMAIL, '(embedded recipient view - signs)');
+  console.log('  3. Borrower:', borrowerEmail, '(email - signs via email link)');
+  console.log('  Status:', status);
 
   return env;
 }
 
 /**
- * Create recipient view request for embedded signing
- * This generates the URL for the borrower to sign the document
+ * Create sender view request for embedded signing
+ * NOTE: This function is deprecated and no longer used.
+ * All signers (iPay, Organization) now use recipient view.
+ * Kept for backwards compatibility only.
+ * 
+ * @param returnUrl - URL to redirect after signing is complete
+ * @deprecated Use makeRecipientViewRequest instead
  */
-export function makeRecipientViewRequest(name: string, email: string, returnUrl: string) {
-  if (!INTEGRATION_KEY) {
-    throw new Error('Missing INTEGRATION_KEY in environment variables');
-  }
+export function makeSenderViewRequest(returnUrl: string) {
+  // ReturnUrlRequest is the correct type for sender view
+  const viewRequest: { returnUrl: string } = {
+    returnUrl: returnUrl
+  };
+  return viewRequest;
+}
 
+/**
+ * Create recipient view request for embedded signing
+ * This generates the URL for organization/borrower to sign the document
+ * 
+ * @param name - Full name of the signer
+ * @param email - Email address of the signer
+ * @param clientUserId - Unique client user ID (must match envelope creation)
+ * @param returnUrl - URL to redirect after signing is complete
+ */
+export function makeRecipientViewRequest(
+  name: string, 
+  email: string, 
+  clientUserId: string,
+  returnUrl: string
+) {
   const viewRequest = new docusign.RecipientViewRequest();
 
   viewRequest.returnUrl = returnUrl;
@@ -227,24 +256,33 @@ export function makeRecipientViewRequest(name: string, email: string, returnUrl:
   // Recipient information must match embedded recipient info
   viewRequest.email = email;
   viewRequest.userName = name;
-  viewRequest.clientUserId = INTEGRATION_KEY; // Using INTEGRATION_KEY as CLIENT_USER_ID per your instruction
+  viewRequest.clientUserId = clientUserId;
 
   return viewRequest;
 }
 
 /**
- * Create and send envelope to all three signers via email
+ * Create and send envelope for embedded signing flow
  * This is the main function that orchestrates the DocuSign flow
  * 
  * Flow:
- * 1. Creates envelope with all 3 signers (iPay, Borrower, Organization)
- * 2. All signers receive email notifications in sequential order
- * 3. No embedded signing - all done via email links
+ * 1. Creates and sends envelope with all 3 signers (iPay, Organization, Borrower)
+ * 2. iPay uses recipient view to sign (embedded)
+ * 3. Organization uses recipient view to sign (embedded)
+ * 4. Borrower receives email to sign
+ * 
+ * Note: Envelope must be 'sent' status for recipient view to work
+ * 
+ * @param borrowerName - Full name of the borrower
+ * @param borrowerEmail - Email address of the borrower
+ * @param loanData - Pre-filled form field values
+ * @param status - 'sent' to send immediately (default, required for recipient view), 'created' for draft
  */
 export async function createAndSendEnvelope(
   borrowerName: string,
   borrowerEmail: string,
-  loanData: Record<string, string>
+  loanData: Record<string, string>,
+  status: 'created' | 'sent' = 'sent'
 ) {
   if (!API_ACCOUNT_ID) {
     throw new Error('Missing API_ACCOUNT_ID in environment variables');
@@ -258,19 +296,23 @@ export async function createAndSendEnvelope(
     const envelopesApi = await getEnvelopesApi();
 
     // Step 3: Create envelope with loan data and all 3 signers
-    const envelope = makeEnvelope(borrowerName, borrowerEmail, loanData);
+    const envelope = makeEnvelope(borrowerName, borrowerEmail, loanData, status);
 
-    console.log('📤 Creating envelope with 3 signers (all via email)...');
+    console.log(`📤 Creating ${status} envelope with 3 signers (embedded + email)...`);
     
     // Step 4: Create and send the envelope
     const results = await envelopesApi.createEnvelope(API_ACCOUNT_ID, {
       envelopeDefinition: envelope
     });
 
-    console.log('✅ Envelope created and sent:', results.envelopeId);
-    console.log('📧 iPay will receive email notification immediately');
-    console.log('📧 Borrower will receive email notification after iPay signs');
-    console.log('📧 Organization will receive email notification after Borrower signs');
+    console.log(`✅ Envelope ${status === 'created' ? 'created as draft' : 'created and sent'}:`, results.envelopeId);
+    if (status === 'sent') {
+      console.log('📝 iPay can now use recipient view to sign (embedded)');
+      console.log('📝 Organization can use recipient view to sign (embedded) after iPay signs');
+      console.log('📧 Borrower will receive email notification after Organization signs');
+    } else {
+      console.log('⚠️  Draft envelope created - must be sent before recipient view can be used');
+    }
     console.log('');
     console.log('🔗 View envelope in DocuSign:');
     console.log(`   https://demo.docusign.net/documents/details/${results.envelopeId}`);

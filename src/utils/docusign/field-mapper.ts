@@ -214,8 +214,8 @@ export function validateRequiredFields(loan: LoanApplicationData): string[] {
   if (!borrower.email) missingFields.push('Email');
   if (!borrower.phone && !loan.verified_phone_number) missingFields.push('Phone Number');
   
-  // Check required loan fields
-  if (!loan.amount) missingFields.push('Loan Amount');
+  // Check required loan fields - support both amount and principal_amount
+  if (!loan.amount && !loan.principal_amount) missingFields.push('Loan Amount');
   
   return missingFields;
 }

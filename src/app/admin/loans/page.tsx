@@ -6,6 +6,7 @@ import AdminLayout from '@/components/AdminLayout';
 import { RoleRedirect } from '@/components/auth/RoleRedirect';
 import { AdminLoanListItem } from '@/types/loan';
 import CustomSelect from '@/components/CustomSelect';
+import { formatLoanStatus } from '@/utils/formatters';
 
 interface Organization {
   id: string;
@@ -272,7 +273,7 @@ export default function LoansPage() {
                               {loan.borrower?.first_name} {loan.borrower?.last_name}
                             </h3>
                             <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${getStatusColor(loan.status)}`}>
-                              {loan.status}
+                              {formatLoanStatus(loan.status)}
                             </span>
                           </div>
                           <div className="flex items-center space-x-6 text-sm text-gray-600">

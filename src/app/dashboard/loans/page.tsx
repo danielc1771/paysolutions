@@ -7,6 +7,7 @@ import CustomSelect from '@/components/CustomSelect';
 import { LoanListItem } from '@/types/loan';
 import { Plus, Search, FileText, Calendar, Car, Eye, Trash2, CheckCircle, DollarSign, PenTool, Check } from 'lucide-react';
 import { SigningProgressDots, getSigningProgressText } from '@/components/SigningProgressIndicator';
+import { formatLoanStatus } from '@/utils/formatters';
 
 export default function UserLoans() {
   const [loans, setLoans] = useState<LoanListItem[]>([]);
@@ -111,26 +112,9 @@ export default function UserLoans() {
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
       month: 'short',
       day: 'numeric'
     });
-  };
-
-  const formatStatus = (status: string) => {
-    switch (status) {
-      case 'new': return 'New';
-      case 'application_sent': return 'Application Sent';
-      case 'application_completed': return 'Application Completed';
-      case 'ipay_approved': return 'iPay Approved';
-      case 'dealer_approved': return 'Dealer Approved';
-      case 'fully_signed': return 'Fully Signed';
-      case 'review': return 'Under Review';
-      case 'funded': return 'Funded';
-      case 'active': return 'Active';
-      case 'closed': return 'Closed';
-      default: return status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ');
-    }
   };
 
   // Filter loans based on status and search term
@@ -441,7 +425,7 @@ export default function UserLoans() {
                                     {loan.borrower?.first_name} {loan.borrower?.last_name}
                                   </h3>
                                   <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${getStatusColor(loan.status)}`}>
-                                    {formatStatus(loan.status)}
+                                    {formatLoanStatus(loan.status)}
                                   </span>
                                   {/* Show signing progress for loans in signing stages */}
                                   {(loan.status === 'application_completed' ||
