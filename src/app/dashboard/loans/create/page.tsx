@@ -89,6 +89,12 @@ export default function CreateLoan() {
     if (!sendFormData.loanAmount) {
       errors.loanAmount = true;
       isValid = false;
+    } else {
+      const amount = parseInt(sendFormData.loanAmount);
+      if (isNaN(amount) || amount <= 0 || amount > 2998) {
+        errors.loanAmount = true;
+        isValid = false;
+      }
     }
     if (!sendFormData.loanTerm) {
       errors.loanTerm = true;
@@ -209,9 +215,6 @@ export default function CreateLoan() {
     }
   };
 
-
-  const loanAmountOptions = ['1000', '1500', '2000', '2500', '2998'];
-
   // Calculate available terms and payment details for send application
   const availableTerms = useMemo(() => {
     if (!sendFormData.loanAmount) return [];
@@ -233,13 +236,16 @@ export default function CreateLoan() {
 
   // Handle loan amount change to reset term if invalid
   const handleLoanAmountChange = (newAmount: string) => {
-    setSendFormData(prev => ({ ...prev, loanAmount: newAmount }));
-    if (newAmount) {
-      const terms = getAvailableTerms();
-      if (terms.length > 0 && !terms.some(t => t.weeks.toString() === sendFormData.loanTerm)) {
-        setSendFormData(prev => ({ ...prev, loanTerm: '4' })); // Default to 4 weeks
+    setSendFormData(prev => {
+      if (newAmount) {
+        const terms = getAvailableTerms();
+        // Check if current term is still valid
+        if (terms.length > 0 && !terms.some(t => t.weeks.toString() === prev.loanTerm)) {
+          return { ...prev, loanAmount: newAmount, loanTerm: '4' };
+        }
       }
-    }
+      return { ...prev, loanAmount: newAmount };
+    });
   };
 
   return (
@@ -311,16 +317,42 @@ export default function CreateLoan() {
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Loan Amount *</label>
-                        <CustomSelect
-                          options={loanAmountOptions.map(amount => ({
-                            value: amount,
-                            label: `$${parseInt(amount).toLocaleString()}`
-                          }))}
-                          value={sendFormData.loanAmount}
-                          onChange={(value) => handleLoanAmountChange(value)}
-                          placeholder="Select loan amount"
-                          className={`w-full px-4 py-3 rounded-2xl border ${validationErrors.loanAmount ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'} focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white transition-all duration-300 flex items-center justify-between`}
-                        />
+                        <div className="relative">
+                          <input
+                            type="number"
+                            required
+                            min="1"
+                            max="2998"
+                            step="1"
+                            value={sendFormData.loanAmount}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                              const value = e.target.value;
+                              // Allow empty or valid numbers only
+                              if (value === '') {
+                                setSendFormData(prev => ({ ...prev, loanAmount: '' }));
+                              } else {
+                                const numValue = parseInt(value);
+                                // Only update if it's a valid number within range
+                                if (!isNaN(numValue) && numValue >= 1 && numValue <= 2998) {
+                                  handleLoanAmountChange(value);
+                                }
+                              }
+                            }}
+                            onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
+                              // Enforce max on blur if user typed a larger number
+                              const value = e.target.value;
+                              if (value) {
+                                const numValue = parseInt(value);
+                                if (numValue > 2998) {
+                                  handleLoanAmountChange('2998');
+                                }
+                              }
+                            }}
+                            className={`w-full pl-4 pr-4 py-3 rounded-2xl border ${validationErrors.loanAmount ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'} focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                            placeholder="2998"
+                          />
+                        </div>
+                        <p className="mt-1 text-xs text-gray-500">Enter a whole number between $1 and $2,998</p>
                       </div>
                       
                       {/* Loan Term Selection */}
