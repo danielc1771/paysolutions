@@ -164,6 +164,7 @@ DOCUSIGN_USER_ID=
 DOCUSIGN_ACCOUNT_ID=
 DOCUSIGN_PRIVATE_KEY=
 DOCUSIGN_BASE_PATH=https://demo.docusign.net/restapi
+DOCUSIGN_WEB_URL=https://demo.docusign.net
 
 # Communication
 TWILIO_ACCOUNT_SID=
@@ -327,7 +328,7 @@ Key database relationships and constraints:
 
 #### URL Configuration
 - **Single Base URL**: `NEXT_PUBLIC_BASE_URL` handles all URL needs (auth, DocuSign callbacks, webhooks, redirects)
-- **DocuSign Web URLs**: Automatically derived from `BASE_PATH` by removing `/restapi` suffix  
+- **DocuSign URLs**: Separate API (`DOCUSIGN_BASE_PATH`) and web (`DOCUSIGN_WEB_URL`) endpoints for reliability  
 - **Environment Switching**: Change one variable from `http://localhost:3000` to `https://your-domain.com` for production
 - Verify API version compatibility (`2025-06-30.basil`)
 
