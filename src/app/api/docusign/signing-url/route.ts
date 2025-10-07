@@ -5,7 +5,7 @@ import { getEnvelopesApi, makeRecipientViewRequest } from '@/utils/docusign/jwt-
 const IPAY_EMAIL = 'architex.development@gmail.com';
 const ORGANIZATION_EMAIL = 'architex.development@gmail.com';
 const INTEGRATION_KEY = process.env.INTEGRATION_KEY || '';
-const DOCUSIGN_RETURN_URL = process.env.DOCUSIGN_RETURN_URL || 'http://localhost:3000';
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
 
 /**
  * POST /api/docusign/signing-url
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
     console.log(`🔄 Generating new signing URL for ${signerType}`);
 
     const envelopesApi = await getEnvelopesApi();
-    const returnUrl = `${DOCUSIGN_RETURN_URL}/admin/loans/${loanId}?signed=true`;
+    const returnUrl = `${BASE_URL}/docusign-complete?event=signing_complete&loanId=${loanId}&signerType=${signerType}`;
 
     // iPay and Organization use recipient view (embedded signing)
     // Borrower uses email-based signing
