@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 
 // Hardcoded signer emails for now
-const IPAY_ADMIN_EMAIL = 'jhoamadrian@gmail.com';
+const IPAY_ADMIN_EMAIL = 'ipaycustomer@gmail.com';
 const ORG_OWNER_EMAIL = 'jgarcia@easycarus.com'; // EasyCar organization owner
 
 /**
