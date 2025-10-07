@@ -315,7 +315,8 @@ export async function createAndSendEnvelope(
     }
     console.log('');
     console.log('🔗 View envelope in DocuSign:');
-    console.log(`   https://demo.docusign.net/documents/details/${results.envelopeId}`);
+    const docusignWebUrl = process.env.BASE_PATH?.replace('/restapi', '') || 'https://demo.docusign.net';
+    console.log(`   ${docusignWebUrl}/documents/details/${results.envelopeId}`);
     console.log('');
 
     return {
@@ -323,7 +324,7 @@ export async function createAndSendEnvelope(
       status: results.status,
       uri: results.uri,
       statusDateTime: results.statusDateTime,
-      docusignUrl: `https://demo.docusign.net/documents/details/${results.envelopeId}`
+      docusignUrl: `${docusignWebUrl}/documents/details/${results.envelopeId}`
     };
   } catch (error: unknown) {
     console.error('❌ Failed to create envelope:', error);

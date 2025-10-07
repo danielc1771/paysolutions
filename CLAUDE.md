@@ -21,6 +21,10 @@ npm run lint
 # Format code
 npm run format
 npm run format:check
+
+# Test data management
+npm run test:create-loan
+npm run test:cleanup
 ```
 
 ### Database Commands
@@ -169,9 +173,8 @@ EMAIL_SERVER_USER=
 EMAIL_SERVER_PASSWORD=
 
 # Application
-NEXT_PUBLIC_SITE_URL=
-NEXTAUTH_SECRET=
-NEXTAUTH_URL=
+NEXT_PUBLIC_BASE_URL=http://localhost:3000  # Change to https://your-domain.com for production
+NEXTAUTH_SECRET=your_nextauth_secret_here
 ```
 
 ### Development Guidelines
@@ -205,6 +208,15 @@ Reference the setup guides for comprehensive testing:
 - `docs/setup-guides/DOCUSIGN_SETUP.md` - Document signing and template testing
 
 **Note**: No formal testing framework is currently configured. Consider adding Jest/Vitest for unit tests and Playwright/Cypress for E2E testing.
+
+### Test Data Management Commands
+```bash
+# Create test loan data for DocuSign testing
+npm run test:create-loan
+
+# Clean up all test data
+npm run test:cleanup
+```
 
 ### Common Development Patterns
 
@@ -312,6 +324,11 @@ Key database relationships and constraints:
 #### Stripe Integration
 - Webhook endpoint must be publicly accessible for testing
 - Use Stripe CLI for local webhook forwarding: `stripe listen --forward-to localhost:3000/api/stripe/webhook`
+
+#### URL Configuration
+- **Single Base URL**: `NEXT_PUBLIC_BASE_URL` handles all URL needs (auth, DocuSign callbacks, webhooks, redirects)
+- **DocuSign Web URLs**: Automatically derived from `BASE_PATH` by removing `/restapi` suffix  
+- **Environment Switching**: Change one variable from `http://localhost:3000` to `https://your-domain.com` for production
 - Verify API version compatibility (`2025-06-30.basil`)
 
 #### Database Migrations

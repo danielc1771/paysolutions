@@ -605,7 +605,7 @@ export default function LoanDetail({ params }: LoanDetailProps) {
                 
                 {loan.docusign_envelope_id && (
                   <a
-                    href={`https://demo.docusign.net/documents/${loan.docusign_envelope_id}`}
+                    href={`${process.env.BASE_PATH?.replace('/restapi', '') || 'https://demo.docusign.net'}/documents/${loan.docusign_envelope_id}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors flex items-center space-x-2"
