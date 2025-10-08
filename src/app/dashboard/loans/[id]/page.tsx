@@ -561,7 +561,7 @@ export default function LoanDetail({ params }: LoanDetailProps) {
             </div>
 
             {/* Action Buttons */}
-            {(loan.ipay_signed_at && !loan.organization_signed_at) || loan.borrower_signed_at && (
+            {((loan.ipay_signed_at && !loan.organization_signed_at) || loan.borrower_signed_at) && (
               <div className="flex gap-3 mb-6">
                 {/* Show signing button only when iPay has signed but organization hasn't */}
                 {loan.ipay_signed_at && !loan.organization_signed_at && (
