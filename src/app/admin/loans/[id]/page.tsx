@@ -337,8 +337,8 @@ export default function LoanDetail({ params }: LoanDetailProps) {
                     <div className="px-6 py-3 bg-yellow-100 text-yellow-800 rounded-lg font-semibold">
                       📧 Awaiting Borrower to Complete Application
                     </div>
-                  ) : (loan.status === 'application_completed' || loan.status === 'pending_ipay_signature') ? (
-                    <button 
+                  ) : !loan.ipay_signed_at ? (
+                    <button
                       onClick={handleSignDocuSign}
                       disabled={signingDocusign}
                       className="bg-green-600 text-white hover:bg-green-700 px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-50"
@@ -349,18 +349,18 @@ export default function LoanDetail({ params }: LoanDetailProps) {
                           Opening DocuSign...
                         </div>
                       ) : (
-                        '✍️ Sign & Send Agreement'
+                        '✍️ Sign & Send Agreement (iPay Admin)'
                       )}
                     </button>
-                  ) : loan.status === 'pending_org_signature' ? (
+                  ) : loan.ipay_signed_at && !loan.organization_signed_at ? (
                     <div className="px-6 py-3 bg-yellow-100 text-yellow-800 rounded-lg font-semibold">
                       📄 Awaiting Organization Signature
                     </div>
-                  ) : loan.status === 'pending_borrower_signature' ? (
+                  ) : loan.organization_signed_at && !loan.borrower_signed_at ? (
                     <div className="px-6 py-3 bg-orange-100 text-orange-800 rounded-lg font-semibold">
                       📄 Awaiting Borrower Signature
                     </div>
-                  ) : loan.status === 'fully_signed' ? (
+                  ) : loan.borrower_signed_at ? (
                     <div className="px-6 py-3 bg-green-100 text-green-800 rounded-lg font-semibold">
                       ✅ Fully Signed - Ready to Fund
                     </div>
@@ -453,7 +453,7 @@ export default function LoanDetail({ params }: LoanDetailProps) {
           )}
 
           {/* Admin Approval Section - Moved to top for high visibility */}
-          {loan.status === 'fully_signed' && (
+          {loan.borrower_signed_at && loan.status !== 'funded' && (
             <div className="bg-gradient-to-r from-orange-50 to-red-50 border-l-4 border-orange-400 rounded-xl shadow-lg p-6">
               <div className="flex items-start">
                 <div className="flex-shrink-0">

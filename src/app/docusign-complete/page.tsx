@@ -20,16 +20,37 @@ function DocuSignCompleteContent() {
         // Get parameters from URL
         const envelopeId = searchParams.get('envelopeId');
         const event = searchParams.get('event');
-        
+
         if (!envelopeId) {
           throw new Error('No envelope ID provided');
         }
 
         // Check if the signing was successful based on event parameter
         if (event === 'signing_complete') {
+          // Update the loan's signing timestamps based on which signer completed
+          try {
+            const updateResponse = await fetch('/api/docusign/update-signing-timestamp', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ envelopeId }),
+            });
+
+            const updateData = await updateResponse.json();
+
+            if (!updateData.success) {
+              console.error('Failed to update signing timestamp:', updateData.error);
+            } else {
+              console.log('Successfully updated signing timestamp:', updateData.signerType);
+            }
+          } catch (updateError) {
+            console.error('Error updating signing timestamp:', updateError);
+          }
+
           setStatus('success');
           setMessage('Your document has been signed successfully!');
-          
+
           // Redirect to appropriate dashboard after 3 seconds
           setTimeout(() => {
             // Try to determine user type and redirect appropriately
@@ -43,7 +64,7 @@ function DocuSignCompleteContent() {
           // Default success case
           setStatus('success');
           setMessage('Your signature has been recorded successfully!');
-          
+
           setTimeout(() => {
             router.push('/login');
           }, 3000);

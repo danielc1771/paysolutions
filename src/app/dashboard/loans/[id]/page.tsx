@@ -331,9 +331,9 @@ export default function LoanDetail({ params }: LoanDetailProps) {
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 mb-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-6">Document Signing Progress</h3>
               <SigningProgressIndicator
-                ipayStatus={loan.ipay_signed_at ? 'completed' : loan.status === 'pending_ipay_signature' ? 'pending' : 'pending'}
-                organizationStatus={loan.organization_signed_at ? 'completed' : loan.status === 'pending_org_signature' ? 'pending' : 'pending'}
-                borrowerStatus={loan.borrower_signed_at ? 'completed' : loan.status === 'pending_borrower_signature' ? 'pending' : 'pending'}
+                ipayStatus={loan.ipay_signed_at ? 'completed' : 'pending'}
+                organizationStatus={loan.organization_signed_at ? 'completed' : loan.ipay_signed_at ? 'pending' : undefined}
+                borrowerStatus={loan.borrower_signed_at ? 'completed' : loan.organization_signed_at ? 'pending' : undefined}
                 showLabels={true}
                 size="lg"
               />
@@ -341,16 +341,16 @@ export default function LoanDetail({ params }: LoanDetailProps) {
               {/* Additional status information */}
               <div className="mt-6 p-4 bg-gray-50 rounded-lg">
                 <div className="text-sm text-gray-600">
-                  {loan.status === 'pending_ipay_signature' && (
+                  {!loan.ipay_signed_at && (
                     <p>📝 Awaiting iPay Admin to sign and send the agreement.</p>
                   )}
-                  {loan.status === 'pending_org_signature' && (
-                    <p>✍️ Ready for your signature! Click &quot;Sign Agreement Now&quot; above to sign in your dashboard.</p>
+                  {loan.ipay_signed_at && !loan.organization_signed_at && (
+                    <p>✍️ Ready for your signature! Click &quot;Sign Agreement Now&quot; below to complete your signature.</p>
                   )}
-                  {loan.status === 'pending_borrower_signature' && (
+                  {loan.organization_signed_at && !loan.borrower_signed_at && (
                     <p>✉️ Awaiting Borrower signature. Email has been sent to {loan.borrower?.email}</p>
                   )}
-                  {loan.status === 'fully_signed' && (
+                  {loan.borrower_signed_at && (
                     <p>✅ All parties have signed. Document is fully executed and ready for funding.</p>
                   )}
                 </div>
@@ -361,17 +361,17 @@ export default function LoanDetail({ params }: LoanDetailProps) {
                     <p className="text-xs text-gray-500 font-semibold mb-1">Signature Timeline:</p>
                     {loan.ipay_signed_at && (
                       <p className="text-xs text-gray-500">
-                        iPay Admin: {new Date(loan.ipay_signed_at).toLocaleString()}
+                        ✅ iPay Admin: {new Date(loan.ipay_signed_at).toLocaleString()}
                       </p>
                     )}
                     {loan.organization_signed_at && (
                       <p className="text-xs text-gray-500">
-                        Organization: {new Date(loan.organization_signed_at).toLocaleString()}
+                        ✅ Organization: {new Date(loan.organization_signed_at).toLocaleString()}
                       </p>
                     )}
                     {loan.borrower_signed_at && (
                       <p className="text-xs text-gray-500">
-                        Borrower: {new Date(loan.borrower_signed_at).toLocaleString()}
+                        ✅ Borrower: {new Date(loan.borrower_signed_at).toLocaleString()}
                       </p>
                     )}
                   </div>
@@ -561,9 +561,10 @@ export default function LoanDetail({ params }: LoanDetailProps) {
             </div>
 
             {/* Action Buttons */}
-            {(loan.status === 'pending_org_signature' || loan.status === 'fully_signed') && (
+            {(loan.ipay_signed_at && !loan.organization_signed_at) || loan.borrower_signed_at && (
               <div className="flex gap-3 mb-6">
-                {loan.status === 'pending_org_signature' && (
+                {/* Show signing button only when iPay has signed but organization hasn't */}
+                {loan.ipay_signed_at && !loan.organization_signed_at && (
                   <button
                     onClick={handleSignDocuSign}
                     disabled={docusignLoading}
@@ -582,8 +583,9 @@ export default function LoanDetail({ params }: LoanDetailProps) {
                     )}
                   </button>
                 )}
-                
-                {loan.status === 'fully_signed' && (
+
+                {/* Show fund button only when all parties have signed */}
+                {loan.borrower_signed_at && (
                   <button
                     onClick={handleFundLoan}
                     disabled={fundingLoading}
@@ -602,7 +604,7 @@ export default function LoanDetail({ params }: LoanDetailProps) {
                     )}
                   </button>
                 )}
-                
+
                 {loan.docusign_envelope_id && (
                   <a
                     href={`${process.env.DOCUSIGN_WEB_URL || 'https://demo.docusign.net'}/documents/${loan.docusign_envelope_id}`}
