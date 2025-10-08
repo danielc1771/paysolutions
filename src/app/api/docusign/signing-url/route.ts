@@ -10,7 +10,7 @@ const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
 /**
  * POST /api/docusign/signing-url
  *
- * Generate or retrieve cached signing URL for a specific signer
+ * Generate a fresh signing URL for a specific signer (valid for 5 minutes)
  */
 export async function POST(request: NextRequest) {
   try {
@@ -47,30 +47,9 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Check if we have a cached URL that's still valid (24 hours)
-    const urlField = `${signerType}_signing_url`;
-    const cachedUrl = loan[urlField];
-    const urlGeneratedAt = loan.signing_urls_generated_at;
-
-    if (cachedUrl && urlGeneratedAt) {
-      const urlAge = Date.now() - new Date(urlGeneratedAt).getTime();
-      const twentyFourHours = 24 * 60 * 60 * 1000;
-
-      if (urlAge < twentyFourHours) {
-        console.log(`✅ Returning cached signing URL for ${signerType}`);
-        return NextResponse.json({
-          success: true,
-          signingUrl: cachedUrl,
-          cached: true
-        });
-      }
-    }
-
-    // Generate new signing URL
-    console.log(`🔄 Generating new signing URL for ${signerType}`);
-
     const envelopesApi = await getEnvelopesApi();
     const returnUrl = `${BASE_URL}/docusign-complete?event=signing_complete&loanId=${loanId}&signerType=${signerType}`;
+
 
     // iPay and Organization use recipient view (embedded signing)
     // Borrower uses email-based signing
@@ -137,21 +116,11 @@ export async function POST(request: NextRequest) {
 
       const signingUrl = result.url;
 
-      // Cache the signing URL in database
-      await supabase
-        .from('loans')
-        .update({
-          [urlField]: signingUrl ?? "",
-          signing_urls_generated_at: new Date().toISOString()
-        })
-        .eq('id', loanId);
-
-      console.log(`✅ Recipient view URL generated and cached for ${signerType}`);
+      console.log(`✅ Recipient view URL generated for ${signerType}`);
 
       return NextResponse.json({
         success: true,
-        signingUrl,
-        cached: false
+        signingUrl
       });
     } catch (embedError: unknown) {
       console.error('⚠️ Recipient view failed for', signerType);
