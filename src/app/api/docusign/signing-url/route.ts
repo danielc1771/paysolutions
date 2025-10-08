@@ -48,8 +48,7 @@ export async function POST(request: NextRequest) {
     }
 
     const envelopesApi = await getEnvelopesApi();
-    const returnUrl = `${BASE_URL}/docusign-complete?event=signing_complete&loanId=${loanId}&signerType=${signerType}`;
-
+    const returnUrl = `${BASE_URL}/docusign-complete?event=signing_complete&loanId=${loanId}&signerType=${signerType}&envelopeId=${loan.docusign_envelope_id}`;
 
     // iPay and Organization use recipient view (embedded signing)
     // Borrower uses email-based signing
