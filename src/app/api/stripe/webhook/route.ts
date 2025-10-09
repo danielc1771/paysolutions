@@ -3,7 +3,7 @@ import Stripe from 'stripe';
 import { createClient } from '@/utils/supabase/server';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-06-30.basil',
+  apiVersion: '2025-09-30.clover',
 });
 
 /**
@@ -54,160 +54,61 @@ async function handleIdentityVerification(verificationSession: Stripe.Identity.V
 }
 
 /**
- * Get or Create Late Fee Product and Price
- * Ensures we have a reusable late fee product in Stripe
- */
-async function getOrCreateLateFeePrice(): Promise<string> {
-  try {
-    // Search for existing late fee product
-    const products = await stripe.products.search({
-      query: 'name:"Late Fee"',
-    });
-
-    let product: Stripe.Product;
-    
-    if (products.data.length > 0) {
-      product = products.data[0];
-      console.log('✅ Found existing late fee product:', product.id);
-    } else {
-      // Create new late fee product
-      product = await stripe.products.create({
-        name: 'Late Fee',
-        description: 'Late payment fee for overdue invoices',
-        metadata: {
-          type: 'late_fee',
-        },
-      });
-      console.log('✅ Created late fee product:', product.id);
-    }
-
-    // Search for existing price
-    const prices = await stripe.prices.list({
-      product: product.id,
-      active: true,
-    });
-
-    if (prices.data.length > 0) {
-      const existingPrice = prices.data.find(p => p.unit_amount === 1500); // $15.00
-      if (existingPrice) {
-        console.log('✅ Found existing late fee price:', existingPrice.id);
-        return existingPrice.id;
-      }
-    }
-
-    // Create new price
-    const price = await stripe.prices.create({
-      product: product.id,
-      unit_amount: 1500, // $15.00
-      currency: 'usd',
-      metadata: {
-        type: 'late_fee',
-      },
-    });
-
-    console.log('✅ Created late fee price:', price.id);
-    return price.id;
-
-  } catch (error) {
-    console.error('❌ Error getting/creating late fee price:', error);
-    throw error;
-  }
-}
-
-/**
  * Handle Overdue Invoice Events
- * Voids the original invoice and creates a new one with late fee
+ *
+ * Adds a one-time $15 late fee line item to overdue invoices.
+ * The late fee is only applied once per invoice via metadata tracking.
  */
 async function handleOverdueInvoice(invoice: Stripe.Invoice) {
   try {
-    // Get subscription ID from the first subscription line item
-    const subscriptionLineItem = invoice.lines.data.find(line => line.subscription);
-    const subscriptionId = subscriptionLineItem?.subscription as string;
-
     console.log('⏰ Processing overdue invoice:', {
       invoiceId: invoice.id,
       customerId: invoice.customer,
-      subscriptionId: subscriptionId,
       amount: invoice.amount_due / 100,
+      paymentNumber: invoice.metadata?.payment_number,
     });
 
-    // Check if this is already a late fee invoice
-    if (invoice.metadata?.is_late_fee_invoice === 'true') {
-      console.log('ℹ️ Skipping late fee for invoice that already includes late fees');
-      return;
-    }
-
-    // Check if late fee was already applied
+    // IDEMPOTENCY CHECK: Ensure late fee is only applied once per invoice
     if (invoice.metadata?.has_late_fee_applied === 'true') {
-      console.log('ℹ️ Late fee already applied to this invoice');
+      console.log('ℹ️ Late fee already applied to this invoice - skipping');
       return;
     }
 
-    // Skip if no subscription found (not a subscription invoice)
-    if (!subscriptionId) {
-      console.log('ℹ️ No subscription found for invoice, skipping late fee');
+    // Skip if invoice is already paid or voided
+    if (invoice.status === 'paid' || invoice.status === 'void') {
+      console.log('ℹ️ Invoice already paid or voided - skipping late fee');
       return;
     }
-
-    // Get late fee price
-    const lateFeePrice = await getOrCreateLateFeePrice();
 
     if (!invoice.id) {
       console.error('❌ No invoice ID found in invoice object');
       return;
     }
 
-    // Mark original invoice with metadata before voiding
+    // Add $15 late fee as a line item to the existing open invoice
+    // Stripe will automatically update the invoice total
+    await stripe.invoiceItems.create({
+      customer: invoice.customer as string,
+      invoice: invoice.id,
+      amount: 1500, // $15.00 in cents
+      currency: 'usd',
+      description: `Late Fee - Payment ${invoice.metadata?.payment_number || 'N/A'}`,
+    });
+
+    // Mark invoice metadata to prevent duplicate late fee charges
     await stripe.invoices.update(invoice.id, {
       metadata: {
         ...invoice.metadata,
         has_late_fee_applied: 'true',
+        late_fee_applied_at: new Date().toISOString(),
       },
     });
 
-    // Void the original invoice
-    await stripe.invoices.voidInvoice(invoice.id);
-    console.log('✅ Voided original invoice:', invoice.id);
-
-    // Create new invoice with original items plus late fee
-    const newInvoice = await stripe.invoices.create({
-      customer: invoice.customer as string
-    });
-
-    // Add all original line items
-    for (const line of invoice.lines.data) {
-      if (line.subscription) {
-        // For subscription items, use the subscription_item property
-        await stripe.invoiceItems.create({
-          customer: invoice.customer as string,
-          invoice: newInvoice.id,
-          subscription: line.subscription as string,
-          quantity: line.quantity || 1,
-          description: line.description || undefined,
-        });
-      }
-    }
-
-    // Add late fee
-    await stripe.invoiceItems.create({
-      customer: invoice.customer as string,
-      invoice: newInvoice.id,
-      pricing :{
-        price: lateFeePrice,
-      },
-      description: `Late fee for overdue invoice ${invoice.number || invoice.id}`,
-    });
-
-    // Finalize and send the new invoice
-    await stripe.invoices.finalizeInvoice(newInvoice.id as string);
-    
-    // Send the invoice to customer
-    await stripe.invoices.sendInvoice(newInvoice.id as string);
-
-    console.log('✅ Created and sent new invoice with late fee:', {
-      newInvoiceId: newInvoice.id,
-      originalInvoiceId: invoice.id,
-      totalAmount: newInvoice.amount_due / 100,
+    console.log('✅ Added $15 late fee to invoice:', {
+      invoiceId: invoice.id,
+      paymentNumber: invoice.metadata?.payment_number,
+      originalAmount: invoice.amount_due / 100,
+      newTotal: (invoice.amount_due + 1500) / 100, // Original + $15
     });
 
   } catch (error) {
@@ -217,68 +118,52 @@ async function handleOverdueInvoice(invoice: Stripe.Invoice) {
 }
 
 /**
- * Handle Subscription Payment Events
- * Updates payment records and loan status based on subscription events
+ * Handle Invoice Payment Events
+ * Updates payment records and loan status based on invoice payments
  */
-async function handleSubscriptionPayment(invoice: Stripe.Invoice & {
+async function handleInvoicePayment(invoice: Stripe.Invoice & {
   subscription?: string | Stripe.Subscription;
   payment_intent?: string | Stripe.PaymentIntent;
   amount_paid?: number;
   amount_due?: number;
 }, status: 'succeeded' | 'failed') {
   try {
-    console.log('💳 Processing subscription payment:', {
+    console.log('💳 Processing invoice payment:', {
       invoiceId: invoice.id,
-      subscriptionId: invoice.subscription,
       status,
-      amount: invoice.amount_paid
+      amount: invoice.amount_paid,
+      paymentNumber: invoice.metadata?.payment_number
     });
 
     const supabase = await createClient();
-    
-    // Get subscription to find loan information
-    if (!invoice.subscription) {
-      console.error('❌ No subscription ID found in invoice');
-      return;
-    }
 
-    const subscriptionId = typeof invoice.subscription === 'string' ? 
-      invoice.subscription : 
-      invoice.subscription.id;
-    
-    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-    const loanId = subscription.metadata?.loan_id;
+    // Get loan ID from invoice metadata
+    const loanId = invoice.metadata?.loan_id;
 
     if (!loanId) {
-      console.error('❌ No loan_id found in subscription metadata');
+      console.error('❌ No loan_id found in invoice metadata');
       return;
     }
 
-    // Get current payment schedule entry (try pending first, then any status)
-    let { data: paymentSchedules } = await supabase
+    // Get the payment number from invoice metadata
+    const paymentNumber = invoice.metadata?.payment_number;
+    if (!paymentNumber) {
+      console.error('❌ No payment_number found in invoice metadata');
+      return;
+    }
+
+    // Get the specific payment schedule entry for this payment number
+    const { data: paymentSchedules } = await supabase
       .from('payment_schedules')
       .select('*')
       .eq('loan_id', loanId)
-      .eq('status', 'pending')
-      .order('payment_number')
+      .eq('payment_number', parseInt(paymentNumber))
       .limit(1);
 
-    // If no pending payment found, get the first payment (regardless of status)
-    if (!paymentSchedules || paymentSchedules.length === 0) {
-      const { data: firstPayment } = await supabase
-        .from('payment_schedules')
-        .select('*')
-        .eq('loan_id', loanId)
-        .eq('payment_number', 1)
-        .limit(1);
-      
-      paymentSchedules = firstPayment;
-    }
-
     const currentPayment = paymentSchedules?.[0];
-    
+
     if (!currentPayment) {
-      console.log('⚠️ No payment schedule found for loan:', loanId);
+      console.log('⚠️ No payment schedule found for loan:', loanId, 'payment:', paymentNumber);
       return;
     }
 
@@ -302,53 +187,33 @@ async function handleSubscriptionPayment(invoice: Stripe.Invoice & {
           payment_schedule_id: currentPayment.id,
           amount: (invoice.amount_paid / 100).toString(),
           payment_date: new Date().toISOString().split('T')[0],
-          payment_method: 'stripe_subscription',
-          stripe_payment_intent_id: typeof invoice.payment_intent === 'string' ? 
-            invoice.payment_intent : 
+          payment_method: 'stripe_invoice',
+          stripe_payment_intent_id: typeof invoice.payment_intent === 'string' ?
+            invoice.payment_intent :
             invoice.payment_intent?.id || null,
           status: 'completed',
-          notes: `Stripe subscription payment - Invoice: ${invoice.id}`
+          notes: `Stripe invoice payment - Invoice: ${invoice.id} - Payment ${paymentNumber}`
         });
 
-      // Check if this was the first payment (loan in funding_in_progress status)
-      const { data: loanData } = await supabase
-        .from('loans')
-        .select('status, stripe_subscription_id')
-        .eq('id', loanId)
-        .single();
+      // Check if this was the last payment
+      const { data: remainingPayments } = await supabase
+        .from('payment_schedules')
+        .select('id')
+        .eq('loan_id', loanId)
+        .eq('status', 'pending');
 
-      if (loanData?.status === 'funding_in_progress' && loanData?.stripe_subscription_id === subscriptionId) {
-        // This is the first payment completing - update loan to funded
+      if (!remainingPayments || remainingPayments.length === 0) {
+        // All payments completed - mark loan as closed
         await supabase
           .from('loans')
           .update({
-            status: 'funded',
+            status: 'closed',
+            remaining_balance: '0.00',
             updated_at: new Date().toISOString()
           })
           .eq('id', loanId);
 
-        console.log('🎉 First payment completed - loan now funded:', loanId);
-      } else {
-        // Check if this was the last payment
-        const { data: remainingPayments } = await supabase
-          .from('payment_schedules')
-          .select('id')
-          .eq('loan_id', loanId)
-          .eq('status', 'pending');
-
-        if (!remainingPayments || remainingPayments.length === 0) {
-          // All payments completed - mark loan as closed
-          await supabase
-            .from('loans')
-            .update({
-              status: 'closed',
-              remaining_balance: '0.00',
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', loanId);
-
-          console.log('🎉 Loan fully paid off:', loanId);
-        }
+        console.log('🎉 Loan fully paid off:', loanId);
       }
 
       console.log('✅ Payment recorded successfully:', {
@@ -366,12 +231,12 @@ async function handleSubscriptionPayment(invoice: Stripe.Invoice & {
           payment_schedule_id: currentPayment.id,
           amount: (invoice.amount_due / 100).toString(),
           payment_date: new Date().toISOString().split('T')[0],
-          payment_method: 'stripe_subscription',
-          stripe_payment_intent_id: typeof invoice.payment_intent === 'string' ? 
-            invoice.payment_intent : 
+          payment_method: 'stripe_invoice',
+          stripe_payment_intent_id: typeof invoice.payment_intent === 'string' ?
+            invoice.payment_intent :
             invoice.payment_intent?.id || null,
           status: 'failed',
-          notes: `Stripe subscription payment failed - Invoice: ${invoice.id}`
+          notes: `Stripe invoice payment failed - Invoice: ${invoice.id} - Payment ${paymentNumber}`
         });
 
       console.log('❌ Payment failed recorded:', {
@@ -382,7 +247,7 @@ async function handleSubscriptionPayment(invoice: Stripe.Invoice & {
     }
 
   } catch (error) {
-    console.error('❌ Error in handleSubscriptionPayment:', error);
+    console.error('❌ Error in handleInvoicePayment:', error);
     throw error;
   }
 }
@@ -421,7 +286,7 @@ export async function POST(request: NextRequest) {
     switch (event.type) {
       case 'invoice.payment_succeeded':
         console.log('📄 Invoice payment succeeded:', event.data.object.id);
-        await handleSubscriptionPayment(event.data.object, 'succeeded');
+        await handleInvoicePayment(event.data.object, 'succeeded');
         break;
 
       case 'invoice.payment_failed':
@@ -433,7 +298,7 @@ export async function POST(request: NextRequest) {
           attemptCount: failedInvoice.attempt_count,
           nextPaymentAttempt: failedInvoice.next_payment_attempt ? new Date(failedInvoice.next_payment_attempt * 1000).toISOString() : null,
         });
-        await handleSubscriptionPayment(event.data.object, 'failed');
+        await handleInvoicePayment(event.data.object, 'failed');
         break;
 
       
