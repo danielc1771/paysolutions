@@ -15,19 +15,10 @@ export interface UserProfile {
 // Role-based route configuration
 export const ROLE_ROUTES: Record<Role, string[]> = {
   admin: [
+    '/dashboard',
+    '/dashboard/*',
     '/admin',
-    '/admin/dashboard',
-    '/admin/loans',
-    '/admin/loans/create',
-    '/admin/loans/*',
-    '/admin/borrowers',
-    '/admin/borrowers/*',
-    '/admin/organizations',
-    '/admin/organizations/*',
-    '/admin/users',
-    '/admin/users/*',
-    '/admin/reports',
-    '/admin/settings'
+    '/admin/*'
   ],
   user: [
     '/dashboard',
@@ -76,7 +67,7 @@ export const ROLE_ROUTES: Record<Role, string[]> = {
 
 // Homepage redirection for each role
 export const ROLE_HOMEPAGES: Record<Role, string> = {
-  admin: '/admin',
+  admin: '/dashboard',
   user: '/dashboard',
   team_member: '/dashboard',
   organization_owner: '/dashboard',

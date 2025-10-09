@@ -16,8 +16,8 @@ const OAUTH_SCOPE = 'signature';
 // const IPAY_EMAIL = 'jhoamadrian@gmail.com';
 // const ORGANIZATION_EMAIL = 'jgarcia@easycarus.com';
 
-const IPAY_EMAIL = 'architex.development@gmail.com';
-const ORGANIZATION_EMAIL = 'architex.development@gmail.com';
+const IPAY_EMAIL = 'ipayusdevelopment@gmail.com';
+const ORGANIZATION_EMAIL = 'jgarcia@easycarus.com';
 
 // Token storage interface
 interface TokenData {
@@ -313,11 +313,10 @@ export async function createAndSendEnvelope(
     } else {
       console.log('⚠️  Draft envelope created - must be sent before recipient view can be used');
     }
-    console.log('');
     console.log('🔗 View envelope in DocuSign:');
-    const docusignWebUrl = process.env.DOCUSIGN_WEB_URL || 'https://demo.docusign.net';
+    const docusignWebUrl = process.env._URL || 'https://demo.docusign.net';
     console.log(`   ${docusignWebUrl}/documents/details/${results.envelopeId}`);
-    console.log('');
+
 
     return {
       envelopeId: results.envelopeId,

@@ -4,16 +4,24 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
 import CustomSelect from '@/components/CustomSelect';
-import { LoanListItem } from '@/types/loan';
+import { LoanListItem, AdminLoanListItem } from '@/types/loan';
 import { Plus, Search, FileText, Calendar, Car, Eye, Trash2, CheckCircle, DollarSign, PenTool, Check } from 'lucide-react';
 import { SigningProgressDots, getSigningProgressText } from '@/components/SigningProgressIndicator';
 import { formatLoanStatus } from '@/utils/formatters';
+import { useUserProfile } from '@/components/auth/RoleRedirect';
+
+interface Organization {
+  id: string;
+  name: string;
+}
 
 export default function UserLoans() {
-  const [loans, setLoans] = useState<LoanListItem[]>([]);
+  const [loans, setLoans] = useState<(LoanListItem | AdminLoanListItem)[]>([]);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [selectedOrganization, setSelectedOrganization] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
@@ -29,6 +37,8 @@ export default function UserLoans() {
     loanNumber: '',
     borrowerName: ''
   });
+  const { profile } = useUserProfile();
+  const isAdmin = profile?.role === 'admin';
 
   const supabase = useMemo(() => createClient(), []);
 
@@ -51,37 +61,76 @@ export default function UserLoans() {
           return;
         }
 
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('organization_id')
-          .eq('id', user.id)
-          .single();
+        if (isAdmin) {
+          // Admin: Fetch all loans and organizations
+          const { data: orgsData, error: orgsError } = await supabase
+            .from('organizations')
+            .select('id, name')
+            .order('name', { ascending: true });
 
-        if (profileError || !profile?.organization_id) {
-          setError(profileError?.message || 'Could not retrieve organization ID for user.');
-          setLoading(false);
-          return;
-        }
+          if (orgsError) {
+            console.error('Error fetching organizations:', orgsError);
+          } else {
+            setOrganizations(orgsData || []);
+          }
 
-        const { data, error } = await supabase
-          .from('loans')
-          .select(`
-            *,
-            borrower:borrowers(
-              first_name,
-              last_name,
-              email,
-              kyc_status
-            )
-          `)
-          .eq('organization_id', profile.organization_id)
-          .order('created_at', { ascending: false });
+          const { data, error } = await supabase
+            .from('loans')
+            .select(`
+              *,
+              borrower:borrowers(
+                first_name,
+                last_name,
+                email,
+                kyc_status
+              ),
+              organization:organizations(
+                id,
+                name
+              )
+            `)
+            .order('created_at', { ascending: false });
 
-        if (error) {
-          setError(error.message);
-          console.error('Error fetching loans:', error);
+          if (error) {
+            setError(error.message);
+            console.error('Error fetching loans:', error);
+          } else {
+            setLoans(data || []);
+          }
         } else {
-          setLoans(data || []);
+          // Organization users: Fetch org-scoped loans
+          const { data: userProfile, error: profileError } = await supabase
+            .from('profiles')
+            .select('organization_id')
+            .eq('id', user.id)
+            .single();
+
+          if (profileError || !userProfile?.organization_id) {
+            setError(profileError?.message || 'Could not retrieve organization ID for user.');
+            setLoading(false);
+            return;
+          }
+
+          const { data, error } = await supabase
+            .from('loans')
+            .select(`
+              *,
+              borrower:borrowers(
+                first_name,
+                last_name,
+                email,
+                kyc_status
+              )
+            `)
+            .eq('organization_id', userProfile.organization_id)
+            .order('created_at', { ascending: false });
+
+          if (error) {
+            setError(error.message);
+            console.error('Error fetching loans:', error);
+          } else {
+            setLoans(data || []);
+          }
         }
       } catch (err) {
         setError('Failed to fetch loans');
@@ -91,8 +140,10 @@ export default function UserLoans() {
       }
     };
 
-    fetchLoans();
-  }, [supabase]);
+    if (profile) {
+      fetchLoans();
+    }
+  }, [supabase, isAdmin, profile]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -117,7 +168,7 @@ export default function UserLoans() {
     });
   };
 
-  // Filter loans based on status and search term
+  // Filter loans based on status, organization, and search term
   const filteredLoans = loans.filter(loan => {
     let matchesStatus = false;
     
@@ -132,12 +183,15 @@ export default function UserLoans() {
       matchesStatus = loan.status === filterStatus;
     }
     
+    const matchesOrganization = selectedOrganization === 'all' || 
+      ('organization' in loan && loan.organization?.id === selectedOrganization);
+    
     const matchesSearch = searchTerm === '' || 
       loan.loan_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
       loan.borrower?.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       loan.borrower?.last_name?.toLowerCase().includes(searchTerm.toLowerCase());
     
-    return matchesStatus && matchesSearch;
+    return matchesStatus && matchesOrganization && matchesSearch;
   });
 
   // Add success modal trigger function
@@ -306,6 +360,19 @@ export default function UserLoans() {
                     <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
                   </div>
                 </div>
+                {isAdmin && (
+                  <div className="w-full sm:w-64">
+                    <CustomSelect
+                      options={[
+                        { value: 'all', label: 'All Organizations' },
+                        ...organizations.map(org => ({ value: org.id, label: org.name }))
+                      ]}
+                      value={selectedOrganization}
+                      onChange={setSelectedOrganization}
+                      placeholder="Filter by organization"
+                    />
+                  </div>
+                )}
                 <div className="w-full sm:w-64">
                   <CustomSelect
                     options={statusOptions}
@@ -454,6 +521,14 @@ export default function UserLoans() {
                                     <FileText className="w-4 h-4 mr-1 text-green-500" />
                                     {loan.loan_number}
                                   </span>
+                                  {isAdmin && 'organization' in loan && loan.organization?.name && (
+                                    <span className="flex items-center">
+                                      <svg className="w-4 h-4 mr-1 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                      </svg>
+                                      {loan.organization.name}
+                                    </span>
+                                  )}
                                   <span className="flex items-center">
                                     <Calendar className="w-4 h-4 mr-1 text-purple-500" />
                                     {formatDate(loan.created_at)}
