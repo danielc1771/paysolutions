@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { createClient } from '@/utils/supabase/client';
-import { LayoutDashboard, FileText, Plus, Users, Bell, UserPlus } from 'lucide-react';
+import { LayoutDashboard, FileText, Plus, Users, Bell, UserPlus, Building2 } from 'lucide-react';
 import { useUserProfile } from '@/components/auth/RoleRedirect';
 
 interface UserLayoutProps {
@@ -83,6 +83,12 @@ export default function UserLayout({ children }: UserLayoutProps) {
   // Fetch organization settings
   useEffect(() => {
     const fetchOrgSettings = async () => {
+      // Admin users get purple theme
+      if (profile?.role === 'admin') {
+        setColorTheme('purple');
+        return;
+      }
+      
       if (!profile?.organizationId) return;
       
       try {
@@ -117,7 +123,7 @@ export default function UserLayout({ children }: UserLayoutProps) {
     };
     
     fetchOrgSettings();
-  }, [profile?.organizationId, supabase]);
+  }, [profile?.organizationId, profile?.role, supabase]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -164,7 +170,14 @@ export default function UserLayout({ children }: UserLayoutProps) {
       icon: <Users className="w-5 h-5" />,
     },
     {
-      name: 'Team',
+      name: 'Organizations',
+      href: '/dashboard/organizations',
+      icon: <Building2 className="w-5 h-5" />,
+      // Only show for admin
+      roles: ['admin'],
+    },
+    {
+      name: profile?.role === 'admin' ? 'Users' : 'Team',
       href: '/dashboard/team',
       icon: <UserPlus className="w-5 h-5" />,
       // Only show for admins, users and organization owners, not team members

@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
 import React, { useEffect, useState, useMemo } from 'react';
 import CustomSelect from '@/components/CustomSelect';
+import { useUserProfile } from '@/components/auth/RoleRedirect';
 
 interface Borrower {
   id: string;
@@ -13,6 +14,10 @@ interface Borrower {
   phone: string;
   kyc_status: string;
   created_at: string;
+  organization?: {
+    id: string;
+    name: string;
+  };
   loans: Array<{
     id: string;
     loan_number: string;
@@ -21,12 +26,19 @@ interface Borrower {
   }>;
 }
 
+interface Organization {
+  id: string;
+  name: string;
+}
+
 export default function UserBorrowers() {
   const [borrowers, setBorrowers] = useState<Borrower[]>([]);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterKyc, setFilterKyc] = useState<string>('all');
+  const [selectedOrganization, setSelectedOrganization] = useState<string>('all');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<{
@@ -42,6 +54,8 @@ export default function UserBorrowers() {
     loanCount: 0,
     activeLoans: 0
   });
+  const { profile } = useUserProfile();
+  const isAdmin = profile?.role === 'admin';
 
   const supabase = useMemo(() => createClient(), []);
 
@@ -57,37 +71,76 @@ export default function UserBorrowers() {
           return;
         }
 
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('organization_id')
-          .eq('id', user.id)
-          .single();
+        if (isAdmin) {
+          // Admin: Fetch all borrowers and organizations
+          const { data: orgsData, error: orgsError } = await supabase
+            .from('organizations')
+            .select('id, name')
+            .order('name', { ascending: true });
 
-        if (profileError || !profile?.organization_id) {
-          setError(profileError?.message || 'Could not retrieve organization ID for user.');
-          setLoading(false);
-          return;
-        }
+          if (orgsError) {
+            console.error('Error fetching organizations:', orgsError);
+          } else {
+            setOrganizations(orgsData || []);
+          }
 
-        const { data, error } = await supabase
-          .from('borrowers')
-          .select(`
-            *,
-            loans(
-              id,
-              loan_number,
-              principal_amount,
-              status
-            )
-          `)
-          .eq('organization_id', profile.organization_id)
-          .order('created_at', { ascending: false });
+          const { data, error } = await supabase
+            .from('borrowers')
+            .select(`
+              *,
+              organization:organizations(
+                id,
+                name
+              ),
+              loans(
+                id,
+                loan_number,
+                principal_amount,
+                status
+              )
+            `)
+            .order('created_at', { ascending: false });
 
-        if (error) {
-          setError(error.message);
-          console.error('Error fetching borrowers:', error);
+          if (error) {
+            setError(error.message);
+            console.error('Error fetching borrowers:', error);
+          } else {
+            setBorrowers(data || []);
+          }
         } else {
-          setBorrowers(data || []);
+          // Organization users: Fetch org-scoped borrowers
+          const { data: userProfile, error: profileError } = await supabase
+            .from('profiles')
+            .select('organization_id')
+            .eq('id', user.id)
+            .single();
+
+          if (profileError || !userProfile?.organization_id) {
+            setError(profileError?.message || 'Could not retrieve organization ID for user.');
+            setLoading(false);
+            return;
+          }
+
+          const { data, error } = await supabase
+            .from('borrowers')
+            .select(`
+              *,
+              loans(
+                id,
+                loan_number,
+                principal_amount,
+                status
+              )
+            `)
+            .eq('organization_id', userProfile.organization_id)
+            .order('created_at', { ascending: false });
+
+          if (error) {
+            setError(error.message);
+            console.error('Error fetching borrowers:', error);
+          } else {
+            setBorrowers(data || []);
+          }
         }
       } catch (err) {
         setError('Failed to fetch borrowers');
@@ -97,8 +150,10 @@ export default function UserBorrowers() {
       }
     };
 
-    fetchBorrowers();
-  }, [supabase]);
+    if (profile) {
+      fetchBorrowers();
+    }
+  }, [supabase, isAdmin, profile]);
 
   const getKycStatusColor = (status: string) => {
     switch (status) {
@@ -177,7 +232,7 @@ export default function UserBorrowers() {
     });
   };
 
-  // Filter borrowers based on search term and KYC status
+  // Filter borrowers based on search term, KYC status, and organization
   const filteredBorrowers = borrowers.filter(borrower => {
     const matchesSearch = searchTerm === '' || 
       borrower.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -187,7 +242,10 @@ export default function UserBorrowers() {
     
     const matchesKyc = filterKyc === 'all' || borrower.kyc_status === filterKyc;
     
-    return matchesSearch && matchesKyc;
+    const matchesOrganization = selectedOrganization === 'all' || 
+      borrower.organization?.id === selectedOrganization;
+    
+    return matchesSearch && matchesKyc && matchesOrganization;
   });
 
   const kycOptions = [
@@ -239,6 +297,19 @@ export default function UserBorrowers() {
                     </svg>
                   </div>
                 </div>
+                {isAdmin && (
+                  <div className="w-full sm:w-64">
+                    <CustomSelect
+                      options={[
+                        { value: 'all', label: 'All Organizations' },
+                        ...organizations.map(org => ({ value: org.id, label: org.name }))
+                      ]}
+                      value={selectedOrganization}
+                      onChange={setSelectedOrganization}
+                      placeholder="Filter by organization"
+                    />
+                  </div>
+                )}
                 <div className="w-full sm:w-64">
                   <CustomSelect
                     options={kycOptions}
@@ -413,6 +484,14 @@ export default function UserBorrowers() {
                                 </span>
                               </div>
                               <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                                {isAdmin && borrower.organization?.name && (
+                                  <span className="flex items-center">
+                                    <svg className="w-4 h-4 mr-1 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                    </svg>
+                                    {borrower.organization.name}
+                                  </span>
+                                )}
                                 {borrower.email && (
                                   <span className="flex items-center">
                                     <svg className="w-4 h-4 mr-1 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">

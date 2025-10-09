@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { Users, UserPlus, Mail, CheckCircle, Clock, Trash2 } from 'lucide-react';
+import { useUserProfile } from '@/components/auth/RoleRedirect';
+import CustomSelect from '@/components/CustomSelect';
 
 interface TeamMember {
   id: string;
@@ -10,18 +12,32 @@ interface TeamMember {
   email: string;
   role: string;
   status: 'INVITED' | 'ACTIVE';
+  organization?: {
+    id: string;
+    name: string;
+  };
+}
+
+interface Organization {
+  id: string;
+  name: string;
 }
 
 export default function TeamPage() {
   const [loading, setLoading] = useState(false);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [selectedOrganization, setSelectedOrganization] = useState<string>('all');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [inviteData, setInviteData] = useState({
     fullName: '',
-    email: ''
+    email: '',
+    role: 'team_member'
   });
+  const { profile } = useUserProfile();
+  const isAdmin = profile?.role === 'admin';
   const supabase = useMemo(() => createClient(), []);
 
   // Fetch team members
@@ -35,40 +51,86 @@ export default function TeamPage() {
         return;
       }
 
-      // Get current user's organization
-      const { data: currentProfile } = await supabase
-        .from('profiles')
-        .select('organization_id')
-        .eq('id', user.id)
-        .single();
+      if (isAdmin) {
+        // Admin: Fetch all users and organizations
+        const { data: orgsData, error: orgsError } = await supabase
+          .from('organizations')
+          .select('id, name')
+          .order('name', { ascending: true });
 
-      if (!currentProfile?.organization_id) {
-        setError('Organization not found');
-        return;
+        if (orgsError) {
+          console.error('Error fetching organizations:', orgsError);
+        } else {
+          setOrganizations(orgsData || []);
+        }
+
+        // Get all users (exclude borrowers)
+        const { data: members, error: membersError } = await supabase
+          .from('profiles')
+          .select(`
+            id,
+            full_name,
+            email,
+            role,
+            status,
+            organization:organizations(
+              id,
+              name
+            )
+          `)
+          .neq('role', 'borrower')
+          .order('full_name', { ascending: true });
+
+        if (membersError) {
+          console.error('Supabase error:', membersError);
+          setError(`Failed to fetch users: ${membersError.message}`);
+          return;
+        }
+
+        setTeamMembers(members?.map(member => ({
+          id: member.id,
+          fullName: member.full_name || '',
+          email: member.email || '',
+          role: member.role || 'team_member',
+          status: member.status || 'INVITED',
+          organization: Array.isArray(member.organization) ? member.organization[0] : member.organization
+        })) || []);
+      } else {
+        // Organization users: Fetch org team members
+        const { data: currentProfile } = await supabase
+          .from('profiles')
+          .select('organization_id')
+          .eq('id', user.id)
+          .single();
+
+        if (!currentProfile?.organization_id) {
+          setError('Organization not found');
+          return;
+        }
+
+        // Get all team members in the organization (exclude borrowers and system admins)
+        const { data: members, error: membersError } = await supabase
+          .from('profiles')
+          .select('id, full_name, email, role, status')
+          .eq('organization_id', currentProfile.organization_id)
+          .neq('role', 'borrower')
+          .neq('role', 'admin')
+          .order('full_name', { ascending: true });
+
+        if (membersError) {
+          console.error('Supabase error:', membersError);
+          setError(`Failed to fetch team members: ${membersError.message}`);
+          return;
+        }
+
+        setTeamMembers(members?.map(member => ({
+          id: member.id,
+          fullName: member.full_name || '',
+          email: member.email || '',
+          role: member.role || 'team_member',
+          status: member.status || 'INVITED'
+        })) || []);
       }
-
-      // Get all team members in the organization (exclude borrowers and system admins)
-      const { data: members, error: membersError } = await supabase
-        .from('profiles')
-        .select('id, full_name, email, role, status')
-        .eq('organization_id', currentProfile.organization_id)
-        .neq('role', 'borrower')
-        .neq('role', 'admin')
-        .order('full_name', { ascending: true });
-
-      if (membersError) {
-        console.error('Supabase error:', membersError);
-        setError(`Failed to fetch team members: ${membersError.message}`);
-        return;
-      }
-
-      setTeamMembers(members?.map(member => ({
-        id: member.id,
-        fullName: member.full_name || '',
-        email: member.email || '',
-        role: member.role || 'team_member',
-        status: member.status || 'INVITED'
-      })) || []);
 
     } catch (error) {
       console.error('Team fetch error:', error);
@@ -76,7 +138,7 @@ export default function TeamPage() {
     } finally {
       setLoading(false);
     }
-  }, [supabase]);
+  }, [supabase, isAdmin]);
 
   // Invite team member
   const handleInviteSubmit = async (e: React.FormEvent) => {
@@ -104,7 +166,7 @@ export default function TeamPage() {
       }
 
       setSuccess(`Invitation sent successfully to ${inviteData.email}`);
-      setInviteData({ fullName: '', email: '' });
+      setInviteData({ fullName: '', email: '', role: 'team_member' });
       setShowInviteForm(false);
       
       // Refresh team members list
@@ -150,8 +212,16 @@ export default function TeamPage() {
   };
 
   useEffect(() => {
-    fetchTeamMembers();
-  }, [fetchTeamMembers]);
+    if (profile) {
+      fetchTeamMembers();
+    }
+  }, [fetchTeamMembers, profile]);
+
+  // Filter team members by organization
+  const filteredTeamMembers = teamMembers.filter(member => {
+    if (selectedOrganization === 'all') return true;
+    return member.organization?.id === selectedOrganization;
+  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-teal-100">
@@ -159,10 +229,29 @@ export default function TeamPage() {
             {/* Header */}
             <div className="mb-8">
               <h1 className="text-4xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent mb-3">
-                Team Management
+                {isAdmin ? 'Platform Users' : 'Team Management'}
               </h1>
-              <p className="text-gray-600 text-lg">Manage your organization&apos;s team members and staff</p>
+              <p className="text-gray-600 text-lg">
+                {isAdmin ? 'Manage all users across the platform' : 'Manage your organization\'s team members and staff'}
+              </p>
             </div>
+
+            {/* Admin Organization Filter */}
+            {isAdmin && organizations.length > 0 && (
+              <div className="mb-6 bg-white/70 backdrop-blur-sm rounded-3xl p-4 shadow-lg border border-white/20">
+                <div className="w-64">
+                  <CustomSelect
+                    options={[
+                      { value: 'all', label: 'All Organizations' },
+                      ...organizations.map(org => ({ value: org.id, label: org.name }))
+                    ]}
+                    value={selectedOrganization}
+                    onChange={setSelectedOrganization}
+                    placeholder="Filter by organization"
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Status Messages */}
             {error && (
@@ -190,16 +279,19 @@ export default function TeamPage() {
               <div className="flex items-center">
                 <Users className="w-5 h-5 text-gray-600 mr-2" />
                 <span className="text-gray-700 font-medium">
-                  {teamMembers.length} Team Member{teamMembers.length !== 1 ? 's' : ''}
+                  {filteredTeamMembers.length} {isAdmin ? 'User' : 'Team Member'}{filteredTeamMembers.length !== 1 ? 's' : ''}
+                  {isAdmin && selectedOrganization !== 'all' && ` (filtered)`}
                 </span>
               </div>
-              <button
-                onClick={() => setShowInviteForm(!showInviteForm)}
-                className="flex items-center px-6 py-3 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-2xl font-semibold hover:from-green-600 hover:to-teal-600 transition-all duration-300"
-              >
-                <UserPlus className="w-4 h-4 mr-2" />
-                Invite Team Member
-              </button>
+              {!isAdmin && (
+                <button
+                  onClick={() => setShowInviteForm(!showInviteForm)}
+                  className="flex items-center px-6 py-3 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-2xl font-semibold hover:from-green-600 hover:to-teal-600 transition-all duration-300"
+                >
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Invite Team Member
+                </button>
+              )}
             </div>
 
             {/* Invite Form */}
@@ -236,7 +328,7 @@ export default function TeamPage() {
                       type="button"
                       onClick={() => {
                         setShowInviteForm(false);
-                        setInviteData({ fullName: '', email: '' });
+                        setInviteData({ fullName: '', email: '', role: 'team_member' });
                       }}
                       className="px-6 py-3 border border-gray-300 rounded-2xl text-gray-700 hover:bg-gray-50 transition-colors"
                     >
@@ -269,33 +361,42 @@ export default function TeamPage() {
               {loading && teamMembers.length === 0 ? (
                 <div className="p-8 text-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto mb-4"></div>
-                  <p className="text-gray-600">Loading team members...</p>
+                  <p className="text-gray-600">Loading {isAdmin ? 'users' : 'team members'}...</p>
                 </div>
-              ) : teamMembers.length === 0 ? (
+              ) : filteredTeamMembers.length === 0 ? (
                 <div className="p-8 text-center">
                   <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No team members yet</h3>
-                  <p className="text-gray-600 mb-4">Start building your team by inviting new members</p>
-                  <button
-                    onClick={() => setShowInviteForm(true)}
-                    className="px-6 py-3 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-2xl font-semibold hover:from-green-600 hover:to-teal-600 transition-all duration-300"
-                  >
-                    Invite First Team Member
-                  </button>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    {isAdmin ? 'No users found' : 'No team members yet'}
+                  </h3>
+                  <p className="text-gray-600 mb-4">
+                    {isAdmin 
+                      ? 'Try adjusting your filters' 
+                      : 'Start building your team by inviting new members'}
+                  </p>
+                  {!isAdmin && (
+                    <button
+                      onClick={() => setShowInviteForm(true)}
+                      className="px-6 py-3 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-2xl font-semibold hover:from-green-600 hover:to-teal-600 transition-all duration-300"
+                    >
+                      Invite First Team Member
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-gradient-to-r from-green-500 to-teal-500 text-white">
                       <tr>
-                        <th className="px-6 py-4 text-left text-sm font-semibold">Team Member</th>
+                        <th className="px-6 py-4 text-left text-sm font-semibold">{isAdmin ? 'User' : 'Team Member'}</th>
+                        {isAdmin && <th className="px-6 py-4 text-left text-sm font-semibold">Organization</th>}
                         <th className="px-6 py-4 text-left text-sm font-semibold">Role</th>
                         <th className="px-6 py-4 text-left text-sm font-semibold">Status</th>
-                        <th className="px-6 py-4 text-left text-sm font-semibold">Actions</th>
+                        {!isAdmin && <th className="px-6 py-4 text-left text-sm font-semibold">Actions</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      {teamMembers.map((member) => (
+                      {filteredTeamMembers.map((member) => (
                         <tr key={member.id} className="hover:bg-gray-50">
                           <td className="px-6 py-4">
                             <div>
@@ -303,10 +404,18 @@ export default function TeamPage() {
                               <div className="text-sm text-gray-500">{member.email}</div>
                             </div>
                           </td>
+                          {isAdmin && (
+                            <td className="px-6 py-4">
+                              <span className="text-sm text-gray-700">
+                                {member.organization?.name || 'No Organization'}
+                              </span>
+                            </td>
+                          )}
                           <td className="px-6 py-4">
-                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
                               {member.role === 'organization_owner' ? 'Owner' : 
-                               member.role === 'user' ? 'User' : 'Team Member'}
+                               member.role === 'user' ? 'User' :
+                               member.role === 'admin' ? 'Admin' : 'Team Member'}
                             </span>
                           </td>
                           <td className="px-6 py-4">
@@ -328,17 +437,19 @@ export default function TeamPage() {
                               )}
                             </span>
                           </td>
-                          <td className="px-6 py-4">
-                            {member.role !== 'organization_owner' && (
-                              <button
-                                onClick={() => handleDeleteMember(member.id, member.email)}
-                                className="text-red-600 hover:text-red-900 transition-colors"
-                                title="Remove team member"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            )}
-                          </td>
+                          {!isAdmin && (
+                            <td className="px-6 py-4">
+                              {member.role !== 'organization_owner' && (
+                                <button
+                                  onClick={() => handleDeleteMember(member.id, member.email)}
+                                  className="text-red-600 hover:text-red-900 transition-colors"
+                                  title="Remove team member"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>

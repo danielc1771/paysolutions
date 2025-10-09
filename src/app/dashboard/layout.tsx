@@ -9,7 +9,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <RoleRedirect allowedRoles={['user', 'team_member', 'organization_owner']}>
+    <RoleRedirect allowedRoles={['admin', 'user', 'team_member', 'organization_owner']}>
       <UserLayout>
         {children}
       </UserLayout>
