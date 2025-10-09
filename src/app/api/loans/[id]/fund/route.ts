@@ -47,7 +47,7 @@ export async function POST(
     }
 
     // Verify loan is ready for funding
-    if (loan.docusign_status !== 'signed') {
+    if (loan.status !== 'fully_signed') {
       return NextResponse.json(
         { error: 'Loan must be signed before funding' },
         { status: 400 }
