@@ -2,12 +2,13 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { CheckCircle, ExternalLink, ArrowLeft, Send, DollarSign } from 'lucide-react';
+import { CheckCircle, ArrowLeft, Send, DollarSign } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { LoanWithBorrower } from '@/types/loan';
 import { Invoice } from '@/app/api/loans/[id]/invoices/route';
 import { SigningProgressIndicator } from '@/components/SigningProgressIndicator';
 import { formatLoanStatus } from '@/utils/formatters';
+import { useUserProfile } from '@/components/auth/RoleRedirect';
 
 interface LoanDetailProps {
   params: Promise<{ id: string }>;
@@ -23,6 +24,8 @@ export default function LoanDetail({ params }: LoanDetailProps) {
   const [successMessage, setSuccessMessage] = useState('');
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [invoicesLoading, setInvoicesLoading] = useState(false);
+  const { profile } = useUserProfile();
+  const isAdmin = profile?.role === 'admin';
 
   const supabase = createClient();
 
@@ -38,18 +41,7 @@ export default function LoanDetail({ params }: LoanDetailProps) {
           return;
         }
 
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('organization_id')
-          .eq('id', user.id)
-          .single();
-
-        if (!profile?.organization_id) {
-          setError('Organization not found');
-          return;
-        }
-
-        const { data, error } = await supabase
+        let query = supabase
           .from('loans')
           .select(`
             *,
@@ -79,9 +71,25 @@ export default function LoanDetail({ params }: LoanDetailProps) {
               kyc_status
             )
           `)
-          .eq('id', id)
-          .eq('organization_id', profile.organization_id)
-          .single();
+          .eq('id', id);
+
+        // For non-admin users, filter by organization
+        if (!isAdmin) {
+          const { data: userProfile } = await supabase
+            .from('profiles')
+            .select('organization_id')
+            .eq('id', user.id)
+            .single();
+
+          if (!userProfile?.organization_id) {
+            setError('Organization not found');
+            return;
+          }
+
+          query = query.eq('organization_id', userProfile.organization_id);
+        }
+
+        const { data, error } = await query.single();
 
         if (error) {
           setError(error.message);
@@ -96,8 +104,10 @@ export default function LoanDetail({ params }: LoanDetailProps) {
       }
     };
 
-    fetchLoan();
-  }, [params, supabase]);
+    if (profile) {
+      fetchLoan();
+    }
+  }, [params, supabase, isAdmin, profile]);
 
   useEffect(() => {
     const fetchInvoices = async () => {
@@ -121,11 +131,39 @@ export default function LoanDetail({ params }: LoanDetailProps) {
     fetchInvoices();
   }, [loan]);
 
-  const handleSignDocuSign = async () => {
+  const handleSignDocuSign = async (signerType: 'ipay' | 'organization' = 'organization') => {
     if (!loan) return;
 
     setDocusignLoading(true);
     try {
+      // First, ensure DocuSign envelope exists
+      if (!loan.docusign_envelope_id) {
+        console.log('📝 No envelope found, creating new envelope...');
+        const createResponse = await fetch('/api/docusign/create-envelope', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ loanId: loan.id }),
+        });
+
+        const createData = await createResponse.json();
+        
+        if (!createData.success) {
+          alert('Failed to create DocuSign envelope: ' + (createData.error || 'Unknown error'));
+          return;
+        }
+
+        console.log('✅ Envelope created:', createData.envelopeId);
+        
+        // Refresh the page to get updated loan data with envelope ID
+        window.location.reload();
+        return;
+      } else {
+        console.log('📋 Envelope already exists:', loan.docusign_envelope_id);
+      }
+      
+      console.log('🔗 Requesting signing URL for', signerType, '...');
       const response = await fetch('/api/docusign/signing-url', {
         method: 'POST',
         headers: {
@@ -133,16 +171,18 @@ export default function LoanDetail({ params }: LoanDetailProps) {
         },
         body: JSON.stringify({ 
           loanId: loan.id,
-          signerType: 'organization'
+          signerType: signerType
         }),
       });
 
       const data = await response.json();
       
       if (data.success && data.signingUrl) {
+        console.log('✅ Redirecting to DocuSign...');
         // Redirect to DocuSign embedded recipient view
         window.location.href = data.signingUrl;
       } else {
+        console.error('❌ Failed to get signing URL:', data);
         alert('Failed to get DocuSign signing URL: ' + (data.error || 'Unknown error'));
       }
     } catch (error) {
@@ -561,12 +601,33 @@ export default function LoanDetail({ params }: LoanDetailProps) {
             </div>
 
             {/* Action Buttons */}
-            {((loan.ipay_signed_at && !loan.organization_signed_at) || loan.borrower_signed_at) && (
+            {(((loan.status === 'application_completed' || loan.status === 'pending_ipay_signature') && !loan.ipay_signed_at) || (loan.ipay_signed_at && !loan.organization_signed_at) || loan.borrower_signed_at) && (
               <div className="flex gap-3 mb-6">
+                {/* Show Send & Sign button for iPay admin when application is completed but not yet signed */}
+                {(loan.status === 'application_completed' || loan.status === 'pending_ipay_signature') && !loan.ipay_signed_at && isAdmin && (
+                  <button
+                    onClick={() => handleSignDocuSign('ipay')}
+                    disabled={docusignLoading}
+                    className="bg-green-600 text-white px-5 py-2.5 rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                  >
+                    {docusignLoading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                        <span>{loan.docusign_envelope_id ? 'Opening...' : 'Creating...'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        <span>{loan.docusign_envelope_id ? 'Sign Document' : 'Create Document'}</span>
+                      </>
+                    )}
+                  </button>
+                )}
+
                 {/* Show signing button only when iPay has signed but organization hasn't */}
                 {loan.ipay_signed_at && !loan.organization_signed_at && (
                   <button
-                    onClick={handleSignDocuSign}
+                    onClick={() => handleSignDocuSign('organization')}
                     disabled={docusignLoading}
                     className="bg-green-600 text-white px-5 py-2.5 rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                   >
@@ -603,18 +664,6 @@ export default function LoanDetail({ params }: LoanDetailProps) {
                       </>
                     )}
                   </button>
-                )}
-
-                {loan.docusign_envelope_id && (
-                  <a
-                    href={`${process.env.DOCUSIGN_WEB_URL || 'https://demo.docusign.net'}/documents/${loan.docusign_envelope_id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors flex items-center space-x-2"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    <span>View Document</span>
-                  </a>
                 )}
               </div>
             )}
