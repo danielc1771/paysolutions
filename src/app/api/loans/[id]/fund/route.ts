@@ -46,17 +46,17 @@ export async function POST(
       );
     }
 
-    // Verify loan is ready for funding
-    if (loan.status !== 'fully_signed') {
+    if (loan.status === 'funded') {
       return NextResponse.json(
-        { error: 'Loan must be signed before funding' },
+        { error: 'Loan is already funded' },
         { status: 400 }
       );
     }
 
-    if (loan.status === 'funded') {
+    // Verify loan is ready for funding
+    if (loan.status !== 'fully_signed') {
       return NextResponse.json(
-        { error: 'Loan is already funded' },
+        { error: 'Loan must be signed before funding' },
         { status: 400 }
       );
     }
