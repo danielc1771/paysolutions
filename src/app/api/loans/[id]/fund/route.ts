@@ -3,7 +3,7 @@ import Stripe from 'stripe';
 import { createClient } from '@/utils/supabase/server';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-06-30.basil',
+  apiVersion: '2025-09-30.clover',
 });
 
 
@@ -142,56 +142,61 @@ export async function POST(
       },
     });
 
-    console.log('✅ Created Stripe price:', price.id);
+    console.log('✅ Created Stripe product and price');
 
-    // Step 4: Create Stripe subscription schedule for better control
-    const startDate = Math.floor(Date.now() / 1000);
-    // TODO: Change to 1 week from now for production: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60)
-    
-    const subscriptionSchedule = await stripe.subscriptionSchedules.create({
-      customer: stripeCustomer.id,
-      start_date: startDate,
-      end_behavior: 'cancel', // Automatically cancel after all phases complete
-      phases: [
-        {
-          items: [
-            {
-              price: price.id,
-              quantity: 1,
-            },
-          ],
-          iterations: loan.term_weeks, // Number of weekly payments
-          metadata: {
-            loan_id: loanId,
-            loan_number: loan.loan_number,
-            borrower_id: borrower.id,
-          },
-          collection_method: 'send_invoice',
-          invoice_settings: {
-            days_until_due: 5,
-          },
+    // Step 4: Create all invoices upfront with scheduled auto-finalization
+    // Stripe will automatically finalize and send each invoice at the specified time
+    console.log(`📄 Creating ${loan.term_weeks} invoices with automatic scheduling...`);
+
+    const weeklyPaymentAmount = Math.round(parseFloat(loan.weekly_payment) * 100); // Convert to cents
+    const startDate = Math.floor(Date.now() / 1000); // Today
+    const invoiceIds: string[] = [];
+
+    for (let week = 1; week <= loan.term_weeks; week++) {
+      // Calculate when this invoice should be sent and auto-finalized (1 week from now for first payment, then +7 days each)
+      const finalizeAt = startDate + (week * 7 * 24 * 60 * 60); // Unix timestamp when Stripe will auto-finalize and send
+
+      // Create invoice as DRAFT with auto-finalize
+      const invoice = await stripe.invoices.create({
+        customer: stripeCustomer.id,
+        collection_method: 'send_invoice',
+        days_until_due: 12, // Payment due 7 days after invoice sent
+        automatically_finalizes_at: finalizeAt, // Stripe will finalize and send at this time
+        metadata: {
+          loan_id: loanId,
+          loan_number: loan.loan_number,
+          borrower_id: borrower.id,
+          payment_number: week.toString(),
+          total_payments: loan.term_weeks.toString(),
         },
-      ],
-      metadata: {
-        loan_id: loanId,
-        loan_number: loan.loan_number,
-        borrower_id: borrower.id,
-        total_payments: loan.term_weeks.toString(),
-      },
-    });
+        description: `Loan ${loan.loan_number} - Payment ${week} of ${loan.term_weeks}`,
+      });
 
-    console.log('✅ Created Stripe subscription schedule:', subscriptionSchedule.id);
+      // Add payment line item
+      await stripe.invoiceItems.create({
+        customer: stripeCustomer.id,
+        invoice: invoice.id,
+        amount: weeklyPaymentAmount,
+        currency: 'usd',
+        description: `Weekly Payment ${week}/${loan.term_weeks}`,
+        metadata: {
+          loan_id: loanId,
+          payment_number: week.toString(),
+        },
+      });
 
-    // Get the subscription ID from the schedule
-    const subscription = subscriptionSchedule.subscription as string;
+      invoiceIds.push(invoice.id);
 
-    console.log('✅ Enabled invoice emails for customer');
+      const finalizeDate = new Date(finalizeAt * 1000);
+      console.log(`✅ Created invoice ${week}/${loan.term_weeks} - will auto-send on ${finalizeDate.toLocaleDateString()}`);
+    }
 
-    // Step 6: Update loan record with Stripe information
+    console.log(`✅ Created ${invoiceIds.length} invoices for loan ${loan.loan_number}`);
+
+    // Step 5: Update loan record with Stripe information
     const { error: updateError } = await supabase
       .from('loans')
       .update({
-        stripe_subscription_id: subscription || subscriptionSchedule.id,
         stripe_product_id: product.id,
         stripe_price_id: price.id,
         status: 'funded',
@@ -209,16 +214,20 @@ export async function POST(
       );
     }
 
+    const firstPaymentDate = new Date((startDate + (7 * 24 * 60 * 60)) * 1000);
+
     return NextResponse.json({
       success: true,
-      message: 'Loan funded successfully! The borrower will receive an email invoice for their first payment.',
+      message: `Loan funded successfully! ${invoiceIds.length} payment invoices created and scheduled. First payment invoice will be automatically sent on ${firstPaymentDate.toLocaleDateString()}.`,
       data: {
         loan_id: loanId,
         stripe_customer_id: stripeCustomer.id,
-        stripe_subscription_schedule_id: subscriptionSchedule.id,
-        stripe_subscription_id: subscription,
         stripe_product_id: product.id,
         stripe_price_id: price.id,
+        invoices_created: invoiceIds.length,
+        first_invoice_id: invoiceIds[0],
+        first_payment_date: firstPaymentDate.toISOString(),
+        total_payments: loan.term_weeks,
       },
     });
 
