@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { getEnvelopesApi, makeRecipientViewRequest } from '@/utils/docusign/jwt-client';
 
-const IPAY_EMAIL = 'architex.development@gmail.com';
-const ORGANIZATION_EMAIL = 'architex.development@gmail.com';
+const IPAY_EMAIL = 'ipayusdevelopment@gmail.com';
+const ORGANIZATION_EMAIL = 'jgarcia@easycarus.com';
 const INTEGRATION_KEY = process.env.INTEGRATION_KEY || '';
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
 

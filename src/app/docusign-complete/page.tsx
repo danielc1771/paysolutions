@@ -20,10 +20,15 @@ function DocuSignCompleteContent() {
         // Get parameters from URL
         const envelopeId = searchParams.get('envelopeId');
         const event = searchParams.get('event');
+        const loanId = searchParams.get('loanId');
+        const signerType = searchParams.get('signerType');
 
         if (!envelopeId) {
           throw new Error('No envelope ID provided');
         }
+
+        // Determine redirect URL based on loan ID
+        const redirectUrl = loanId ? `/dashboard/loans/${loanId}` : '/dashboard';
 
         // Check if the signing was successful based on event parameter
         if (event === 'signing_complete') {
@@ -49,14 +54,12 @@ function DocuSignCompleteContent() {
           }
 
           setStatus('success');
-          setMessage('Your document has been signed successfully!');
+          setMessage(`Your document has been signed successfully!${signerType === 'ipay' ? ' The organization will be notified to sign next.' : signerType === 'organization' ? ' The borrower will be notified to sign next.' : ''}`);
 
-          // Redirect to appropriate dashboard after 3 seconds
+          // Redirect to loan detail page after 2 seconds
           setTimeout(() => {
-            // Try to determine user type and redirect appropriately
-            // Default to login page if we can't determine the user type
-            router.push('/login');
-          }, 3000);
+            router.push(redirectUrl);
+          }, 2000);
         } else if (event === 'cancel' || event === 'decline') {
           setStatus('error');
           setMessage('The document signing was cancelled or declined.');
@@ -66,8 +69,8 @@ function DocuSignCompleteContent() {
           setMessage('Your signature has been recorded successfully!');
 
           setTimeout(() => {
-            router.push('/login');
-          }, 3000);
+            router.push(redirectUrl);
+          }, 2000);
         }
       } catch (error) {
         console.error('Error processing DocuSign completion:', error);
@@ -80,7 +83,9 @@ function DocuSignCompleteContent() {
   }, [router, searchParams]);
 
   const handleReturnClick = () => {
-    router.push('/login');
+    const loanId = searchParams.get('loanId');
+    const redirectUrl = loanId ? `/dashboard/loans/${loanId}` : '/dashboard';
+    router.push(redirectUrl);
   };
 
   return (
