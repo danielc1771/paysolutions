@@ -1,61 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 
-// Hardcoded signer emails for now
-const IPAY_ADMIN_EMAIL = 'ipaycustomer@gmail.com';
-const ORG_OWNER_EMAIL = 'jgarcia@easycarus.com'; // EasyCar organization owner
-
-/**
- * Identifies the signer type based on email
- */
-function identifySignerType(email: string): 'ipay' | 'organization' | 'borrower' | null {
-  const normalizedEmail = email?.toLowerCase().trim();
-
-  if (normalizedEmail === IPAY_ADMIN_EMAIL.toLowerCase()) {
-    return 'ipay';
-  }
-  if (normalizedEmail === ORG_OWNER_EMAIL.toLowerCase()) {
-    return 'organization';
-  }
-  // Anyone else is assumed to be the borrower
-  if (normalizedEmail) {
-    return 'borrower';
-  }
-
-  return null;
-}
-
-/**
- * Get human-readable status label for display
- */
-function getStatusLabel(status: string): string {
-  switch (status) {
-    case 'pending_ipay_signature':
-      return 'Awaiting iPay Signature';
-    case 'pending_org_signature':
-      return 'Awaiting Organization Signature';
-    case 'pending_borrower_signature':
-      return 'Awaiting Borrower Signature';
-    case 'fully_signed':
-      return 'Fully Signed';
-    default:
-      return status;
-  }
-}
-
 /**
  * POST /api/docusign/webhook
  *
- * Enhanced webhook endpoint for DocuSign to notify us of envelope and recipient events
+ * Webhook endpoint for DocuSign to notify us of envelope and recipient events
  *
- * DocuSign will send notifications when:
- * - Envelope is sent/delivered/completed/declined/voided
- * - Individual recipients complete their signing
+ * IMPORTANT: This webhook ONLY handles the BORROWER signature.
+ * iPay and Organization signatures are handled via the embedded signing redirect
+ * to /api/docusign/update-signing-timestamp.
  *
- * This webhook implements three-stage signing progression:
- * 1. iPay Admin signs → status becomes 'ipay_approved'
- * 2. Organization Owner signs → status becomes 'dealer_approved'
- * 3. Borrower signs → status becomes 'fully_signed'
+ * When the borrower signs via email (after iPay and Org have signed):
+ * - borrower_signed_at timestamp is set
+ * - status → 'fully_signed'
  */
 export async function POST(request: NextRequest) {
   try {
@@ -76,68 +33,46 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient();
 
-    // Handle recipient-level events for three-stage tracking
-    if (event === 'recipient-completed' || event === 'recipient-sent' || event === 'recipient-delivered') {
+    // Get the loan with current signing timestamps
+    const { data: loan } = await supabase
+      .from('loans')
+      .select(`
+        id,
+        ipay_signed_at,
+        docusign_completed_at,
+        organization_signed_at,
+        borrower_signed_at,
+        status
+      `)
+      .eq('docusign_envelope_id', envelopeId)
+      .single();
+
+    if (!loan) {
+      console.warn('⚠️ Loan not found for envelope ID:', envelopeId);
+      return NextResponse.json({ received: true });
+    }
+
+    // ONLY handle recipient-completed events for the BORROWER
+    // (iPay and Organization are handled via embedded signing redirect)
+    if (event === 'recipient-completed') {
       const recipientEmail = body.data?.email || body.data?.recipient?.email;
-      const recipientName = body.data?.name || body.data?.recipient?.name;
       const completedTime = body.data?.completedTime || body.data?.statusDateTime || new Date().toISOString();
 
-      console.log('👤 Recipient event:', {
-        event,
+      console.log('👤 Recipient completed:', {
         email: recipientEmail,
-        name: recipientName,
         time: completedTime
       });
 
-      if (!recipientEmail) {
-        console.warn('⚠️ Recipient event without email');
-        return NextResponse.json({ received: true });
-      }
+      // Check if this is the borrower's turn (both iPay and Org have already signed)
+      if (loan.ipay_signed_at && loan.organization_signed_at && !loan.borrower_signed_at) {
+        console.log('✅ Borrower completed signing via email');
 
-      const signerType = identifySignerType(recipientEmail);
-      console.log('🔍 Identified signer type:', signerType);
-
-      if (!signerType) {
-        console.warn('⚠️ Could not identify signer type for email:', recipientEmail);
-        return NextResponse.json({ received: true });
-      }
-
-      // Only process completion events for status progression
-      if (event === 'recipient-completed') {
-        // Determine the update based on signer type
-        let updateData: Record<string, string> = {
+        const updateData = {
+          borrower_signed_at: completedTime,
+          status: 'fully_signed',
+          docusign_completed_at: completedTime,
           updated_at: new Date().toISOString()
         };
-
-        switch (signerType) {
-          case 'ipay':
-            console.log('✅ iPay Admin completed signing');
-            updateData = {
-              ...updateData,
-              status: 'pending_org_signature',
-              ipay_signed_at: completedTime
-            };
-            break;
-
-          case 'organization':
-            console.log('✅ Organization Owner completed signing');
-            updateData = {
-              ...updateData,
-              status: 'pending_borrower_signature',
-              organization_signed_at: completedTime
-            };
-            break;
-
-          case 'borrower':
-            console.log('✅ Borrower completed signing');
-            updateData = {
-              ...updateData,
-              status: 'fully_signed',
-              borrower_signed_at: completedTime,
-              docusign_completed_at: completedTime
-            };
-            break;
-        }
 
         console.log('📝 Updating loan with:', updateData);
 
@@ -153,57 +88,46 @@ export async function POST(request: NextRequest) {
         } else {
           console.log('✅ Loan updated successfully');
           console.log('New status:', updatedLoan.status);
-          console.log('Status label:', getStatusLabel(updatedLoan.status));
-
-          // Log next expected signer
-          switch (updatedLoan.status) {
-            case 'pending_org_signature':
-              console.log('📧 Next: Organization Owner can sign via embedded view');
-              break;
-            case 'pending_borrower_signature':
-              console.log('📧 Next: Borrower will receive signing email');
-              break;
-            case 'fully_signed':
-              console.log('🎉 All signatures complete! Document is fully executed.');
-              break;
-          }
+          console.log('🎉 All signatures complete! Document is fully executed.');
         }
+      } else {
+        // This is either iPay or Organization signing (handled by redirect flow)
+        // or borrower already signed - just log and ignore
+        console.log('ℹ️ Ignoring recipient-completed event (handled by embedded signing redirect or already signed)');
+        console.log('Current timestamps:', {
+          ipay_signed_at: loan.ipay_signed_at,
+          organization_signed_at: loan.organization_signed_at,
+          borrower_signed_at: loan.borrower_signed_at
+        });
       }
     }
 
-    // Handle envelope-level events
-    else if (event.includes('envelope-')) {
-      console.log('📋 Envelope event:', event);
+    // Handle envelope-completed event as a backup
+    else if (event === 'envelope-completed') {
+      console.log('📋 Envelope completed event');
 
-      const updateData: Record<string, string> = {
-        updated_at: new Date().toISOString()
-      };
+      // Only update if all parties have signed but status isn't fully_signed yet
+      if (loan.ipay_signed_at && loan.organization_signed_at && loan.borrower_signed_at) {
+        if (loan.status !== 'fully_signed') {
+          console.log('🎉 Marking envelope as fully signed');
 
-      // Only update to fully_signed if envelope is completed and not already set
-      if (event.includes('completed')) {
-        console.log('🎉 Entire envelope completed - all signers have signed');
-        
-        const { data: currentLoan } = await supabase
-          .from('loans')
-          .select('status')
-          .eq('docusign_envelope_id', envelopeId)
-          .single();
+          const { error } = await supabase
+            .from('loans')
+            .update({
+              status: 'fully_signed',
+              docusign_completed_at: loan.docusign_completed_at || new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            })
+            .eq('docusign_envelope_id', envelopeId);
 
-        if (currentLoan && currentLoan.status !== 'fully_signed') {
-          updateData.status = 'fully_signed';
-          updateData.docusign_completed_at = new Date().toISOString();
+          if (error) {
+            console.error('❌ Failed to update loan:', error);
+          } else {
+            console.log('✅ Loan marked as fully signed');
+          }
         }
-      }
-
-      const { error } = await supabase
-        .from('loans')
-        .update(updateData)
-        .eq('docusign_envelope_id', envelopeId);
-
-      if (error) {
-        console.error('❌ Failed to update loan:', error);
       } else {
-        console.log('✅ Loan updated successfully');
+        console.log('ℹ️ Envelope completed but not all parties have signed yet');
       }
     }
 
@@ -227,11 +151,27 @@ export async function GET() {
   return NextResponse.json({
     status: 'ok',
     message: 'DocuSign webhook endpoint is active',
-    description: 'Three-stage signing workflow enabled',
-    signers: {
-      stage1: { role: 'iPay Admin', email: IPAY_ADMIN_EMAIL },
-      stage2: { role: 'Organization Owner', email: ORG_OWNER_EMAIL },
-      stage3: { role: 'Borrower', email: 'Dynamic from application' }
-    }
+    description: 'Borrower-only webhook (iPay and Org handled via embedded redirect)',
+    workflow: {
+      stage1: {
+        role: 'iPay Admin',
+        timestamp: 'ipay_signed_at',
+        status_after: 'ipay_approved',
+        handler: 'Embedded signing redirect → /api/docusign/update-signing-timestamp'
+      },
+      stage2: {
+        role: 'Organization Owner',
+        timestamp: 'organization_signed_at',
+        status_after: 'dealer_approved',
+        handler: 'Embedded signing redirect → /api/docusign/update-signing-timestamp'
+      },
+      stage3: {
+        role: 'Borrower',
+        timestamp: 'borrower_signed_at',
+        status_after: 'fully_signed',
+        handler: 'DocuSign email → This webhook'
+      }
+    },
+    logic: 'Webhook only processes borrower signature (when both ipay_signed_at and organization_signed_at exist)'
   });
 }
