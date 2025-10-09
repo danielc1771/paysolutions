@@ -158,6 +158,7 @@ export async function POST(
 
       // Create invoice as DRAFT with auto-finalize
       const invoice = await stripe.invoices.create({
+        auto_advance: true,
         customer: stripeCustomer.id,
         collection_method: 'send_invoice',
         days_until_due: 12, // Payment due 7 days after invoice sent
