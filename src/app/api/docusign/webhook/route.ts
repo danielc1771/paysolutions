@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
-import { LoanWithBorrower } from '@/types/loan';
 
 /**
  * POST /api/docusign/webhook
@@ -34,7 +33,7 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient();
 
-    // Get the loan with current signing timestamps and borrower email
+    // Get the loan with current signing timestamps
     const { data: loan } = await supabase
       .from('loans')
       .select(`
@@ -43,8 +42,7 @@ export async function POST(request: NextRequest) {
         docusign_completed_at,
         organization_signed_at,
         borrower_signed_at,
-        status,
-        borrower:borrowers(email)
+        status
       `)
       .eq('docusign_envelope_id', envelopeId)
       .single();
@@ -54,49 +52,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ received: true });
     }
 
-    // ONLY handle recipient-completed events for the BORROWER
+    // ONLY handle recipient-completed events for the BORROWER (recipientId === '3')
     // (iPay and Organization are handled via embedded signing redirect)
     if (event === 'recipient-completed') {
+      const recipientId = body.data?.recipientId || body.data?.recipient?.recipientId;
       const recipientEmail = body.data?.email || body.data?.recipient?.email;
       const completedTime = body.data?.completedTime || body.data?.statusDateTime || new Date().toISOString();
 
       console.log('👤 Recipient completed:', {
+        recipientId,
         email: recipientEmail,
         time: completedTime
       });
 
-      if (!recipientEmail) {
-        console.warn('⚠️ Recipient email not found in webhook payload');
+      // Only process if this is recipient #3 (the borrower)
+      // Recipient 1 = iPay Admin, Recipient 2 = Organization Owner, Recipient 3 = Borrower
+      if (recipientId !== '3') {
+        console.log(`ℹ️ Ignoring recipient-completed event for recipient ${recipientId} (not the borrower)`);
         return NextResponse.json({ received: true });
       }
 
-      // Check if this email belongs to a user in our profiles table
-      // If it does, it's iPay or Org (handled by redirect), so ignore it
-      const { data: userProfile } = await supabase
-        .from('profiles')
-        .select('id, email, role')
-        .eq('email', recipientEmail.toLowerCase().trim())
-        .single();
-
-      if (userProfile) {
-        console.log('ℹ️ Ignoring event - signer is a system user (iPay/Org), handled by embedded redirect');
-        console.log('User profile:', { email: userProfile.email, role: userProfile.role });
+      // Double-check that both iPay and Org have already signed
+      if (!loan.ipay_signed_at || !loan.organization_signed_at) {
+        console.warn('⚠️ Borrower signing event received but iPay or Org has not signed yet');
+        console.log('Current timestamps:', {
+          ipay_signed_at: loan.ipay_signed_at,
+          organization_signed_at: loan.organization_signed_at
+        });
         return NextResponse.json({ received: true });
       }
 
-      // Verify this is actually the borrower's email
-      const borrowerEmail = (loan as unknown as LoanWithBorrower).borrower?.email?.toLowerCase().trim();
-      const signerEmail = recipientEmail.toLowerCase().trim();
-
-      if (signerEmail !== borrowerEmail) {
-        console.warn('⚠️ Signer email does not match borrower email');
-        console.log('Expected:', borrowerEmail, 'Got:', signerEmail);
-        return NextResponse.json({ received: true });
-      }
-
-      // Check if this is the borrower's turn (both iPay and Org have already signed)
-      if (loan.ipay_signed_at && loan.organization_signed_at && !loan.borrower_signed_at) {
-        console.log('✅ Borrower completed signing via email');
+      // Check if borrower hasn't signed yet
+      if (!loan.borrower_signed_at) {
+        console.log('✅ Borrower (recipient #3) completed signing via email');
 
         const updateData = {
           borrower_signed_at: completedTime,
