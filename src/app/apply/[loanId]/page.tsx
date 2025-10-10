@@ -32,6 +32,8 @@ export default function ApplyPage() {
     annualIncome: '',
     currentEmployerName: '',
     timeWithEmployment: '',
+    employmentYears: '',
+    employmentMonths: '',
     reference1Name: '',
     reference1Phone: '',
     reference1Email: '',
@@ -162,6 +164,8 @@ export default function ApplyPage() {
             annualIncome: '',
             currentEmployerName: '',
             timeWithEmployment: '',
+            employmentYears: '',
+            employmentMonths: '',
             // References
             reference1Name: '',
             reference1Phone: '',
@@ -434,6 +438,8 @@ export default function ApplyPage() {
           annualIncome: '',
           currentEmployerName: '',
           timeWithEmployment: '',
+          employmentYears: '',
+          employmentMonths: '',
           // References
           reference1Name: '',
           reference1Phone: '',
@@ -1007,13 +1013,20 @@ function PersonalDetailsStep({ formData, setFormData, initialData, handleNext, h
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, state: e.target.value })} 
             error={errors.state}
           />
-          <InputFieldWithError 
-            label={t.personalDetails.zipCode} 
-            name="zipCode" 
-            type="text" 
+          <InputFieldWithError
+            label={t.personalDetails.zipCode}
+            name="zipCode"
+            type="text"
             placeholder="33101"
-            value={formData.zipCode} 
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, zipCode: e.target.value })} 
+            maxLength={10}
+            value={formData.zipCode}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+              const value = e.target.value;
+              // Only allow digits and hyphen, max 10 chars (12345-6789 format)
+              if (value === '' || /^[\d-]{0,10}$/.test(value)) {
+                setFormData({ ...formData, zipCode: value });
+              }
+            }}
             error={errors.zipCode}
           />
         </div>
@@ -1081,9 +1094,11 @@ function EmploymentDetailsStep({ formData, setFormData, handleNext, handlePrev, 
       }
 
       // Time with employment validation (required for employed/self-employed)
-      if (!formData.timeWithEmployment || String(formData.timeWithEmployment).trim() === '') {
+      const years = formData.employmentYears || '';
+      const months = formData.employmentMonths || '';
+      if (!years && !months) {
         newErrors.timeWithEmployment = t.employment.validation.timeRequired;
-      } else if (String(formData.timeWithEmployment).trim().length < 2) {
+      } else if (!formData.timeWithEmployment || String(formData.timeWithEmployment).trim().length < 2) {
         newErrors.timeWithEmployment = t.employment.validation.timeMinLength;
       }
     }
@@ -1128,13 +1143,19 @@ function EmploymentDetailsStep({ formData, setFormData, handleNext, handlePrev, 
           )}
         </div>
 
-        <InputFieldWithError 
-          label={t.employment.annualIncome} 
-          name="annualIncome" 
-          type="number" 
-          placeholder="50000" 
-          value={formData.annualIncome} 
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, annualIncome: e.target.value })} 
+        <InputFieldWithError
+          label={t.employment.annualIncome}
+          name="annualIncome"
+          type="text"
+          placeholder="50000"
+          value={formData.annualIncome}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+            const value = e.target.value;
+            // Only allow digits
+            if (value === '' || /^\d+$/.test(value)) {
+              setFormData({ ...formData, annualIncome: value });
+            }
+          }}
           error={errors.annualIncome}
         />
 
@@ -1149,15 +1170,77 @@ function EmploymentDetailsStep({ formData, setFormData, handleNext, handlePrev, 
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, currentEmployerName: e.target.value })} 
               error={errors.currentEmployerName}
             />
-            <InputFieldWithError 
-              label={t.employment.timeWithEmployment} 
-              name="timeWithEmployment" 
-              type="text" 
-              placeholder="e.g., 2 years, 6 months, 1.5 years" 
-              value={formData.timeWithEmployment} 
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, timeWithEmployment: e.target.value })} 
-              error={errors.timeWithEmployment}
-            />
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">{t.employment.timeWithEmployment}</label>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <input
+                    type="number"
+                    placeholder="Years"
+                    value={formData.employmentYears as number || 0}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                      const value = e.target.value;
+                      // Only allow digits, max 2 digits
+                      if (value === '' || /^\d{0,2}$/.test(value)) {
+                        const years = value;
+                        const months = formData.employmentMonths || '';
+                        const timeText = [
+                          years && `${years} ${(parseInt(years) === 1 ? 'year' : 'years')}`,
+                          months && `${months} ${(parseInt(months as string) === 1 ? 'month' : 'months')}`
+                        ].filter(Boolean).join(', ');
+                        setFormData({
+                          ...formData,
+                          employmentYears: value,
+                          timeWithEmployment: timeText || ''
+                        });
+                      }
+                    }}
+                    className={`w-full py-3 px-4 border rounded-2xl bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:outline-none transition-all duration-300 ${
+                      errors.timeWithEmployment
+                        ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
+                        : 'border-gray-200 focus:ring-purple-500 focus:border-purple-500'
+                    }`}
+                  />
+                  <p className="mt-1 text-xs text-gray-500">Years</p>
+                </div>
+                <div>
+                  <input
+                    type="number"
+                    placeholder="Months"
+                    value={formData.employmentMonths as number || 0}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                      const value = e.target.value;
+                      // Only allow digits 0-11
+                      if (value === '' || (/^\d{0,2}$/.test(value) && parseInt(value || '0') <= 11)) {
+                        const years = formData.employmentYears || '';
+                        const months = value;
+                        const timeText = [
+                          years && `${years} ${parseInt(years as string) === 1 ? 'year' : 'years'}`,
+                          months && `${months} ${parseInt(months) === 1 ? 'month' : 'months'}`
+                        ].filter(Boolean).join(', ');
+                        setFormData({
+                          ...formData,
+                          employmentMonths: value,
+                          timeWithEmployment: timeText || ''
+                        });
+                      }
+                    }}
+                    className={`w-full py-3 px-4 border rounded-2xl bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:outline-none transition-all duration-300 ${
+                      errors.timeWithEmployment
+                        ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
+                        : 'border-gray-200 focus:ring-purple-500 focus:border-purple-500'
+                    }`}
+                  />
+                  <p className="mt-1 text-xs text-gray-500">Months</p>
+                </div>
+              </div>
+              {errors.timeWithEmployment && (
+                <p className="mt-2 text-sm text-red-600 flex items-center">
+                  <AlertCircle className="w-4 h-4 mr-1" />
+                  {errors.timeWithEmployment}
+                </p>
+              )}
+            </div>
           </>
         )}
 
