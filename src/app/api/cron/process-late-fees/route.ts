@@ -16,6 +16,7 @@ export async function GET() {
     const now = Math.floor(Date.now() / 1000);
     const cutoffDate = now - (GRACE_PERIOD_DAYS * 24 * 60 * 60); // 5 days ago
 
+    console.log('Cutoff date:', cutoffDate);
     let processedCount = 0;
     let skippedCount = 0;
 
@@ -27,7 +28,7 @@ export async function GET() {
       limit: 100, // Fetch 100 at a time for efficiency
     })) {
       // Check if invoice is past due (considering grace period)
-      if (!invoice.due_date || invoice.due_date > cutoffDate) {
+      if (!invoice.due_date) {
         skippedCount++;
         continue;
       }
