@@ -1616,35 +1616,97 @@ const SuccessMessage = ({ selectedLanguage = 'en' }: { selectedLanguage?: Langua
 };
 
 // New Step: References
-function ReferencesStep({ formData, setFormData, handleNext, handlePrev, selectedLanguage }: { 
-  formData: Record<string, unknown>; 
-  setFormData: React.Dispatch<React.SetStateAction<Record<string, unknown>>>; 
-  handleNext: () => void; 
-  handlePrev: () => void; 
+function ReferencesStep({ formData, setFormData, handleNext, handlePrev, selectedLanguage }: {
+  formData: Record<string, unknown>;
+  setFormData: React.Dispatch<React.SetStateAction<Record<string, unknown>>>;
+  handleNext: () => void;
+  handlePrev: () => void;
   selectedLanguage: Language;
 }) {
+  const [error, setError] = useState<string | null>(null);
   const t = getTranslations(selectedLanguage);
+
+  // Helper function to check if a reference is complete
+  const isReferenceComplete = (num: number) => {
+    const name = String(formData[`reference${num}Name`] || '').trim();
+    const phone = String(formData[`reference${num}Phone`] || '').trim();
+    const email = String(formData[`reference${num}Email`] || '').trim();
+    return name && phone && email;
+  };
+
+  // Validation function
+  const validateReferences = () => {
+    const completeReferences = [1, 2, 3].filter(num => isReferenceComplete(num));
+
+    if (completeReferences.length < 2) {
+      setError('Please provide at least 2 complete references (name, phone, and email for each).');
+      return false;
+    }
+
+    setError(null);
+    return true;
+  };
+
+  const handleNextClick = () => {
+    if (validateReferences()) {
+      handleNext();
+    }
+  };
+
   return (
     <div>
       <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">{t.references.title}</h1>
       <p className="text-gray-600 mb-8">{t.references.subtitle}</p>
 
-      <div className="space-y-8">
-        {[1, 2, 3].map((num) => (
-          <div key={num} className="p-4 border border-gray-200 rounded-2xl bg-gray-50/50">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">{t.references.reference} {num}</h3>
-            <div className="space-y-4">
-              <InputField label={t.references.name} name={`reference${num}Name`} type="text" value={formData[`reference${num}Name`]} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, [`reference${num}Name`]: e.target.value})} />
-              <InputField label={t.references.phone} name={`reference${num}Phone`} type="text" value={formData[`reference${num}Phone`]} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, [`reference${num}Phone`]: e.target.value})} />
-              <InputField label={t.references.email} name={`reference${num}Email`} type="email" value={formData[`reference${num}Email`]} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, [`reference${num}Email`]: e.target.value})} />
-            </div>
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-2xl">
+          <div className="flex items-center">
+            <AlertCircle className="w-5 h-5 text-red-500 mr-2" />
+            <span className="text-red-700">{error}</span>
           </div>
-        ))}
+        </div>
+      )}
+
+      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-6">
+        <div className="flex items-center">
+          <svg className="w-5 h-5 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p className="text-blue-700 text-sm">
+            Please provide at least 2 complete references. All fields (name, phone, email) are required for each reference.
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-8">
+        {[1, 2, 3].map((num) => {
+          const isComplete = isReferenceComplete(num);
+          return (
+            <div key={num} className={`p-4 border rounded-2xl ${isComplete ? 'border-green-300 bg-green-50/50' : 'border-gray-200 bg-gray-50/50'}`}>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold text-gray-900">{t.references.reference} {num}</h3>
+                {isComplete && (
+                  <span className="text-green-600 text-sm font-semibold flex items-center">
+                    <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Complete
+                  </span>
+                )}
+              </div>
+              <div className="space-y-4">
+                <InputField label={t.references.name} name={`reference${num}Name`} type="text" value={formData[`reference${num}Name`]} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, [`reference${num}Name`]: e.target.value})} />
+                <InputField label={t.references.phone} name={`reference${num}Phone`} type="text" value={formData[`reference${num}Phone`]} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, [`reference${num}Phone`]: e.target.value})} />
+                <InputField label={t.references.email} name={`reference${num}Email`} type="email" value={formData[`reference${num}Email`]} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, [`reference${num}Email`]: e.target.value})} />
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       <div className="mt-10 flex flex-col-reverse md:flex-row md:justify-between gap-4">
         <button onClick={handlePrev} className="w-full md:w-auto px-8 py-4 bg-white/60 backdrop-blur-sm border border-white/30 rounded-2xl text-gray-700 font-semibold hover:bg-white/80 hover:shadow-lg transition-all duration-300 shadow-sm justify-center">{t.references.back}</button>
-        <button onClick={handleNext} className="w-full md:w-auto px-8 py-4 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-2xl font-semibold hover:from-purple-600 hover:to-blue-600 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center">
+        <button onClick={handleNextClick} className="w-full md:w-auto px-8 py-4 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-2xl font-semibold hover:from-purple-600 hover:to-blue-600 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center">
           {t.references.next} <ArrowRight className="w-5 h-5 ml-2" />
         </button>
       </div>

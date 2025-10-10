@@ -153,16 +153,18 @@ export async function POST(
     const invoiceIds: string[] = [];
 
     for (let week = 1; week <= loan.term_weeks; week++) {
-      // Calculate when this invoice should be sent and auto-finalized (1 week from now for first payment, then +7 days each)
-      const finalizeAt = startDate + (week * 7 * 24 * 60 * 60); // Unix timestamp when Stripe will auto-finalize and send
+      // Calculate when this invoice should be sent and auto-finalized
+      // First invoice: finalize immediately (now)
+      // Subsequent invoices: week 2 at +7 days, week 3 at +14 days, etc.
+      const finalizeAt = week === 1 ? startDate : startDate + ((week - 1) * 7 * 24 * 60 * 60);
 
-      // Create invoice as DRAFT with auto-finalize
+      // Create invoice as DRAFT with auto-finalize (or finalize immediately for first invoice)
       const invoice = await stripe.invoices.create({
         auto_advance: true,
         customer: stripeCustomer.id,
         collection_method: 'send_invoice',
-        days_until_due: 12, // Payment due 7 days after invoice sent
-        automatically_finalizes_at: finalizeAt, // Stripe will finalize and send at this time
+        days_until_due: 12, // Payment due 12 days after invoice sent
+        automatically_finalizes_at: week === 1 ? undefined : finalizeAt, // First invoice will be manually finalized immediately
         metadata: {
           loan_id: loanId,
           loan_number: loan.loan_number,
@@ -186,10 +188,16 @@ export async function POST(
         },
       });
 
-      invoiceIds.push(invoice.id);
+      // Finalize and send the first invoice immediately
+      if (week === 1) {
+        await stripe.invoices.finalizeInvoice(invoice.id);
+        console.log(`✅ Created and finalized invoice 1/${loan.term_weeks} - sent immediately`);
+      } else {
+        const finalizeDate = new Date(finalizeAt * 1000);
+        console.log(`✅ Created invoice ${week}/${loan.term_weeks} - will auto-send on ${finalizeDate.toLocaleDateString()}`);
+      }
 
-      const finalizeDate = new Date(finalizeAt * 1000);
-      console.log(`✅ Created invoice ${week}/${loan.term_weeks} - will auto-send on ${finalizeDate.toLocaleDateString()}`);
+      invoiceIds.push(invoice.id);
     }
 
     console.log(`✅ Created ${invoiceIds.length} invoices for loan ${loan.loan_number}`);
@@ -215,11 +223,12 @@ export async function POST(
       );
     }
 
-    const firstPaymentDate = new Date((startDate + (7 * 24 * 60 * 60)) * 1000);
+    const firstPaymentDate = new Date(startDate * 1000); // First invoice sent immediately
+    const secondPaymentDate = loan.term_weeks > 1 ? new Date((startDate + (7 * 24 * 60 * 60)) * 1000) : null;
 
     return NextResponse.json({
       success: true,
-      message: `Loan funded successfully! ${invoiceIds.length} payment invoices created and scheduled. First payment invoice will be automatically sent on ${firstPaymentDate.toLocaleDateString()}.`,
+      message: `Loan funded successfully! ${invoiceIds.length} payment invoices created. First payment invoice sent immediately.${secondPaymentDate ? ` Next invoice will be sent on ${secondPaymentDate.toLocaleDateString()}.` : ''}`,
       data: {
         loan_id: loanId,
         stripe_customer_id: stripeCustomer.id,
@@ -228,6 +237,7 @@ export async function POST(
         invoices_created: invoiceIds.length,
         first_invoice_id: invoiceIds[0],
         first_payment_date: firstPaymentDate.toISOString(),
+        second_payment_date: secondPaymentDate?.toISOString(),
         total_payments: loan.term_weeks,
       },
     });
