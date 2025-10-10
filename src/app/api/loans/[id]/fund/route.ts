@@ -167,7 +167,7 @@ export async function POST(
         customer: stripeCustomer.id,
         collection_method: 'send_invoice',
         due_date: dueDateTimestamp, // Absolute due date timestamp
-        automatically_finalizes_at: week === 1 ? undefined : finalizeAt, // First invoice will be manually finalized immediately
+        automatically_finalizes_at: week === 1 ? startDate : finalizeAt, // First invoice will be manually finalized immediately
         metadata: {
           loan_id: loanId,
           loan_number: loan.loan_number,
