@@ -49,6 +49,7 @@ export async function GET() {
             invoice: invoice.id,
             action: 'revision',
           },
+          due_date: invoice.due_date,
         });
         console.log(`📝 Created revision invoice ${revisionInvoice.id} from ${invoice.id}`);
 
