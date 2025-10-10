@@ -71,7 +71,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ loa
     }
 
     if (validation.data.address && validation.data.address.trim() !== '') {
-      updateData.address_line1 = validation.data.address;
+      updateData.address = validation.data.address; // For DocuSign compatibility
+      updateData.address_line1 = validation.data.address; // Primary address field
     }
     if (validation.data.city && validation.data.city.trim() !== '') {
       updateData.city = validation.data.city;
