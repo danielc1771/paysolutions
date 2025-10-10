@@ -49,7 +49,6 @@ export async function GET() {
             invoice: invoice.id,
             action: 'revision',
           },
-          due_date: invoice.due_date,
         });
         console.log(`📝 Created revision invoice ${revisionInvoice.id} from ${invoice.id}`);
 
@@ -64,6 +63,7 @@ export async function GET() {
 
         // Step 3: Update metadata on the revision before finalizing
         await stripe.invoices.update(revisionInvoice.id, {
+          due_date: invoice.due_date,
           metadata: {
             ...invoice.metadata,
             late_fee_applied: 'true',
