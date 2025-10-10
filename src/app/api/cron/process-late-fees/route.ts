@@ -42,17 +42,28 @@ export async function GET() {
       try {
         console.log(`💰 Processing late fee for invoice ${invoice.id} (due: ${new Date(invoice.due_date * 1000).toLocaleDateString()})`);
 
-        // Add late fee line item to the existing invoice
+
+        // Step 1: Create a revision invoice (creates a new draft invoice from the original)
+        const revisionInvoice = await stripe.invoices.create({
+          customer: invoice.customer as string,
+          from_invoice: {
+            invoice: invoice.id,
+            action: 'revision',
+          },
+        });
+        console.log(`📝 Created revision invoice ${revisionInvoice.id} from ${invoice.id}`);
+
+        // Step 2: Add late fee line item to the revision
         await stripe.invoiceItems.create({
           customer: invoice.customer as string,
-          invoice: invoice.id,
+          invoice: revisionInvoice.id,
           amount: LATE_FEE_AMOUNT, // $15.00 in cents
           currency: 'usd',
           description: `Late Fee - Payment ${invoice.metadata?.payment_number || 'N/A'}`,
         });
 
-        // Mark invoice metadata to prevent duplicate late fee charges
-        await stripe.invoices.update(invoice.id, {
+        // Step 3: Update metadata on the revision before finalizing
+        await stripe.invoices.update(revisionInvoice.id, {
           metadata: {
             ...invoice.metadata,
             late_fee_applied: 'true',
@@ -60,9 +71,12 @@ export async function GET() {
           },
         });
 
+        // Step 4: Finalize the revision (this voids the original invoice automatically)
+        await stripe.invoices.finalizeInvoice(revisionInvoice.id);
+
         processedCount++;
 
-        console.log(`✅ Late fee added to invoice ${invoice.id}`);
+        console.log(`✅ Late fee added to invoice ${invoice.id} via revision ${revisionInvoice.id}`);
       } catch (error) {
         console.error(`❌ Failed to process late fee for invoice ${invoice.id}:`, error);
       }
