@@ -440,10 +440,12 @@ export default function UserBorrowers() {
                   <p className="text-gray-600 mb-6 max-w-md mx-auto">
                     {searchTerm || filterKyc !== 'all' 
                       ? 'Try adjusting your search terms or filters to find what you\'re looking for.'
-                      : 'Borrowers will appear here once you create loan applications for customers.'
+                      : isAdmin
+                        ? 'Borrowers from all organizations will appear here.'
+                        : 'Borrowers will appear here once you create loan applications for customers.'
                     }
                   </p>
-                  {(!searchTerm && filterKyc === 'all') && (
+                  {(!searchTerm && filterKyc === 'all' && !isAdmin) && (
                     <Link
                       href="/dashboard/loans/create"
                       className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-2xl font-bold hover:from-green-600 hover:to-teal-600 transition-all duration-300 shadow-lg hover:shadow-xl space-x-2"
