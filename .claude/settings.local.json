@@ -1,6 +1,13 @@
 {
+  "permissions": {
+    "allow": [
+      "Read(//var/folders/zn/43mj8gm90_14tyzddsqq7hpc0000gn/T/TemporaryItems/NSIRD_screencaptureui_XFgZsa/**)",
+      "Read(//var/folders/zn/43mj8gm90_14tyzddsqq7hpc0000gn/T/TemporaryItems/NSIRD_screencaptureui_AIJQ7J/**)",
+      "WebFetch(domain:docs.stripe.com)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "supabase"
-  ],
-  "enableAllProjectMcpServers": true
+  ]
 }
