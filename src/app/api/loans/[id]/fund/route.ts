@@ -158,12 +158,19 @@ export async function POST(
       // Subsequent invoices: week 2 at +7 days, week 3 at +14 days, etc.
       const finalizeAt = week === 1 ? startDate : startDate + ((week - 1) * 7 * 24 * 60 * 60);
 
+      // Calculate absolute due date: 12 days after invoice is sent
+      // Week 1: sent day 0, due day 12
+      // Week 2: sent day 7, due day 19
+      // Week 3: sent day 14, due day 26, etc.
+      const invoiceSentDay = (week - 1) * 7;
+      const dueDateTimestamp = startDate + ((invoiceSentDay + 12) * 24 * 60 * 60);
+
       // Create invoice as DRAFT with auto-finalize (or finalize immediately for first invoice)
       const invoice = await stripe.invoices.create({
         auto_advance: true,
         customer: stripeCustomer.id,
         collection_method: 'send_invoice',
-        days_until_due: 12, // Payment due 12 days after invoice sent
+        due_date: dueDateTimestamp, // Absolute due date timestamp
         automatically_finalizes_at: week === 1 ? undefined : finalizeAt, // First invoice will be manually finalized immediately
         metadata: {
           loan_id: loanId,
