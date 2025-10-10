@@ -45,7 +45,6 @@ export async function GET() {
 
         // Step 1: Create a revision invoice (creates a new draft invoice from the original)
         const revisionInvoice = await stripe.invoices.create({
-          customer: invoice.customer as string,
           from_invoice: {
             invoice: invoice.id,
             action: 'revision',
