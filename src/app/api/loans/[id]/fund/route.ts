@@ -191,12 +191,6 @@ export async function POST(
         },
       });
 
-      // Finalize and send the first invoice immediately
-      if (week === 1) {
-        await stripe.invoices.finalizeInvoice(invoice.id);
-        console.log(`✅ Created and finalized invoice 1/${loan.term_weeks} - sent immediately`);
-      } 
-
       invoiceIds.push(invoice.id);
     }
 
