@@ -103,6 +103,14 @@ export default function CreateLoan() {
     if (!sendFormData.vehicleYear.trim()) {
       errors.vehicleYear = true;
       isValid = false;
+    } else {
+      // Vehicle Year validation: must be 4 digits and within reasonable range
+      const year = parseInt(sendFormData.vehicleYear);
+      const currentYear = new Date().getFullYear();
+      if (!/^\d{4}$/.test(sendFormData.vehicleYear) || isNaN(year) || year < 1900 || year > currentYear + 1) {
+        errors.vehicleYear = true;
+        isValid = false;
+      }
     }
     if (!sendFormData.vehicleMake.trim()) {
       errors.vehicleMake = true;
@@ -115,6 +123,13 @@ export default function CreateLoan() {
     if (!sendFormData.vehicleVin.trim()) {
       errors.vehicleVin = true;
       isValid = false;
+    } else {
+      // VIN validation: must be exactly 17 alphanumeric characters (excluding I, O, Q)
+      const vinPattern = /^[A-HJ-NPR-Z0-9]{17}$/i;
+      if (!vinPattern.test(sendFormData.vehicleVin)) {
+        errors.vehicleVin = true;
+        isValid = false;
+      }
     }
 
     // Email format validation
@@ -192,7 +207,7 @@ export default function CreateLoan() {
         throw new Error(result.error || result.message || 'Failed to send application');
       }
 
-      setSuccessMessage(`Application sent successfully to ${sendFormData.customerEmail}! Application URL: ${result.applicationUrl}`);
+      setSuccessMessage(`Application sent successfully to ${sendFormData.customerEmail}!`);
       setCreatedLoanId(result.loanId || null);
       setShowSuccessModal(true);
       setSendFormData({
@@ -319,36 +334,25 @@ export default function CreateLoan() {
                         <label className="block text-sm font-medium text-gray-700 mb-2">Loan Amount *</label>
                         <div className="relative">
                           <input
-                            type="number"
+                            type="text"
                             required
-                            min="1"
-                            max="2998"
-                            step="1"
                             value={sendFormData.loanAmount}
                             onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                               const value = e.target.value;
-                              // Allow empty or valid numbers only
-                              if (value === '') {
-                                setSendFormData(prev => ({ ...prev, loanAmount: '' }));
-                              } else {
-                                const numValue = parseInt(value);
-                                // Only update if it's a valid number within range
-                                if (!isNaN(numValue) && numValue >= 1 && numValue <= 2998) {
-                                  handleLoanAmountChange(value);
+                              // Only allow digits and empty string
+                              if (value === '' || /^\d+$/.test(value)) {
+                                // Check if within range before updating
+                                if (value === '') {
+                                  setSendFormData(prev => ({ ...prev, loanAmount: '' }));
+                                } else {
+                                  const numValue = parseInt(value);
+                                  if (numValue <= 2998) {
+                                    handleLoanAmountChange(value);
+                                  }
                                 }
                               }
                             }}
-                            onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
-                              // Enforce max on blur if user typed a larger number
-                              const value = e.target.value;
-                              if (value) {
-                                const numValue = parseInt(value);
-                                if (numValue > 2998) {
-                                  handleLoanAmountChange('2998');
-                                }
-                              }
-                            }}
-                            className={`w-full pl-4 pr-4 py-3 rounded-2xl border ${validationErrors.loanAmount ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'} focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                            className={`w-full pl-4 pr-4 py-3 rounded-2xl border ${validationErrors.loanAmount ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'} focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white`}
                             placeholder="2998"
                           />
                         </div>
@@ -379,8 +383,15 @@ export default function CreateLoan() {
                         <input
                           type="text"
                           required
+                          maxLength={4}
                           value={sendFormData.vehicleYear}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSendFormData(prev => ({ ...prev, vehicleYear: e.target.value }))}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                            const value = e.target.value;
+                            // Only allow digits
+                            if (value === '' || /^\d{0,4}$/.test(value)) {
+                              setSendFormData(prev => ({ ...prev, vehicleYear: value }));
+                            }
+                          }}
                           className={`w-full px-4 py-3 rounded-2xl border ${validationErrors.vehicleYear ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'} focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white`}
                           placeholder="2020"
                         />
@@ -415,11 +426,19 @@ export default function CreateLoan() {
                         <input
                           type="text"
                           required
+                          maxLength={17}
                           value={sendFormData.vehicleVin}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSendFormData(prev => ({ ...prev, vehicleVin: e.target.value }))}
-                          className={`w-full px-4 py-3 rounded-2xl border ${validationErrors.vehicleVin ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'} focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white`}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                            const value = e.target.value.toUpperCase();
+                            // Only allow valid VIN characters (A-Z, 0-9, excluding I, O, Q)
+                            if (value === '' || /^[A-HJ-NPR-Z0-9]{0,17}$/.test(value)) {
+                              setSendFormData(prev => ({ ...prev, vehicleVin: value }));
+                            }
+                          }}
+                          className={`w-full px-4 py-3 rounded-2xl border ${validationErrors.vehicleVin ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'} focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white uppercase`}
                           placeholder="1HGBH41JXMN109186"
                         />
+                        <p className="mt-1 text-xs text-gray-500">Must be exactly 17 characters (letters and numbers, excluding I, O, Q)</p>
                       </div>
                     </div>
 
