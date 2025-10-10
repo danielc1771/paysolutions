@@ -110,7 +110,7 @@ export async function GET(
 
     // Sort by creation date (newest first)
     transformedInvoices.sort((a, b) => 
-      new Date(b.due_date || '').getTime() - new Date(a.due_date || '').getTime()
+      new Date(a.due_date || '').getTime() - new Date(b.due_date || '').getTime()
     );
 
  
