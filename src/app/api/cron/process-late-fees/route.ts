@@ -8,7 +8,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 const LATE_FEE_AMOUNT = 1500; // $15.00 in cents
 const GRACE_PERIOD_DAYS = 5;
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
 
     console.log('🔄 Starting late fee processing job...');
