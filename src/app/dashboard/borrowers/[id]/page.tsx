@@ -55,17 +55,21 @@ export default function BorrowerDetail({ params }: BorrowerDetailProps) {
 
         const { data: profile } = await supabase
           .from('profiles')
-          .select('organization_id')
+          .select('organization_id, role')
           .eq('id', user.id)
           .single();
 
-        if (!profile?.organization_id) {
+        const isAdmin = profile?.role === 'admin';
+
+        // Admin users don't need organization_id check
+        if (!isAdmin && !profile?.organization_id) {
           setError('Organization not found');
           return;
         }
 
         // Fetch borrower with organization scoping and their loans
-        const { data: borrowerData, error: borrowerError } = await supabase
+        // Admin can see all borrowers, others only see their organization's borrowers
+        let query = supabase
           .from('borrowers')
           .select(`
             *,
@@ -80,9 +84,14 @@ export default function BorrowerDetail({ params }: BorrowerDetailProps) {
               term_weeks
             )
           `)
-          .eq('id', id)
-          .eq('organization_id', profile.organization_id)
-          .single();
+          .eq('id', id);
+
+        // Only filter by organization for non-admin users
+        if (!isAdmin && profile?.organization_id) {
+          query = query.eq('organization_id', profile.organization_id);
+        }
+
+        const { data: borrowerData, error: borrowerError } = await query.single();
 
         if (borrowerError) {
           if (borrowerError.code === 'PGRST116') {
