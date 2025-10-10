@@ -181,6 +181,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ loa
     const annualIncomeValue = typeof validation.data.annualIncome === 'string' 
       ? parseFloat(validation.data.annualIncome) 
       : validation.data.annualIncome;
+    
+    console.log('💰 Annual Income Processing:', {
+      original: validation.data.annualIncome,
+      type: typeof validation.data.annualIncome,
+      parsed: annualIncomeValue
+    });
 
     // Prepare communication consent data
     const consentData = {
@@ -194,7 +200,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ loa
       .from('borrowers')
       .update({
         date_of_birth: validation.data.dateOfBirth,
-        address_line1: validation.data.address,
+        address: validation.data.address, // For DocuSign compatibility
+        address_line1: validation.data.address, // Primary address field
         city: validation.data.city,
         state: validation.data.state,
         zip_code: validation.data.zipCode,

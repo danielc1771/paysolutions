@@ -46,6 +46,7 @@ export interface LoanApplicationData {
     phone?: string;
     date_of_birth?: string;
     address?: string;
+    address_line1?: string;
     city?: string;
     state?: string;
     zip_code?: string;
@@ -82,13 +83,43 @@ export interface LoanApplicationData {
  */
 export function mapLoanDataToDocuSignFields(loan: LoanApplicationData): Record<string, string> {
   const borrower = loan.borrower;
-  const loanAmount = loan.amount || loan.principal_amount || 0;
-  const interestRate = loan.interest_rate || 0;
-  const termWeeks = loan.term_weeks || 16;
+  const loanAmount = Number(loan.amount || loan.principal_amount || 0);
+  const interestRate = Number(loan.interest_rate || 0);
+  const termWeeks = Number(loan.term_weeks || 16);
+  
+  // Debug: Log annual income value and type
+  console.log('📊 Annual Income Debug:', {
+    value: borrower.annual_income,
+    type: typeof borrower.annual_income,
+    asString: borrower.annual_income ? String(borrower.annual_income) : 'empty'
+  });
   
   // Calculate total with interest
-  const totalInterest = loanAmount * (interestRate / 100);
-  const totalWithInterest = loanAmount + totalInterest;
+  // If payment schedule exists, use the sum of all payments for accuracy
+  let totalWithInterest: number;
+  let totalInterest: number;
+  
+  if (loan.payment_schedule && loan.payment_schedule.length > 0) {
+    // Calculate from actual payment schedule
+    totalInterest = loan.payment_schedule.reduce((sum, payment) => sum + (payment.interest_amount || 0), 0);
+    totalWithInterest = loan.payment_schedule.reduce((sum, payment) => sum + (payment.total_amount || 0), 0);
+  } else {
+    // Fallback: Simple calculation (will be 0 if interest rate is 0)
+    totalInterest = loanAmount * (interestRate / 100);
+    totalWithInterest = loanAmount + totalInterest;
+  }
+  
+  // Debug: Log loan calculations
+  console.log('💵 Loan Calculations:', {
+    loanAmount,
+    termWeeks,
+    termWeeksType: typeof loan.term_weeks,
+    termWeeksRaw: loan.term_weeks,
+    interestRate,
+    totalInterest: totalInterest.toFixed(2),
+    totalWithInterest: totalWithInterest.toFixed(2),
+    hasPaymentSchedule: !!loan.payment_schedule?.length
+  });
   
   // Calculate first payment date (1 week from creation)
   const createdDate = loan.created_at ? new Date(loan.created_at) : new Date();
@@ -99,10 +130,10 @@ export function mapLoanDataToDocuSignFields(loan: LoanApplicationData): Record<s
   const fieldMapping: Record<string, string> = {
     // ===== iPay Fields =====
     // Loan basic info
-    'loan_amount': loanAmount.toString(),
-    'interest_applied': totalInterest.toFixed(2),
-    'loan_total_with_interest': totalWithInterest.toFixed(2),
-    'loan_term_weeks': termWeeks.toString(),
+    'loan_amount': String(loanAmount),
+    'interest_applied': String(totalInterest.toFixed(2)),
+    'loan_total_with_interest': String(totalWithInterest.toFixed(2)),
+    'loan_term_weeks': String(termWeeks),
     'loan_first_payment_date': firstPaymentDate.toISOString().split('T')[0],
     'emission_date': createdDate.toISOString().split('T')[0],
     
@@ -141,7 +172,7 @@ export function mapLoanDataToDocuSignFields(loan: LoanApplicationData): Record<s
     'date_of_birth': borrower.date_of_birth || '',
     
     // Address Information
-    'borrower_address_line_1': borrower.address || '',
+    'borrower_address_line_1': borrower.address_line1 || borrower.address || '',
     'borrower_city': borrower.city || '',
     'borrower_state': borrower.state || '',
     'borrower_zip_code': borrower.zip_code || '',
@@ -152,25 +183,24 @@ export function mapLoanDataToDocuSignFields(loan: LoanApplicationData): Record<s
     'borrower_employer': borrower.current_employer_name || '',
     'borrower_employer_state': borrower.employer_state || '',
     'borrower_employed_time': borrower.time_with_employment || '',
-    'borrower_salary': borrower.annual_income?.toString() || '',
-    'annual_income': borrower.annual_income?.toString() || '',
+    'borrower_salary': borrower.annual_income ? String(borrower.annual_income) : '',
+    'annual_income': borrower.annual_income ? String(borrower.annual_income) : '',
     
     // Loan Information
     'loan_type': loan.loan_type || '',
-    'loan_term': loan.term_months?.toString() || '',
-    'interest_rate': interestRate.toString(),
-    'monthly_payment': loan.monthly_payment?.toString() || '',
+    'loan_term': loan.term_months ? String(loan.term_months) : '',
+    'interest_rate': String(interestRate),
+    'monthly_payment': loan.monthly_payment ? String(loan.monthly_payment) : '',
     
     // Reference 1
     'borrower_reference_name_1': borrower.reference1_name || '',
-    'borrower_reference_name_1 _phone': borrower.reference1_phone || '',
+    'borrower_reference_phone_1': borrower.reference1_phone || '',
     'borrower_reference_name_1 _country_code': borrower.reference1_country_code || '+1',
     'reference1_email': borrower.reference1_email || '',
-    'borrower_reference_1': borrower.reference1_name || '',
     
     // Reference 2
     'borrower_reference_name_2': borrower.reference2_name || '',
-    'borrower_reference_name_2_phone': borrower.reference2_phone || '',
+    'borrower_reference_phone_2': borrower.reference2_phone || '',
     'borrower_reference_name_2_country_code': borrower.reference2_country_code || '+1',
     'reference2_email': borrower.reference2_email || '',
     
@@ -186,9 +216,9 @@ export function mapLoanDataToDocuSignFields(loan: LoanApplicationData): Record<s
       const num = index + 1;
       if (num <= 16) {
         fieldMapping[`exp_date_${num}`] = payment.due_date || '';
-        fieldMapping[`principal_amount_${num}`] = payment.principal_amount?.toFixed(2) || '';
-        fieldMapping[`payment_amount_${num}`] = payment.total_amount?.toFixed(2) || '';
-        fieldMapping[`balance_${num}`] = payment.remaining_balance?.toFixed(2) || '';
+        fieldMapping[`principal_amount_${num}`] = payment.principal_amount ? String(Number(payment.principal_amount).toFixed(2)) : '';
+        fieldMapping[`payment_amount_${num}`] = payment.total_amount ? String(Number(payment.total_amount).toFixed(2)) : '';
+        fieldMapping[`balance_${num}`] = payment.remaining_balance ? String(Number(payment.remaining_balance).toFixed(2)) : '';
       }
     });
   }
