@@ -32,7 +32,6 @@ export async function GET(
 ) {
   try {
     const { id: loanId } = await params;
-    console.log('📋 Fetching invoices for loan:', loanId);
 
     const supabase = await createClient();
 
@@ -66,12 +65,11 @@ export async function GET(
     // Fetch invoices for this customer and subscription
     const invoices = await stripe.invoices.list({
       customer: customerId,
-      subscription: loan.stripe_subscription_id || undefined,
       limit: 100,
-    });
-
+    })
     // Transform invoice data for frontend
-    const transformedInvoices = invoices.data.map(invoice => {
+    const transformedInvoices = invoices.data.filter(invoice => invoice.metadata?.loan_id === loanId)
+    .map(invoice => {
       // Check for late fees in line items
       const lateFeeItems = invoice.lines.data.filter(line => 
         line.metadata?.type === 'late_fee' || 
@@ -112,11 +110,10 @@ export async function GET(
 
     // Sort by creation date (newest first)
     transformedInvoices.sort((a, b) => 
-      new Date(b.created).getTime() - new Date(a.created).getTime()
+      new Date(b.due_date || '').getTime() - new Date(a.due_date || '').getTime()
     );
 
-    console.log(`✅ Found ${transformedInvoices.length} invoices for loan ${loanId}`);
-
+ 
     return NextResponse.json({
       success: true,
       invoices: transformedInvoices,
