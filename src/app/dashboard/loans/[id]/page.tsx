@@ -24,6 +24,8 @@ export default function LoanDetail({ params }: LoanDetailProps) {
   const [successMessage, setSuccessMessage] = useState('');
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [invoicesLoading, setInvoicesLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
   const { profile } = useUserProfile();
   const isAdmin = profile?.role === 'admin';
 
@@ -602,98 +604,121 @@ export default function LoanDetail({ params }: LoanDetailProps) {
 
             {/* Payment History */}
             {loan.status === 'funded' && (
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 ">
+              <div className="rounded-2xl shadow-sm border border-gray-200 p-6 ">
                 <h3 className="text-lg font-semibold text-gray-900 mb-6">Payment History</h3>
-                
+
                 {invoicesLoading ? (
-                  <div className="text-center py-4">
+                  <div className="text-center py-4 min-h-[600px] flex flex-col items-center justify-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-2 border-green-500 border-t-transparent mx-auto"></div>
                     <p className="text-sm text-gray-600 mt-2">Loading payment history...</p>
                   </div>
                 ) : invoices.length === 0 ? (
-                  <p className="text-sm text-gray-600">No payments yet.</p>
+                  <div className="min-h-[600px] flex items-start">
+                    <p className="text-sm text-gray-600">No payments yet.</p>
+                  </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-3 min-h-[600px] flex flex-col">
                     <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
                       <p className="text-sm text-blue-900">
                         <strong>{invoices.filter(inv => inv.status === 'paid').length}</strong> of <strong>{loan.term_weeks}</strong> payments completed
                       </p>
                       <div className="mt-2 bg-blue-100 rounded-full h-2 overflow-hidden">
-                        <div 
+                        <div
                           className="bg-blue-600 h-full transition-all duration-500"
                           style={{ width: `${(invoices.filter(inv => inv.status === 'paid').length / loan.term_weeks) * 100}%` }}
                         />
                       </div>
                     </div>
-                    
-                    {invoices.slice(0, 5).map((invoice) => (
-                      <div key={invoice.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="space-y-1">
-                              <p className="text-sm font-medium text-gray-900">
-                                ${invoice.base_amount?.toFixed(2) || invoice.amount_due.toFixed(2)}
-                              </p>
-                              {invoice.has_late_fee && (
-                                <p className="text-xs font-medium text-red-600">
-                                  + ${invoice.late_fee_amount?.toFixed(2)} late fee
+                      {invoices.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((invoice) => (
+                        <div key={invoice.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors mb-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="space-y-1">
+                                <p className="text-sm font-medium text-gray-900">
+                                  ${invoice.base_amount?.toFixed(2) || invoice.amount_due.toFixed(2)}
                                 </p>
-                              )}
-                              {invoice.has_late_fee && (
-                                <p className="text-xs font-semibold text-gray-900">
-                                  Total: ${invoice.amount_due.toFixed(2)}
+                                {invoice.has_late_fee && (
+                                  <p className="text-xs font-medium text-red-600">
+                                    + ${invoice.late_fee_amount?.toFixed(2)} late fee
+                                  </p>
+                                )}
+                                {invoice.has_late_fee && (
+                                  <p className="text-xs font-semibold text-gray-900">
+                                    Total: ${invoice.amount_due.toFixed(2)}
+                                  </p>
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-500 mt-1">
+                                Due: {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : 'N/A'}
+                              </p>
+                              {invoice.is_late_fee_invoice && (
+                                <p className="text-xs text-orange-600 font-medium mt-1">
+                                  ⚠️ Includes late fee
                                 </p>
                               )}
                             </div>
-                            <p className="text-xs text-gray-500 mt-1">
-                              Due: {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : 'N/A'}
-                            </p>
-                            {invoice.is_late_fee_invoice && (
-                              <p className="text-xs text-orange-600 font-medium mt-1">
-                                ⚠️ Includes late fee
-                              </p>
-                            )}
-                          </div>
-                          <div className="text-right">
-                            {invoice.status === 'paid' ? (
-                              <div>
-                                <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
-                                  Paid
+                            <div className="text-right">
+                              {invoice.status === 'paid' ? (
+                                <div>
+                                  <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
+                                    Paid
+                                  </span>
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    {invoice.paid_at ? new Date(invoice.paid_at).toLocaleDateString() : ''}
+                                  </p>
+                                </div>
+                              ) : invoice.status === 'open' ? (
+                                <div>
+                                  <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
+                                    Open
+                                  </span>
+                                  {invoice.hosted_invoice_url && (
+                                    <a
+                                      href={invoice.hosted_invoice_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="block text-xs text-blue-600 hover:text-blue-800 mt-1"
+                                    >
+                                      View Invoice →
+                                    </a>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
+                                  {invoice.status}
                                 </span>
-                                <p className="text-xs text-gray-500 mt-1">
-                                  {invoice.paid_at ? new Date(invoice.paid_at).toLocaleDateString() : ''}
-                                </p>
-                              </div>
-                            ) : invoice.status === 'open' ? (
-                              <div>
-                                <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
-                                  Open
-                                </span>
-                                {invoice.hosted_invoice_url && (
-                                  <a
-                                    href={invoice.hosted_invoice_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="block text-xs text-blue-600 hover:text-blue-800 mt-1"
-                                  >
-                                    View Invoice →
-                                  </a>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
-                                {invoice.status}
-                              </span>
-                            )}
+                              )}
+                            </div>
                           </div>
                         </div>
+                      ))}
+         
+
+                    {invoices.length > itemsPerPage && (
+                      <div className="flex items-center justify-between pt-4 border-t border-gray-200 mt-auto">
+                        <p className="text-sm text-gray-600">
+                          Showing {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, invoices.length)} of {invoices.length} payments
+                        </p>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                            disabled={currentPage === 1}
+                            className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            Previous
+                          </button>
+                          <span className="text-sm text-gray-600">
+                            Page {currentPage} of {Math.ceil(invoices.length / itemsPerPage)}
+                          </span>
+                          <button
+                            onClick={() => setCurrentPage(prev => Math.min(Math.ceil(invoices.length / itemsPerPage), prev + 1))}
+                            disabled={currentPage === Math.ceil(invoices.length / itemsPerPage)}
+                            className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            Next
+                          </button>
+                        </div>
                       </div>
-                    ))}
-                    
-                    {invoices.length > 5 && (
-                      <p className="text-sm text-gray-600 text-center pt-2">
-                        Showing 5 of {invoices.length} payments
-                      </p>
                     )}
                   </div>
                 )}

@@ -54,70 +54,6 @@ async function handleIdentityVerification(verificationSession: Stripe.Identity.V
 }
 
 /**
- * Handle Overdue Invoice Events
- *
- * Adds a one-time $15 late fee line item to overdue invoices.
- * The late fee is only applied once per invoice via metadata tracking.
- */
-async function handleOverdueInvoice(invoice: Stripe.Invoice) {
-  try {
-    console.log('⏰ Processing overdue invoice:', {
-      invoiceId: invoice.id,
-      customerId: invoice.customer,
-      amount: invoice.amount_due / 100,
-      paymentNumber: invoice.metadata?.payment_number,
-    });
-
-    // IDEMPOTENCY CHECK: Ensure late fee is only applied once per invoice
-    if (invoice.metadata?.has_late_fee_applied === 'true') {
-      console.log('ℹ️ Late fee already applied to this invoice - skipping');
-      return;
-    }
-
-    // Skip if invoice is already paid or voided
-    if (invoice.status === 'paid' || invoice.status === 'void') {
-      console.log('ℹ️ Invoice already paid or voided - skipping late fee');
-      return;
-    }
-
-    if (!invoice.id) {
-      console.error('❌ No invoice ID found in invoice object');
-      return;
-    }
-
-    // Add $15 late fee as a line item to the existing open invoice
-    // Stripe will automatically update the invoice total
-    await stripe.invoiceItems.create({
-      customer: invoice.customer as string,
-      invoice: invoice.id,
-      amount: 1500, // $15.00 in cents
-      currency: 'usd',
-      description: `Late Fee - Payment ${invoice.metadata?.payment_number || 'N/A'}`,
-    });
-
-    // Mark invoice metadata to prevent duplicate late fee charges
-    await stripe.invoices.update(invoice.id, {
-      metadata: {
-        ...invoice.metadata,
-        has_late_fee_applied: 'true',
-        late_fee_applied_at: new Date().toISOString(),
-      },
-    });
-
-    console.log('✅ Added $15 late fee to invoice:', {
-      invoiceId: invoice.id,
-      paymentNumber: invoice.metadata?.payment_number,
-      originalAmount: invoice.amount_due / 100,
-      newTotal: (invoice.amount_due + 1500) / 100, // Original + $15
-    });
-
-  } catch (error) {
-    console.error('❌ Error handling overdue invoice:', error);
-    throw error;
-  }
-}
-
-/**
  * Handle Invoice Payment Events
  * Updates payment records and loan status based on invoice payments
  */
@@ -312,13 +248,7 @@ export async function POST(request: NextRequest) {
           dueDate: sentInvoice.due_date ? new Date(sentInvoice.due_date * 1000).toISOString() : null,
         });
         break;
-      
-      case 'invoice.overdue':
-        console.log('⏰ Invoice overdue:', event.data.object.id);
-        await handleOverdueInvoice(event.data.object);
-        break;
-
-      case 'identity.verification_session.verified':
+            case 'identity.verification_session.verified':
         console.log('✅ Identity verification succeeded:', event.data.object.id);
         await handleIdentityVerification(event.data.object, 'verified');
         break;
