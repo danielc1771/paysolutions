@@ -11,13 +11,9 @@ const TEMPLATE_ID = process.env.TEMPLATE_ID;
 const API_ACCOUNT_ID = process.env.API_ACCOUNT_ID;
 const OAUTH_SCOPE = 'signature';
 
-// Default signer emails
-// TODO: store this in DB
-// const IPAY_EMAIL = 'jhoamadrian@gmail.com';
-// const ORGANIZATION_EMAIL = 'jgarcia@easycarus.com';
-
-const IPAY_EMAIL = 'ipayusdevelopment@gmail.com';
-const ORGANIZATION_EMAIL = 'jgarcia@easycarus.com';
+// Default signer emails (fallback values)
+const DEFAULT_IPAY_EMAIL = 'ipaycustomer@gmail.com'; // iPay's official email - always stays the same
+const DEFAULT_ORGANIZATION_EMAIL = 'support@example.com'; // Fallback only - should always use org's actual email
 
 // Token storage interface
 interface TokenData {
@@ -123,17 +119,24 @@ export async function getEnvelopesApi() {
  * @param borrowerEmail - Email address of the borrower
  * @param tabValues - Pre-filled form field values
  * @param status - Envelope status: 'created' for draft (embedded), 'sent' for immediate send
+ * @param ipayEmail - Email address of the iPay representative (default: DEFAULT_IPAY_EMAIL)
+ * @param organizationEmail - Email address of the organization representative (default: DEFAULT_ORGANIZATION_EMAIL)
+ * @param organizationName - Full name of the organization representative (default: 'Organization Representative')
  */
 export function makeEnvelope(
-  borrowerName: string, 
-  borrowerEmail: string, 
-  tabValues?: Record<string, string>,
-  status: 'created' | 'sent' = 'created'
-) {
+  borrowerName: string,
+  borrowerEmail: string,
+  tabValues: Record<string, string> = {},
+  status: 'created' | 'sent' = 'sent',
+  ipayEmail: string = DEFAULT_IPAY_EMAIL,
+  organizationEmail: string = DEFAULT_ORGANIZATION_EMAIL,
+  organizationName: string = 'Organization Representative'
+): docusign.EnvelopeDefinition {
   if (!TEMPLATE_ID) {
     throw new Error('Missing TEMPLATE_ID in environment variables');
   }
 
+  // Create envelope definition
   const env = new docusign.EnvelopeDefinition();
   env.templateId = TEMPLATE_ID;
 
@@ -168,7 +171,7 @@ export function makeEnvelope(
 
   // Signer 1: iPay (Routing Order 1) - Embedded recipient view (signs)
   const iPay = new docusign.TemplateRole();
-  iPay.email = IPAY_EMAIL;
+  iPay.email = ipayEmail;
   iPay.name = 'iPay Representative';
   iPay.roleName = 'iPay';
   Object.assign(iPay, {
@@ -183,8 +186,8 @@ export function makeEnvelope(
 
   // Signer 2: Organization (Routing Order 2) - Embedded recipient view (signs in dashboard)
   const organization = new docusign.TemplateRole();
-  organization.email = ORGANIZATION_EMAIL;
-  organization.name = 'Organization Representative';
+  organization.email = organizationEmail;
+  organization.name = organizationName;
   organization.roleName = 'Organization';
   Object.assign(organization, {
     routingOrder: '2',
@@ -208,8 +211,8 @@ export function makeEnvelope(
   env.status = status; // 'created' for draft or 'sent' for immediate send
 
   console.log('📋 Envelope created with 3 signers (embedded + email):');
-  console.log('  1. iPay:', IPAY_EMAIL, '(embedded recipient view - signs)');
-  console.log('  2. Organization:', ORGANIZATION_EMAIL, '(embedded recipient view - signs)');
+  console.log('  1. iPay:', ipayEmail, '(embedded recipient view - signs)');
+  console.log('  2. Organization:', organizationEmail, '(embedded recipient view - signs)');
   console.log('  3. Borrower:', borrowerEmail, '(email - signs via email link)');
   console.log('  Status:', status);
 
@@ -277,12 +280,18 @@ export function makeRecipientViewRequest(
  * @param borrowerEmail - Email address of the borrower
  * @param loanData - Pre-filled form field values
  * @param status - 'sent' to send immediately (default, required for recipient view), 'created' for draft
+ * @param ipayEmail - Email address of the iPay representative (default: DEFAULT_IPAY_EMAIL)
+ * @param organizationEmail - Email address of the organization representative (default: DEFAULT_ORGANIZATION_EMAIL)
+ * @param organizationName - Full name of the organization representative (default: 'Organization Representative')
  */
 export async function createAndSendEnvelope(
   borrowerName: string,
   borrowerEmail: string,
   loanData: Record<string, string>,
-  status: 'created' | 'sent' = 'sent'
+  status: 'created' | 'sent' = 'sent',
+  ipayEmail: string = DEFAULT_IPAY_EMAIL,
+  organizationEmail: string = DEFAULT_ORGANIZATION_EMAIL,
+  organizationName: string = 'Organization Representative'
 ) {
   if (!API_ACCOUNT_ID) {
     throw new Error('Missing API_ACCOUNT_ID in environment variables');
@@ -296,7 +305,7 @@ export async function createAndSendEnvelope(
     const envelopesApi = await getEnvelopesApi();
 
     // Step 3: Create envelope with loan data and all 3 signers
-    const envelope = makeEnvelope(borrowerName, borrowerEmail, loanData, status);
+    const envelope = makeEnvelope(borrowerName, borrowerEmail, loanData, status, ipayEmail, organizationEmail, organizationName);
 
     console.log(`📤 Creating ${status} envelope with 3 signers (embedded + email)...`);
     
