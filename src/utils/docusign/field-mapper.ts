@@ -27,6 +27,7 @@ export interface LoanApplicationData {
   principal_amount?: number;
   verified_phone_number?: string;
   created_at?: string;
+  organization_id?: string;
   
   // Vehicle information
   vehicle_year?: string;
@@ -36,6 +37,18 @@ export interface LoanApplicationData {
   
   // Payment schedule (from payment_schedules table)
   payment_schedule?: PaymentScheduleItem[];
+  
+  // Organization information (from joined query)
+  organization?: {
+    id: string;
+    name: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    zip_code?: string;
+  };
   
   // Borrower information (from joined query)
   borrower: {
@@ -136,31 +149,31 @@ export function mapLoanDataToDocuSignFields(loan: LoanApplicationData): Record<s
     'loan_term_weeks': String(termWeeks),
     'loan_first_payment_date': firstPaymentDate.toISOString().split('T')[0],
     'emission_date': createdDate.toISOString().split('T')[0],
-    
     // Vehicle Information
     'vehicle_year': loan.vehicle_year || '',
     'vehicle_make': loan.vehicle_make || '',
     'vehicle_model': loan.vehicle_model || '',
     'vehicle_vin': loan.vehicle_vin || '',
     
-    // iPay Company Info (hardcoded - update as needed)
+    // iPay Company Info (hardcoded - iPay's official information)
     'iPay_name': 'iPay Solutions',
-    'iPay_address_line': '123 Business St',
-    'ipay_city': 'Miami',
+    'iPay_address_line': '6020 NW 99TH AVE UNIT 313',
+    'ipay_city': 'DORAL',
     'ipay_state': 'FL',
-    'ipay_zip_code': '33101',
+    'ipay_zip_code': '33178',
     'ipay_country': 'US',
-    'ipay_email': 'architex.development@gmail.com',
+    'ipay_email': 'ipaycustomer@gmail.com',
     
-    // Organization Info (hardcoded - update as needed)
-    'dealership_name': 'Easy Carus',
-    'org_name': 'Easy Carus',
-    'org_address_line': '456 Dealer Ave',
-    'org_city': 'Miami',
-    'org_state': 'FL',
-    'org_zip_code': '33102',
+    // Organization Info (from loan organization data)
+    'dealership_name': loan.organization?.name || '',
+    'org_name': loan.organization?.name || '',
+    'org_address_line': loan.organization?.address || '',
+    'org_city': loan.organization?.city || '',
+    'org_state': loan.organization?.state || '',
+    'org_zip_code': loan.organization?.zip_code || '',
     'org_country': 'US',
-    'org_email': 'jgarcia@easycarus.com',
+    'org_email': loan.organization?.email || '',
+    'org_phone': loan.organization?.phone || '',
     
     // ===== Borrower Fields =====
     // Borrower Personal Information

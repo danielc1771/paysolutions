@@ -40,7 +40,8 @@ export async function POST(request: NextRequest) {
       .from('loans')
       .select(`
         *,
-        borrower:borrowers(*)
+        borrower:borrowers(*),
+        organization:organizations(*)
       `)
       .eq('id', loanId)
       .single();

@@ -247,7 +247,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ loa
         .from('loans')
         .select(`
           *,
-          borrower:borrowers(*)
+          borrower:borrowers(*),
+          organization:organizations(*)
         `)
         .eq('id', loanId)
         .single();
@@ -262,7 +263,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ loa
         .from('payment_schedules')
         .select('*')
         .eq('loan_id', loanId)
-        .order('payment_number', { ascending: true });
+        .order('payment_number', { ascending: true});
 
       if (scheduleError) {
         console.warn('⚠️ Failed to fetch payment schedule:', scheduleError);
@@ -273,6 +274,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ loa
         ...loanData,
         payment_schedule: paymentSchedule || []
       } as LoanApplicationData;
+      
+      console.log('🏢 Organization data for DocuSign:', {
+        orgName: loanData.organization?.name,
+        orgEmail: loanData.organization?.email,
+        orgAddress: loanData.organization?.address
+      });
 
       console.log('📋 Loan data prepared for DocuSign:', {
         loanNumber: loanData.loan_number,
@@ -290,11 +297,32 @@ export async function POST(request: Request, { params }: { params: Promise<{ loa
 
       console.log('📝 Fields to populate:', Object.keys(docusignFields).length);
 
+      // Prepare signer emails from loan data
+      const ipayEmail = 'ipaycustomer@gmail.com'; // iPay's official email - always stays the same
+      
+      // Organization email MUST come from the loan creator's organization
+      if (!loanData.organization?.email) {
+        throw new Error('Organization email not found. Please update organization settings before creating DocuSign envelopes.');
+      }
+      const organizationEmail = loanData.organization.email;
+      const organizationName = loanData.organization.name || 'Organization Representative';
+
+      console.log('📧 Signer emails:', {
+        ipay: ipayEmail,
+        organization: organizationEmail,
+        organizationName: organizationName,
+        borrower: borrowerEmail
+      });
+
       // Create envelope and send to all signers via email using NEW JWT client
       const result = await createAndSendEnvelope(
         borrowerName,
         borrowerEmail,
-        docusignFields
+        docusignFields,
+        'sent',
+        ipayEmail,
+        organizationEmail,
+        organizationName
       );
 
       console.log('✅ DocuSign envelope created:', result.envelopeId);

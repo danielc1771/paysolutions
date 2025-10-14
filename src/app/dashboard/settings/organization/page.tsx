@@ -47,7 +47,22 @@ export default function OrganizationSettings() {
     id: string;
     name: string;
     email: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    zip_code?: string;
+    phone?: string;
   } | null>(null);
+  const [isEditingInfo, setIsEditingInfo] = useState(false);
+  const [editedOrg, setEditedOrg] = useState<{
+    name: string;
+    email: string;
+    address: string;
+    city: string;
+    state: string;
+    zip_code: string;
+    phone: string;
+  }>({ name: '', email: '', address: '', city: '', state: '', zip_code: '', phone: '' });
   const [settings, setSettings] = useState<{
     id: string;
     logo_url: string;
@@ -80,6 +95,15 @@ export default function OrganizationSettings() {
 
         if (orgError) throw orgError;
         setOrganization(orgData);
+        setEditedOrg({
+          name: orgData.name || '',
+          email: orgData.email || '',
+          address: orgData.address || '',
+          city: orgData.city || '',
+          state: orgData.state || '',
+          zip_code: orgData.zip_code || '',
+          phone: orgData.phone || ''
+        });
 
         // Fetch organization settings
         const { data: settingsData, error: settingsError } = await supabase
@@ -315,28 +339,182 @@ export default function OrganizationSettings() {
                   </div>
                   
                   <div className="p-6">
+                    {profile?.role === 'organization_owner' && (
+                      <div className="mb-4 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingInfo(!isEditingInfo)}
+                          className="text-sm text-green-600 hover:text-green-700 font-medium"
+                        >
+                          {isEditingInfo ? 'Cancel' : 'Edit Information'}
+                        </button>
+                      </div>
+                    )}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Organization Name</label>
                         <input
                           type="text"
-                          value={organization?.name || ''}
-                          disabled
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
+                          value={isEditingInfo ? editedOrg.name : organization?.name || ''}
+                          onChange={(e) => setEditedOrg({ ...editedOrg, name: e.target.value })}
+                          disabled={!isEditingInfo}
+                          className={`w-full px-4 py-2 border rounded-lg ${
+                            isEditingInfo 
+                              ? 'border-gray-300 bg-white text-gray-900' 
+                              : 'border-gray-300 bg-gray-50 text-gray-500'
+                          }`}
                         />
-                        <p className="mt-1 text-xs text-gray-500">Contact support to change organization name</p>
                       </div>
                       
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                         <input
                           type="email"
-                          value={organization?.email || ''}
-                          disabled
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
+                          value={isEditingInfo ? editedOrg.email : organization?.email || ''}
+                          onChange={(e) => setEditedOrg({ ...editedOrg, email: e.target.value })}
+                          disabled={!isEditingInfo}
+                          className={`w-full px-4 py-2 border rounded-lg ${
+                            isEditingInfo 
+                              ? 'border-gray-300 bg-white text-gray-900' 
+                              : 'border-gray-300 bg-gray-50 text-gray-500'
+                          }`}
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                        <input
+                          type="tel"
+                          value={isEditingInfo ? editedOrg.phone : organization?.phone || ''}
+                          onChange={(e) => setEditedOrg({ ...editedOrg, phone: e.target.value })}
+                          disabled={!isEditingInfo}
+                          className={`w-full px-4 py-2 border rounded-lg ${
+                            isEditingInfo 
+                              ? 'border-gray-300 bg-white text-gray-900' 
+                              : 'border-gray-300 bg-gray-50 text-gray-500'
+                          }`}
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                        <input
+                          type="text"
+                          value={isEditingInfo ? editedOrg.address : organization?.address || ''}
+                          onChange={(e) => setEditedOrg({ ...editedOrg, address: e.target.value })}
+                          disabled={!isEditingInfo}
+                          className={`w-full px-4 py-2 border rounded-lg ${
+                            isEditingInfo 
+                              ? 'border-gray-300 bg-white text-gray-900' 
+                              : 'border-gray-300 bg-gray-50 text-gray-500'
+                          }`}
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                        <input
+                          type="text"
+                          value={isEditingInfo ? editedOrg.city : organization?.city || ''}
+                          onChange={(e) => setEditedOrg({ ...editedOrg, city: e.target.value })}
+                          disabled={!isEditingInfo}
+                          className={`w-full px-4 py-2 border rounded-lg ${
+                            isEditingInfo 
+                              ? 'border-gray-300 bg-white text-gray-900' 
+                              : 'border-gray-300 bg-gray-50 text-gray-500'
+                          }`}
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                        <input
+                          type="text"
+                          value={isEditingInfo ? editedOrg.state : organization?.state || ''}
+                          onChange={(e) => setEditedOrg({ ...editedOrg, state: e.target.value })}
+                          disabled={!isEditingInfo}
+                          className={`w-full px-4 py-2 border rounded-lg ${
+                            isEditingInfo 
+                              ? 'border-gray-300 bg-white text-gray-900' 
+                              : 'border-gray-300 bg-gray-50 text-gray-500'
+                          }`}
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">ZIP Code</label>
+                        <input
+                          type="text"
+                          value={isEditingInfo ? editedOrg.zip_code : organization?.zip_code || ''}
+                          onChange={(e) => setEditedOrg({ ...editedOrg, zip_code: e.target.value })}
+                          disabled={!isEditingInfo}
+                          className={`w-full px-4 py-2 border rounded-lg ${
+                            isEditingInfo 
+                              ? 'border-gray-300 bg-white text-gray-900' 
+                              : 'border-gray-300 bg-gray-50 text-gray-500'
+                          }`}
                         />
                       </div>
                     </div>
+                    
+                    {isEditingInfo && profile?.role === 'organization_owner' && (
+                      <div className="mt-6 flex justify-end gap-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsEditingInfo(false);
+                            setEditedOrg({
+                              name: organization?.name || '',
+                              email: organization?.email || '',
+                              address: organization?.address || '',
+                              city: organization?.city || '',
+                              state: organization?.state || '',
+                              zip_code: organization?.zip_code || '',
+                              phone: organization?.phone || ''
+                            });
+                          }}
+                          className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              setSaving(true);
+                              const { error } = await supabase
+                                .from('organizations')
+                                .update({
+                                  name: editedOrg.name,
+                                  email: editedOrg.email,
+                                  address: editedOrg.address,
+                                  city: editedOrg.city,
+                                  state: editedOrg.state,
+                                  zip_code: editedOrg.zip_code,
+                                  phone: editedOrg.phone,
+                                  updated_at: new Date().toISOString()
+                                })
+                                .eq('id', organization?.id);
+                              
+                              if (error) throw error;
+                              
+                              setOrganization({ ...organization!, ...editedOrg });
+                              setIsEditingInfo(false);
+                              setMessage({ type: 'success', text: 'Organization information updated successfully!' });
+                            } catch (error) {
+                              console.error('Error updating organization:', error);
+                              setMessage({ type: 'error', text: 'Failed to update organization information.' });
+                            } finally {
+                              setSaving(false);
+                            }
+                          }}
+                          disabled={saving}
+                          className="px-4 py-2 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-lg hover:from-green-600 hover:to-teal-600 disabled:opacity-50"
+                        >
+                          {saving ? 'Saving...' : 'Save Changes'}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
                 

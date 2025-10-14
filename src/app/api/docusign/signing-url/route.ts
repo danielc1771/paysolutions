@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { getEnvelopesApi, makeRecipientViewRequest } from '@/utils/docusign/jwt-client';
 
-const IPAY_EMAIL = 'ipayusdevelopment@gmail.com';
-const ORGANIZATION_EMAIL = 'jgarcia@easycarus.com';
+const DEFAULT_IPAY_EMAIL = 'ipaycustomer@gmail.com'; // iPay's official email - always stays the same
 const INTEGRATION_KEY = process.env.INTEGRATION_KEY || '';
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
 
@@ -26,10 +25,13 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient();
 
-    // Fetch loan with envelope ID
+    // Fetch loan with envelope ID and organization data
     const { data: loan, error: loanError } = await supabase
       .from('loans')
-      .select('*')
+      .select(`
+        *,
+        organization:organizations(*)
+      `)
       .eq('id', loanId)
       .single();
 
@@ -58,13 +60,20 @@ export async function POST(request: NextRequest) {
 
     switch (signerType) {
       case 'ipay':
-        signerEmail = IPAY_EMAIL;
+        signerEmail = DEFAULT_IPAY_EMAIL;
         signerName = 'iPay Representative';
         clientUserId = `${INTEGRATION_KEY}-ipay`;
         break;
       case 'organization':
-        signerEmail = ORGANIZATION_EMAIL;
-        signerName = 'Organization Representative';
+        // Organization email MUST come from the loan creator's organization
+        if (!loan.organization?.email) {
+          return NextResponse.json({
+            success: false,
+            error: 'Organization email not found. Please update organization settings.'
+          }, { status: 400 });
+        }
+        signerEmail = loan.organization.email;
+        signerName = loan.organization.name || 'Organization Representative';
         clientUserId = `${INTEGRATION_KEY}-organization`;
         break;
       case 'borrower':
