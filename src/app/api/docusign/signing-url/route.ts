@@ -25,13 +25,11 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient();
 
-    // Fetch loan with envelope ID and organization data
+    // Fetch loan with envelope ID
+    // We use stored DocuSign emails to ensure exact match with envelope creation
     const { data: loan, error: loanError } = await supabase
       .from('loans')
-      .select(`
-        *,
-        organization:organizations(*)
-      `)
+      .select('*')
       .eq('id', loanId)
       .single();
 
@@ -60,39 +58,53 @@ export async function POST(request: NextRequest) {
 
     switch (signerType) {
       case 'ipay':
-        signerEmail = DEFAULT_IPAY_EMAIL;
+        // Use stored iPay email from envelope creation (ensures exact match)
+        signerEmail = loan.docusign_ipay_email || DEFAULT_IPAY_EMAIL;
         signerName = 'iPay Representative';
         clientUserId = `${INTEGRATION_KEY}-ipay`;
+        console.log('🔍 iPay signer details:', { 
+          signerEmail, 
+          signerName, 
+          clientUserId,
+          storedEmail: loan.docusign_ipay_email 
+        });
         break;
       case 'organization':
-        // Organization email MUST come from the loan creator's organization
-        if (!loan.organization?.email) {
+        // Use stored organization email from envelope creation (MUST match exactly)
+        console.log('🔍 Stored DocuSign organization data:', {
+          storedOrgEmail: loan.docusign_org_email,
+          storedOrgName: loan.docusign_org_name
+        });
+        
+        if (!loan.docusign_org_email) {
           return NextResponse.json({
             success: false,
-            error: 'Organization email not found. Please update organization settings.'
+            error: 'Organization email not found in envelope data. Please recreate the envelope.'
           }, { status: 400 });
         }
-        signerEmail = loan.organization.email;
-        signerName = loan.organization.name || 'Organization Representative';
+        signerEmail = loan.docusign_org_email;
+        signerName = loan.docusign_org_name || 'Organization Representative';
         clientUserId = `${INTEGRATION_KEY}-organization`;
+        console.log('🔍 Organization signer details:', { signerEmail, signerName, clientUserId });
         break;
       case 'borrower':
-        // For borrower, we need to fetch their details
+        // Use stored borrower email from envelope creation
+        if (!loan.docusign_borrower_email) {
+          return NextResponse.json({
+            success: false,
+            error: 'Borrower email not found in envelope data.'
+          }, { status: 400 });
+        }
+        
+        // Fetch borrower name for display
         const { data: borrower } = await supabase
           .from('borrowers')
-          .select('email, first_name, last_name')
+          .select('first_name, last_name')
           .eq('id', loan.borrower_id)
           .single();
 
-        if (!borrower) {
-          return NextResponse.json({
-            success: false,
-            error: 'Borrower not found'
-          }, { status: 404 });
-        }
-
-        signerEmail = borrower.email;
-        signerName = `${borrower.first_name} ${borrower.last_name}`;
+        signerEmail = loan.docusign_borrower_email;
+        signerName = borrower ? `${borrower.first_name} ${borrower.last_name}` : 'Borrower';
         // Borrower signs via email, not embedded
         return NextResponse.json({
           success: false,
