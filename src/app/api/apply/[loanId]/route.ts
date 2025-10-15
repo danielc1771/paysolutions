@@ -327,14 +327,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ loa
 
       console.log('✅ DocuSign envelope created:', result.envelopeId);
 
-      // Update loan with DocuSign envelope ID and status
+      // Update loan with DocuSign envelope ID, status, and EXACT signer emails used
+      // Storing these ensures recipient view URLs use matching emails (prevents UNKNOWN_ENVELOPE_RECIPIENT)
       const { error: docusignUpdateError } = await supabase
         .from('loans')
         .update({
           docusign_envelope_id: result.envelopeId,
           docusign_status: 'sent',
           docusign_status_updated: new Date().toISOString(),
-          status: 'pending_ipay_signature'
+          status: 'pending_ipay_signature',
+          // Store exact emails used in envelope creation
+          docusign_ipay_email: ipayEmail,
+          docusign_org_email: organizationEmail,
+          docusign_org_name: organizationName,
+          docusign_borrower_email: borrowerEmail
         })
         .eq('id', loanId);
 
