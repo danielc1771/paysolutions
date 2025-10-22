@@ -324,8 +324,7 @@ export async function createAndSendEnvelope(
     }
     console.log('🔗 View envelope in DocuSign:');
     const docusignWebUrl = process.env._URL || 'https://demo.docusign.net';
-    console.log(`   ${docusignWebUrl}/documents/details/${results.envelopeId}`);
-
+    console.log(`${docusignWebUrl}/documents/details/${results.envelopeId}`);
 
     return {
       envelopeId: results.envelopeId,
