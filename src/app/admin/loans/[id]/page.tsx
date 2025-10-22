@@ -55,6 +55,7 @@ export default function LoanDetail({ params }: LoanDetailProps) {
   const [viewingDocuSign, setViewingDocuSign] = useState(false);
   const [copyingLink, setCopyingLink] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [markingBorrowerSigned, setMarkingBorrowerSigned] = useState(false);
 
   // Function to fetch/refetch loan data
   const fetchLoanData = async (showLoading = false) => {
@@ -267,6 +268,48 @@ export default function LoanDetail({ params }: LoanDetailProps) {
     }
   };
 
+  const handleMarkBorrowerSigned = async () => {
+    if (!loan) return;
+
+    const confirmed = confirm(
+      'Are you sure you want to mark the borrower as signed?\n\n' +
+      'This will update the loan status to "Fully Signed" and allow the loan to be funded.\n\n' +
+      'Only do this if you have confirmed that the borrower has completed their signature in DocuSign.'
+    );
+
+    if (!confirmed) return;
+
+    setMarkingBorrowerSigned(true);
+    try {
+      console.log('📝 Manually marking borrower as signed for loan:', loan.id);
+
+      const response = await fetch('/api/docusign/webhook', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ loanId: loan.id }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to mark borrower as signed');
+      }
+
+      console.log('✅ Borrower marked as signed successfully');
+      alert('Success! Borrower has been marked as signed. The loan is now fully executed and ready for funding.');
+
+      // Refresh loan data to show updated status
+      await fetchLoanData();
+    } catch (error) {
+      console.error('Error marking borrower as signed:', error);
+      alert('Failed to mark borrower as signed: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      setMarkingBorrowerSigned(false);
+    }
+  };
+
 
 
   if (loading) {
@@ -357,9 +400,20 @@ export default function LoanDetail({ params }: LoanDetailProps) {
                       📄 Awaiting Organization Signature
                     </div>
                   ) : loan.organization_signed_at && !loan.borrower_signed_at ? (
-                    <div className="px-6 py-3 bg-orange-100 text-orange-800 rounded-lg font-semibold">
-                      📄 Awaiting Borrower Signature
-                    </div>
+                    <button
+                      onClick={handleMarkBorrowerSigned}
+                      disabled={markingBorrowerSigned}
+                      className="bg-amber-600 text-white hover:bg-amber-700 px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {markingBorrowerSigned ? (
+                        <div className="flex items-center">
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                          Processing...
+                        </div>
+                      ) : (
+                        '✅ Mark Customer as Signed'
+                      )}
+                    </button>
                   ) : loan.borrower_signed_at ? (
                     <div className="px-6 py-3 bg-green-100 text-green-800 rounded-lg font-semibold">
                       ✅ Fully Signed - Ready to Fund
