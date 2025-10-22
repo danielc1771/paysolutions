@@ -162,6 +162,145 @@ export async function POST(request: NextRequest) {
 }
 
 /**
+ * PATCH /api/docusign/webhook
+ *
+ * Manual endpoint for admins to mark borrower as signed when DocuSign webhooks are unavailable
+ * This reuses the same validation and update logic as the automatic webhook
+ */
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { loanId } = body;
+
+    console.log('📝 Manual borrower signature marking requested for loan:', loanId);
+
+    if (!loanId) {
+      return NextResponse.json({
+        success: false,
+        error: 'Loan ID is required'
+      }, { status: 400 });
+    }
+
+    // Verify admin authentication
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({
+        success: false,
+        error: 'Not authenticated'
+      }, { status: 401 });
+    }
+
+    // Check if user is admin
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (!profile || profile.role !== 'admin') {
+      return NextResponse.json({
+        success: false,
+        error: 'Admin access required'
+      }, { status: 403 });
+    }
+
+    // Get the loan with current signing timestamps
+    const { data: loan } = await supabase
+      .from('loans')
+      .select(`
+        id,
+        ipay_signed_at,
+        docusign_completed_at,
+        organization_signed_at,
+        borrower_signed_at,
+        status,
+        docusign_envelope_id
+      `)
+      .eq('id', loanId)
+      .single();
+
+    if (!loan) {
+      return NextResponse.json({
+        success: false,
+        error: 'Loan not found'
+      }, { status: 404 });
+    }
+
+    // Validate that iPay and Organization have already signed
+    if (!loan.ipay_signed_at || !loan.organization_signed_at) {
+      return NextResponse.json({
+        success: false,
+        error: 'iPay and Organization must sign before borrower can be marked as signed',
+        details: {
+          ipay_signed: !!loan.ipay_signed_at,
+          organization_signed: !!loan.organization_signed_at
+        }
+      }, { status: 400 });
+    }
+
+    // Check if borrower already signed
+    if (loan.borrower_signed_at) {
+      return NextResponse.json({
+        success: false,
+        error: 'Borrower has already been marked as signed',
+        borrower_signed_at: loan.borrower_signed_at
+      }, { status: 400 });
+    }
+
+    // Mark borrower as signed - same logic as webhook
+    const completedTime = new Date().toISOString();
+    const updateData = {
+      borrower_signed_at: completedTime,
+      status: 'fully_signed',
+      docusign_completed_at: completedTime,
+      updated_at: completedTime
+    };
+
+    console.log('📝 Manually updating loan with:', updateData);
+
+    const { data: updatedLoan, error } = await supabase
+      .from('loans')
+      .update(updateData)
+      .eq('id', loanId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('❌ Failed to update loan:', error);
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to update loan status'
+      }, { status: 500 });
+    }
+
+    console.log('✅ Loan updated successfully via manual marking');
+    console.log('New status:', updatedLoan.status);
+    console.log('🎉 All signatures complete! Document is fully executed.');
+
+    return NextResponse.json({
+      success: true,
+      message: 'Borrower marked as signed successfully',
+      loan: {
+        id: updatedLoan.id,
+        status: updatedLoan.status,
+        borrower_signed_at: updatedLoan.borrower_signed_at,
+        docusign_completed_at: updatedLoan.docusign_completed_at
+      }
+    });
+
+  } catch (error: unknown) {
+    console.error('❌ Manual signature marking failed:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({
+      success: false,
+      error: errorMessage
+    }, { status: 500 });
+  }
+}
+
+/**
  * GET /api/docusign/webhook
  *
  * Health check endpoint
@@ -188,9 +327,10 @@ export async function GET() {
         role: 'Borrower',
         timestamp: 'borrower_signed_at',
         status_after: 'fully_signed',
-        handler: 'DocuSign email → This webhook'
+        handler: 'DocuSign email → This webhook OR Manual admin marking via PATCH'
       }
     },
-    logic: 'Webhook only processes borrower signature (when both ipay_signed_at and organization_signed_at exist)'
+    logic: 'Webhook only processes borrower signature (when both ipay_signed_at and organization_signed_at exist)',
+    manual_trigger: 'PATCH /api/docusign/webhook with { loanId } (admin only)'
   });
 }
