@@ -306,7 +306,7 @@ export async function createAndSendEnvelope(
 
     // Step 3: Create envelope with loan data and all 3 signers
     const envelope = makeEnvelope(borrowerName, borrowerEmail, loanData, status, ipayEmail, organizationEmail, organizationName);
-
+    console.log({ envelope });
     console.log(`📤 Creating ${status} envelope with 3 signers (embedded + email)...`);
     
     // Step 4: Create and send the envelope
