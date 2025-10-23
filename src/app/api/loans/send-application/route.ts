@@ -103,6 +103,8 @@ export async function POST(request: Request) {
       .eq('email', customerEmail)
       .maybeSingle();
 
+      console.log('Existing borrower:', existingBorrower);
+
     if (borrowerLookupError) {
       console.error('Error looking up existing borrower:', borrowerLookupError);
       throw new Error('Error checking for existing customer');
