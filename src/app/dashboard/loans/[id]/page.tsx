@@ -805,7 +805,7 @@ export default function LoanDetail({ params }: LoanDetailProps) {
             )}
 
             {/* Action Buttons */}
-            {(((loan.status === 'application_completed' || loan.status === 'pending_ipay_signature') && !loan.ipay_signed_at) || (loan.ipay_signed_at && !loan.organization_signed_at) || loan.borrower_signed_at) && (
+            {(((loan.status === 'application_completed' || loan.status === 'pending_ipay_signature') && !loan.ipay_signed_at) || (loan.ipay_signed_at && !loan.organization_signed_at) || (loan.organization_signed_at && !loan.borrower_signed_at) || loan.borrower_signed_at) && (
               <div className="flex gap-3 mb-6">
                 {/* Show Send & Sign button for iPay admin when application is completed but not yet signed */}
                 {(loan.status === 'application_completed' || loan.status === 'pending_ipay_signature') && !loan.ipay_signed_at && isAdmin && (
