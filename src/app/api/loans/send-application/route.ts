@@ -245,6 +245,7 @@ export async function POST(request: Request) {
     
     if (error && typeof error === 'object' && 'message' in error && 'code' in error) {
       const dbError = error as { message?: string; code?: string };
+      console.log('Database error:', dbError);
       if (dbError.message?.includes('duplicate') || dbError.code === '23505') {
         errorMessage = 'A loan application already exists for this customer with these details';
         statusCode = 409;
