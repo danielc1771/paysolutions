@@ -20,6 +20,7 @@ export default function LoanDetail({ params }: LoanDetailProps) {
   const [error, setError] = useState<string | null>(null);
   const [docusignLoading, setDocusignLoading] = useState(false);
   const [fundingLoading, setFundingLoading] = useState(false);
+  const [markingBorrowerSigned, setMarkingBorrowerSigned] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -195,6 +196,84 @@ export default function LoanDetail({ params }: LoanDetailProps) {
     }
   };
 
+  const handleMarkBorrowerSigned = async () => {
+    if (!loan) return;
+
+    const confirmed = confirm(
+      'Are you sure you want to mark the borrower as signed?\n\n' +
+      'This will update the loan status to "Fully Signed" and allow the loan to be funded.\n\n' +
+      'Only do this if you have confirmed that the borrower has completed their signature in DocuSign.'
+    );
+
+    if (!confirmed) return;
+
+    setMarkingBorrowerSigned(true);
+    try {
+      console.log('📝 Manually marking borrower as signed for loan:', loan.id);
+
+      const response = await fetch('/api/docusign/webhook', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ loanId: loan.id }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to mark borrower as signed');
+      }
+
+      console.log('✅ Borrower marked as signed successfully');
+      setSuccessMessage('Borrower has been marked as signed. The loan is now fully executed and ready for funding.');
+      setShowSuccessModal(true);
+
+      // Refresh loan data
+      const { data: updatedLoan } = await supabase
+        .from('loans')
+        .select(`
+          *,
+          borrower:borrowers(
+            first_name,
+            last_name,
+            email,
+            phone,
+            date_of_birth,
+            address_line1,
+            city,
+            state,
+            zip_code,
+            employment_status,
+            annual_income,
+            current_employer_name,
+            time_with_employment,
+            reference1_name,
+            reference1_phone,
+            reference1_email,
+            reference2_name,
+            reference2_phone,
+            reference2_email,
+            reference3_name,
+            reference3_phone,
+            reference3_email,
+            kyc_status
+          )
+        `)
+        .eq('id', loan.id)
+        .single();
+
+      if (updatedLoan) {
+        setLoan(updatedLoan);
+      }
+    } catch (error) {
+      console.error('Error marking borrower as signed:', error);
+      alert('Failed to mark borrower as signed: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      setMarkingBorrowerSigned(false);
+    }
+  };
+
   const handleFundLoan = async () => {
     if (!loan) return;
 
@@ -209,11 +288,11 @@ export default function LoanDetail({ params }: LoanDetailProps) {
       });
 
       const data = await response.json();
-      
+
       if (data.success) {
         setSuccessMessage(data.message || 'Loan funded successfully! The borrower will receive an email invoice for their first payment.');
         setShowSuccessModal(true);
-        
+
         // Refresh loan data
         const { data: updatedLoan } = await supabase
           .from('loans')
@@ -247,7 +326,7 @@ export default function LoanDetail({ params }: LoanDetailProps) {
           `)
           .eq('id', loan.id)
           .single();
-        
+
         if (updatedLoan) {
           setLoan(updatedLoan);
         }
@@ -765,6 +844,27 @@ export default function LoanDetail({ params }: LoanDetailProps) {
                       <>
                         <Send className="w-4 h-4" />
                         <span>Sign Agreement Now</span>
+                      </>
+                    )}
+                  </button>
+                )}
+
+                {/* Show admin-only button to manually mark borrower as signed when org has signed but borrower hasn't */}
+                {loan.organization_signed_at && !loan.borrower_signed_at && isAdmin && (
+                  <button
+                    onClick={handleMarkBorrowerSigned}
+                    disabled={markingBorrowerSigned}
+                    className="bg-amber-600 text-white px-5 py-2.5 rounded-lg font-medium hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                  >
+                    {markingBorrowerSigned ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                        <span>Processing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="w-4 h-4" />
+                        <span>Mark Customer as Signed</span>
                       </>
                     )}
                   </button>
