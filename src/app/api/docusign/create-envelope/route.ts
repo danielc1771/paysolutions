@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAndSendEnvelope } from '@/utils/docusign/jwt-client';
 import { createClient } from '@/utils/supabase/server';
-import { 
-  mapLoanDataToDocuSignFields, 
-  validateRequiredFields, 
-  getBorrowerFullName, 
+import { getOrganizationOwnerByLoanId } from '@/utils/organization/owner-lookup';
+import {
+  mapLoanDataToDocuSignFields,
+  validateRequiredFields,
+  getBorrowerFullName,
   getBorrowerEmail,
-  type LoanApplicationData 
+  type LoanApplicationData
 } from '@/utils/docusign/field-mapper';
 
 /**
@@ -84,11 +85,22 @@ export async function POST(request: NextRequest) {
     const borrowerName = getBorrowerFullName(loanWithSchedule as LoanApplicationData);
     const borrowerEmail = getBorrowerEmail(loanWithSchedule as LoanApplicationData);
 
+    // Lookup organization owner for signing
+    const orgOwner = await getOrganizationOwnerByLoanId(loanId);
+
+    if (!orgOwner || !orgOwner.email) {
+      return NextResponse.json(
+        { error: 'Organization owner not found. Please ensure an organization owner is assigned to this loan.' },
+        { status: 400 }
+      );
+    }
+
     // Map loan data to DocuSign template fields using the field mapper
     const filteredLoanData = mapLoanDataToDocuSignFields(loanWithSchedule as LoanApplicationData);
 
     console.log('📋 Creating DocuSign envelope for loan:', loanId);
     console.log('👤 Borrower:', borrowerName, borrowerEmail);
+    console.log('🏢 Organization Owner:', orgOwner.fullName, orgOwner.email);
     console.log('📝 Fields to populate:', Object.keys(filteredLoanData).length);
     console.log('📅 Payment schedule entries:', paymentSchedule?.length || 0);
 
@@ -97,7 +109,10 @@ export async function POST(request: NextRequest) {
       borrowerName,
       borrowerEmail,
       filteredLoanData,
-      'sent' // Create as sent so iPay can sign via recipient view
+      'sent', // Create as sent so iPay can sign via recipient view
+      undefined, // Use default iPay email
+      orgOwner.email, // Organization owner email
+      orgOwner.fullName // Organization owner name
     );
 
     // Update loan record with envelope ID and set status to pending_ipay_signature
