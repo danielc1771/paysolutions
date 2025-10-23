@@ -13,7 +13,6 @@ const OAUTH_SCOPE = 'signature';
 
 // Default signer emails (fallback values)
 const DEFAULT_IPAY_EMAIL = 'ipaycustomer@gmail.com'; // iPay's official email - always stays the same
-const DEFAULT_ORGANIZATION_EMAIL = 'support@example.com'; // Fallback only - should always use org's actual email
 
 // Token storage interface
 interface TokenData {
@@ -129,7 +128,7 @@ export function makeEnvelope(
   tabValues: Record<string, string> = {},
   status: 'created' | 'sent' = 'sent',
   ipayEmail: string = DEFAULT_IPAY_EMAIL,
-  organizationEmail: string = DEFAULT_ORGANIZATION_EMAIL,
+  organizationEmail: string,
   organizationName: string = 'Organization Representative'
 ): docusign.EnvelopeDefinition {
   if (!TEMPLATE_ID) {
@@ -290,7 +289,7 @@ export async function createAndSendEnvelope(
   loanData: Record<string, string>,
   status: 'created' | 'sent' = 'sent',
   ipayEmail: string = DEFAULT_IPAY_EMAIL,
-  organizationEmail: string = DEFAULT_ORGANIZATION_EMAIL,
+  organizationEmail: string,
   organizationName: string = 'Organization Representative'
 ) {
   if (!API_ACCOUNT_ID) {
