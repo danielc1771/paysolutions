@@ -147,23 +147,27 @@ export default function UserDashboard() {
   }, [supabase, isAdmin, profile]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-teal-100">
+    <div className={`min-h-screen ${isAdmin ? 'bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100' : 'bg-gradient-to-br from-green-50 via-blue-50 to-teal-100'}`}>
           <div className="p-8">
-            {/* Dashboard Header */}
-            <div className="mb-8">
-              <div>
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent mb-3">
-                  {isAdmin ? 'Admin Dashboard' : 'Welcome Back!'}
-                </h1>
-                <p className="text-gray-600 text-lg">
-                  {isAdmin ? 'Platform overview and organization management' : 'Manage your organization\'s loan portfolio'}
-                </p>
-              </div>
-            </div>
-
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-10">
-              {isAdmin ? (
+              {profile === null ? (
+                <>
+                  {/* Loading State */}
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="bg-white/70 backdrop-blur-sm rounded-3xl p-8 shadow-lg border border-white/20 animate-pulse">
+                      <div className="flex items-center justify-between mb-6">
+                        <div className="w-16 h-16 bg-gray-200 rounded-2xl"></div>
+                        <div className="text-right">
+                          <div className="h-9 w-16 bg-gray-200 rounded"></div>
+                        </div>
+                      </div>
+                      <div className="h-6 w-24 bg-gray-200 rounded mb-2"></div>
+                      <div className="h-4 w-20 bg-gray-200 rounded"></div>
+                    </div>
+                  ))}
+                </>
+              ) : isAdmin ? (
                 <>
                   {/* Admin Stats */}
                   <div className="group bg-white/70 backdrop-blur-sm rounded-3xl p-8 shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-white/20">
@@ -295,7 +299,21 @@ export default function UserDashboard() {
             </div>
 
             {/* Quick Actions - Only show for non-admin users */}
-            {!isAdmin && (
+            {profile === null ? (
+              <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-8 mb-10 shadow-2xl border border-white/20 animate-pulse">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="h-8 w-64 bg-gray-200 rounded mb-3"></div>
+                    <div className="h-6 w-96 bg-gray-200 rounded mb-4"></div>
+                    <div className="flex items-center space-x-6">
+                      <div className="h-5 w-32 bg-gray-200 rounded"></div>
+                      <div className="h-5 w-32 bg-gray-200 rounded"></div>
+                    </div>
+                  </div>
+                  <div className="h-14 w-40 bg-gray-200 rounded-2xl"></div>
+                </div>
+              </div>
+            ) : !isAdmin && (
               <div className="bg-gradient-to-r from-green-500 via-teal-500 to-blue-500 rounded-3xl p-8 mb-10 text-white shadow-2xl relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent"></div>
                 <div className="relative z-10 flex items-center justify-between">
@@ -349,8 +367,8 @@ export default function UserDashboard() {
                   </Link>
                 </div>
               </div>
-            
-              {loading ? (
+
+              {profile === null || loading ? (
                 <div className="p-12 text-center">
                   <div className="relative">
                     <div className="animate-spin rounded-full h-12 w-12 border-4 border-green-200 border-t-green-500 mx-auto"></div>
