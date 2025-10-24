@@ -294,39 +294,41 @@ export default function UserDashboard() {
               )}
             </div>
 
-            {/* Quick Actions */}
-            <div className="bg-gradient-to-r from-green-500 via-teal-500 to-blue-500 rounded-3xl p-8 mb-10 text-white shadow-2xl relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent"></div>
-              <div className="relative z-10 flex items-center justify-between">
-                <div>
-                  <h3 className="text-2xl font-bold mb-3">Ready to Create a New Loan?</h3>
-                  <p className="text-blue-100 text-lg mb-4">Streamlined loan processing for your customers</p>
-                  <div className="flex items-center space-x-6 text-sm">
-                    <div className="flex items-center">
-                      <svg className="w-5 h-5 mr-2 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      Fast Processing
-                    </div>
-                    <div className="flex items-center">
-                      <svg className="w-5 h-5 mr-2 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      Auto DocuSign
+            {/* Quick Actions - Only show for non-admin users */}
+            {!isAdmin && (
+              <div className="bg-gradient-to-r from-green-500 via-teal-500 to-blue-500 rounded-3xl p-8 mb-10 text-white shadow-2xl relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent"></div>
+                <div className="relative z-10 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-2xl font-bold mb-3">Ready to Create a New Loan?</h3>
+                    <p className="text-blue-100 text-lg mb-4">Streamlined loan processing for your customers</p>
+                    <div className="flex items-center space-x-6 text-sm">
+                      <div className="flex items-center">
+                        <svg className="w-5 h-5 mr-2 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Fast Processing
+                      </div>
+                      <div className="flex items-center">
+                        <svg className="w-5 h-5 mr-2 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Auto DocuSign
+                      </div>
                     </div>
                   </div>
+                  <Link
+                    href="/dashboard/loans/create"
+                    className="bg-white text-green-600 px-8 py-4 rounded-2xl font-bold hover:bg-gray-50 transition-all duration-300 hover:scale-105 shadow-lg flex items-center space-x-2"
+                  >
+                    <span>Create Loan</span>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                    </svg>
+                  </Link>
                 </div>
-                <Link
-                  href="/dashboard/loans/create"
-                  className="bg-white text-green-600 px-8 py-4 rounded-2xl font-bold hover:bg-gray-50 transition-all duration-300 hover:scale-105 shadow-lg flex items-center space-x-2"
-                >
-                  <span>Create Loan</span>
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                  </svg>
-                </Link>
               </div>
-            </div>
+            )}
 
             {/* Recent Loans */}
             <div className="bg-white/70 backdrop-blur-sm rounded-3xl shadow-xl border border-white/20 overflow-hidden">
@@ -382,16 +384,22 @@ export default function UserDashboard() {
                     </svg>
                   </div>
                   <h3 className="text-xl font-bold text-gray-900 mb-3">No loans yet</h3>
-                  <p className="text-gray-600 mb-6 max-w-md mx-auto">Get started by creating your first loan application for a customer.</p>
-                  <Link
-                    href="/dashboard/loans/create"
-                    className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-2xl font-bold hover:from-green-600 hover:to-teal-600 transition-all duration-300 shadow-lg hover:shadow-xl space-x-2"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
-                    <span>Create Your First Loan</span>
-                  </Link>
+                  <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                    {isAdmin
+                      ? 'No loans have been created yet across the platform.'
+                      : 'Get started by creating your first loan application for a customer.'}
+                  </p>
+                  {!isAdmin && (
+                    <Link
+                      href="/dashboard/loans/create"
+                      className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-2xl font-bold hover:from-green-600 hover:to-teal-600 transition-all duration-300 shadow-lg hover:shadow-xl space-x-2"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                      <span>Create Your First Loan</span>
+                    </Link>
+                  )}
                 </div>
               ) : (
                 <div className="p-6">

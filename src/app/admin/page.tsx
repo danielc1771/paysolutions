@@ -302,16 +302,7 @@ export default function AdminDashboard() {
                   </svg>
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-3">No loans yet</h3>
-                <p className="text-gray-600 mb-6 max-w-md mx-auto">Get started by creating your first loan application. Our streamlined process makes it easy!</p>
-                <Link
-                  href="/admin/loans/create"
-                  className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-2xl font-bold hover:from-purple-600 hover:to-blue-600 transition-all duration-300 shadow-lg hover:shadow-xl space-x-2"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                  <span>Create Your First Loan</span>
-                </Link>
+                <p className="text-gray-600 mb-6 max-w-md mx-auto">No loans have been created yet across the platform. Organizations will create loans through their dashboards.</p>
               </div>
             ) : (
               <div className="p-6">

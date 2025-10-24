@@ -418,12 +418,14 @@ export default function UserLoans() {
                     {searchTerm || filterStatus !== 'all' ? 'No loans match your criteria' : 'No loans yet'}
                   </h3>
                   <p className="text-gray-600 mb-6 max-w-md mx-auto">
-                    {searchTerm || filterStatus !== 'all' 
+                    {searchTerm || filterStatus !== 'all'
                       ? 'Try adjusting your search terms or filters to find what you\'re looking for.'
-                      : 'Get started by creating your first loan application for a customer.'
+                      : isAdmin
+                        ? 'No loans have been created yet across the platform.'
+                        : 'Get started by creating your first loan application for a customer.'
                     }
                   </p>
-                  {(!searchTerm && filterStatus === 'all') && (
+                  {(!searchTerm && filterStatus === 'all' && !isAdmin) && (
                     <Link
                       href="/dashboard/loans/create"
                       className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-2xl font-bold hover:from-green-600 hover:to-teal-600 transition-all duration-300 shadow-lg hover:shadow-xl space-x-2"
