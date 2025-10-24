@@ -300,7 +300,7 @@ export default function UserLoans() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-teal-100">
+    <div className={`min-h-screen ${isAdmin ? 'bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100' : 'bg-gradient-to-br from-green-50 via-blue-50 to-teal-100'}`}>
           <div className="p-8">
             {/* Header */}
             <div className="mb-8">
@@ -311,7 +311,7 @@ export default function UserLoans() {
                   </h1>
                   <p className="text-gray-600 text-lg">Manage all loans {isAdmin ? 'across all organizations' : 'for your organization'}</p>
                 </div>
-                {!isAdmin && (
+                {profile !== null && !isAdmin && (
                   <Link
                     href="/dashboard/loans/create"
                     className="bg-gradient-to-r from-green-500 to-teal-500 text-white px-8 py-4 rounded-2xl font-bold hover:from-green-600 hover:to-teal-600 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center space-x-2"

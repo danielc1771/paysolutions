@@ -257,7 +257,7 @@ export default function UserBorrowers() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-teal-100">
+    <div className={`min-h-screen ${isAdmin ? 'bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100' : 'bg-gradient-to-br from-green-50 via-blue-50 to-teal-100'}`}>
           <div className="p-8">
             {/* Header */}
             <div className="mb-8">
@@ -266,17 +266,19 @@ export default function UserBorrowers() {
                   <h1 className="text-4xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent mb-3">
                     Borrower Management
                   </h1>
-                  <p className="text-gray-600 text-lg">Manage all borrowers for your organization</p>
+                  <p className="text-gray-600 text-lg">{isAdmin ? 'Manage all borrowers across all organizations' : 'Manage all borrowers for your organization'}</p>
                 </div>
-                <Link
-                  href="/dashboard/loans/create"
-                  className="bg-gradient-to-r from-green-500 to-teal-500 text-white px-8 py-4 rounded-2xl font-bold hover:from-green-600 hover:to-teal-600 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center space-x-2"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                  <span>Create New Loan</span>
-                </Link>
+                {!isAdmin && (
+                  <Link
+                    href="/dashboard/loans/create"
+                    className="bg-gradient-to-r from-green-500 to-teal-500 text-white px-8 py-4 rounded-2xl font-bold hover:from-green-600 hover:to-teal-600 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center space-x-2"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                    <span>Create New Loan</span>
+                  </Link>
+                )}
               </div>
             </div>
 

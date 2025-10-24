@@ -224,7 +224,7 @@ export default function TeamPage() {
   });
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-teal-100">
+    <div className={`min-h-screen ${isAdmin ? 'bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100' : 'bg-gradient-to-br from-green-50 via-blue-50 to-teal-100'}`}>
           <div className="p-8">
             {/* Header */}
             <div className="mb-8">
