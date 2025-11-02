@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
           role: 'team_member',
           invited_by: user.id
         },
-        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/accept-invite`
+        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback?type=invite`
       }
     );
 

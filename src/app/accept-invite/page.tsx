@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { AlertCircle, CheckCircle, Loader2, User, Lock } from 'lucide-react';
 
@@ -15,6 +15,7 @@ export default function AcceptInvitePage() {
   const [success, setSuccess] = useState(false);
   const [isValidInvite, setIsValidInvite] = useState<boolean | null>(null);
 
+  const router = useRouter();
   const supabase = createClient();
 
   const verifyInvite = useCallback(async (session: Record<string, unknown> | null) => {
@@ -98,7 +99,10 @@ export default function AcceptInvitePage() {
           setError(profileError.message);
         } else {
           setSuccess(true);
-          await supabase.auth.signOut();
+          // Redirect to dashboard after a brief delay to show success message
+          setTimeout(() => {
+            router.push('/dashboard');
+          }, 1500);
         }
       }
     } catch {
@@ -116,14 +120,12 @@ export default function AcceptInvitePage() {
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="w-8 h-8 text-green-500" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Setup Complete!</h2>
-            <p className="text-gray-600 mb-6">Your account has been successfully created.</p>
-            <Link 
-              href="/login"
-              className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-2xl font-semibold hover:from-purple-600 hover:to-blue-600 transition-all duration-300 shadow-lg hover:shadow-xl"
-            >
-              Proceed to Login
-            </Link>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome Aboard!</h2>
+            <p className="text-gray-600 mb-4">Your account has been successfully created.</p>
+            <div className="flex items-center justify-center text-purple-600">
+              <Loader2 className="w-5 h-5 animate-spin mr-2" />
+              <span className="font-medium">Redirecting to your dashboard...</span>
+            </div>
           </div>
         </div>
       </div>

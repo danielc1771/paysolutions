@@ -79,6 +79,8 @@ export const PUBLIC_ROUTES = [
   '/',
   '/login',
   '/signup',
+  '/accept-invite',
+  '/auth/callback',
   '/apply/*',
   '/payment-setup',
   '/payment-collection/*',

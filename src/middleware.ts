@@ -55,12 +55,23 @@ export async function middleware(request: NextRequest) {
   )
 
   const path = request.nextUrl.pathname
+  const hash = request.nextUrl.hash
+
+  // Check if this is an invite link being redirected to /login
+  // If so, redirect to /accept-invite instead
+  if (path === '/login' && hash.includes('type=invite')) {
+    const url = new URL(request.url)
+    url.pathname = '/accept-invite'
+    return NextResponse.redirect(url)
+  }
 
   // Public routes that don't require authentication
   const publicRoutes = [
     '/',
     '/login',
     '/signup',
+    '/accept-invite',
+    '/auth/callback',
     '/apply/',
     '/payment-setup',
     '/payment-collection/',
