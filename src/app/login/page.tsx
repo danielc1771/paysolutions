@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { AlertCircle, Shield, Zap, CheckCircle, Loader2 } from 'lucide-react';
@@ -12,7 +13,22 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
+  const router = useRouter();
   const supabase = createClient();
+
+  // Check if this is an invite link redirect
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash) {
+      const params = new URLSearchParams(hash.substring(1));
+      const type = params.get('type');
+      
+      // If it's an invite type, redirect to accept-invite with the hash
+      if (type === 'invite') {
+        router.replace(`/accept-invite${hash}`);
+      }
+    }
+  }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
