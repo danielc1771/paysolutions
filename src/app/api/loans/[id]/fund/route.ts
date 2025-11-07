@@ -178,31 +178,29 @@ export async function POST(
         description: `Loan ${loan.loan_number} - Payment ${week} of ${loan.term_weeks}`,
       });
 
-      // Add payment line item
-      await stripe.invoiceItems.create({
-        customer: stripeCustomer.id,
-        invoice: invoice.id,
-        amount: weeklyPaymentAmount,
-        currency: 'usd',
-        description: `Weekly Payment ${week}/${loan.term_weeks}`,
-        metadata: {
-          loan_id: loanId,
-          payment_number: week.toString(),
-        },
-      });
-
-      // Add $5 convenience fee
-      await stripe.invoiceItems.create({
-        customer: stripeCustomer.id,
-        invoice: invoice.id,
-        amount: 500, // $5.00 in cents
-        currency: 'usd',
-        description: 'Convenience Fee',
-        metadata: {
-          loan_id: loanId,
-          payment_number: week.toString(),
-          type: 'convenience_fee',
-        },
+      // Add both line items in a single call using addLines
+      await stripe.invoices.addLines(invoice.id, {
+        lines: [
+          {
+            description: `Weekly Payment ${week}/${loan.term_weeks}`,
+            amount: weeklyPaymentAmount,
+            currency: 'usd',
+            metadata: {
+              loan_id: loanId,
+              payment_number: week.toString(),
+            },
+          },
+          {
+            description: 'Convenience Fee',
+            amount: 500, // $5.00 in cents
+            currency: 'usd',
+            metadata: {
+              loan_id: loanId,
+              payment_number: week.toString(),
+              type: 'convenience_fee',
+            },
+          },
+        ],
       });
 
       invoiceIds.push(invoice.id);
