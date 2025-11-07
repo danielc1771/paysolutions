@@ -191,6 +191,20 @@ export async function POST(
         },
       });
 
+      // Add $5 convenience fee
+      await stripe.invoiceItems.create({
+        customer: stripeCustomer.id,
+        invoice: invoice.id,
+        amount: 500, // $5.00 in cents
+        currency: 'usd',
+        description: 'Convenience Fee',
+        metadata: {
+          loan_id: loanId,
+          payment_number: week.toString(),
+          type: 'convenience_fee',
+        },
+      });
+
       invoiceIds.push(invoice.id);
     }
 
