@@ -83,7 +83,7 @@ export async function POST(request: Request) {
   if (!validateLoanTerms(loanTerm)) {
     return new NextResponse(JSON.stringify({ 
       error: 'Invalid loan term', 
-      message: `${loanTerm} weeks is not a valid loan term. Valid terms are: 4, 6, 8, 12, 16 weeks` 
+      message: `${loanTerm} weeks is not a valid loan term. Valid terms are: 1-24 weeks` 
     }), { 
       status: 400,
       headers: { 'Content-Type': 'application/json' }
