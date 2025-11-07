@@ -184,7 +184,6 @@ export async function POST(
           {
             description: `Weekly Payment ${week}/${loan.term_weeks}`,
             amount: weeklyPaymentAmount,
-            currency: 'usd',
             metadata: {
               loan_id: loanId,
               payment_number: week.toString(),
@@ -193,7 +192,6 @@ export async function POST(
           {
             description: 'Convenience Fee',
             amount: 500, // $5.00 in cents
-            currency: 'usd',
             metadata: {
               loan_id: loanId,
               payment_number: week.toString(),
