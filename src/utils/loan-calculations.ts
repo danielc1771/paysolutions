@@ -29,7 +29,7 @@ export interface LoanCalculation {
 export function getAvailableTerms(): LoanTermOption[] {
   // Generate all weeks from 1 to 20
   const terms: LoanTermOption[] = [];
-  for (let week = 1; week <= 20; week++) {
+  for (let week = 1; week <= 24; week++) {
     terms.push({
       weeks: week,
       label: `${week} ${week === 1 ? 'week' : 'weeks'}`
