@@ -21,20 +21,21 @@ export interface LoanCalculation {
 }
 
 /**
- * Get available loan term options - universal 16-week cap for all loan amounts
+ * Get available loan term options - universal 20-week cap for all loan amounts
  * Rules:
- * - All loan amounts: 4, 6, 8, 12, 16 weeks available
- * - Maximum 16 weeks for any loan amount
+ * - All loan amounts: 1-20 weeks available
+ * - Maximum 20 weeks for any loan amount
  */
 export function getAvailableTerms(): LoanTermOption[] {
-  // All loan amounts now get the same term options - parameter no longer needed
-  return [
-    { weeks: 4, label: '4 weeks' },
-    { weeks: 6, label: '6 weeks' },
-    { weeks: 8, label: '8 weeks' },
-    { weeks: 12, label: '12 weeks' },
-    { weeks: 16, label: '16 weeks' }
-  ];
+  // Generate all weeks from 1 to 20
+  const terms: LoanTermOption[] = [];
+  for (let week = 1; week <= 20; week++) {
+    terms.push({
+      weeks: week,
+      label: `${week} ${week === 1 ? 'week' : 'weeks'}`
+    });
+  }
+  return terms;
 }
 
 /**
