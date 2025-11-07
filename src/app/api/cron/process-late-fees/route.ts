@@ -27,8 +27,8 @@ export async function GET() {
       status: 'open',
       limit: 100, // Fetch 100 at a time for efficiency
     })) {
-      // Check if invoice is past due (considering grace period)
-      if (!invoice.due_date || invoice.due_date < cutoffDate) {
+      // Skip if no due date or if still within grace period
+      if (!invoice.due_date || invoice.due_date > cutoffDate) {
         skippedCount++;
         continue;
       }
