@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { Building2, Users, DollarSign, Calendar, Edit, Trash2, Eye } from 'lucide-react';
 import CustomSelect from '@/components/CustomSelect';
+import AddOrganizationForm from './AddOrganizationForm';
 
 interface Organization {
   id: string;
@@ -29,6 +30,7 @@ export default function OrganizationsTable() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [showAddForm, setShowAddForm] = useState(false);
 
   const supabase = createClient();
 
@@ -135,7 +137,7 @@ export default function OrganizationsTable() {
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Organization Management</h2>
           <p className="text-gray-600">Manage all organizations and their subscriptions</p>
         </div>
-        <button className="bg-gradient-to-r from-green-500 to-teal-500 text-white px-6 py-3 rounded-2xl font-semibold hover:from-green-600 hover:to-teal-600 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center space-x-2">
+        <button className="bg-gradient-to-r from-green-500 to-teal-500 text-white px-6 py-3 rounded-2xl font-semibold hover:from-green-600 hover:to-teal-600 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center space-x-2" onClick={() => setShowAddForm(true)}>
           <Building2 className="w-5 h-5" />
           <span>Add Organization</span>
         </button>
@@ -320,6 +322,14 @@ export default function OrganizationsTable() {
           </div>
         )}
       </div>
+
+      {/* Add Organization Form Modal */}
+      {showAddForm && (
+        <AddOrganizationForm
+          onClose={() => setShowAddForm(false)}
+          onSuccess={fetchOrganizations}
+        />
+      )}
     </div>
   );
 }

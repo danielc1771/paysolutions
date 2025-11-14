@@ -67,7 +67,7 @@ export const ROLE_ROUTES: Record<Role, string[]> = {
 
 // Homepage redirection for each role
 export const ROLE_HOMEPAGES: Record<Role, string> = {
-  admin: '/dashboard',
+  admin: '/admin',
   user: '/dashboard',
   team_member: '/dashboard',
   organization_owner: '/dashboard',
