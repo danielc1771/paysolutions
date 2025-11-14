@@ -250,8 +250,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           <Image 
             src="/logoMain.png" 
             alt="PaySolutions Logo" 
-            width={200} 
-            height={200}
+            width={150} 
+            height={150}
             className="rounded-xl shadow-lg"
           />
         </div>
