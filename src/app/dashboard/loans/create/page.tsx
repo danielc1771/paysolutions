@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { getAvailableTerms, calculateLoanPayment, generateWeeklyPaymentSchedule } from '@/utils/loan-calculations';
 import { getInterestDisplayConfig } from '@/utils/interest-config';
-import { Calculator, DollarSign } from 'lucide-react';
+import { Calculator, DollarSign, Search, CheckCircle, AlertCircle } from 'lucide-react';
 import CustomSelect from '@/components/CustomSelect';
+import { decodeVIN, isValidVINFormat, type VINDecodeResult } from '@/utils/vin-decoder';
 
 export default function CreateLoan() {
   const router = useRouter();
@@ -19,6 +20,8 @@ export default function CreateLoan() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [organizationInfo, setOrganizationInfo] = useState<any>(null);
   const [validationErrors, setValidationErrors] = useState<{[key: string]: boolean}>({});
+  const [vinDecoding, setVinDecoding] = useState(false);
+  const [vinDecodeResult, setVinDecodeResult] = useState<VINDecodeResult | null>(null);
   const supabase = createClient();
 
   // Send Application Form State
@@ -71,6 +74,53 @@ export default function CreateLoan() {
 
     fetchOrganizationInfo();
   }, [supabase]);
+
+  // VIN Decode Handler
+  const handleDecodeVIN = async () => {
+    const vin = sendFormData.vehicleVin.trim();
+    
+    if (!vin) {
+      return;
+    }
+
+    if (!isValidVINFormat(vin)) {
+      setVinDecodeResult({
+        success: false,
+        valid: false,
+        errorText: 'Invalid VIN format. Must be exactly 17 characters.',
+      });
+      return;
+    }
+
+    setVinDecoding(true);
+    setVinDecodeResult(null);
+
+    try {
+      const result = await decodeVIN(vin);
+      setVinDecodeResult(result);
+
+      if (result.success && result.valid) {
+        // Auto-fill vehicle details
+        setSendFormData(prev => ({
+          ...prev,
+          vehicleYear: result.year || prev.vehicleYear,
+          vehicleMake: result.make || prev.vehicleMake,
+          vehicleModel: result.model || prev.vehicleModel,
+        }));
+      }
+    } catch (error) {
+      console.error('Error decoding VIN:', error);
+      setVinDecodeResult({
+        success: false,
+        valid: false,
+        errorText: 'Failed to decode VIN. Please try again.',
+      });
+    } finally {
+      setVinDecoding(false);
+    }
+  };
+
+  // Remove auto-decode - user must click Verify button
 
   // Validation function
   const validateForm = () => {
@@ -378,68 +428,158 @@ export default function CreateLoan() {
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold text-gray-900 mb-4">Vehicle Information</h3>
                       
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Vehicle Year *</label>
-                        <input
-                          type="text"
-                          required
-                          maxLength={4}
-                          value={sendFormData.vehicleYear}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                            const value = e.target.value;
-                            // Only allow digits
-                            if (value === '' || /^\d{0,4}$/.test(value)) {
-                              setSendFormData(prev => ({ ...prev, vehicleYear: value }));
-                            }
-                          }}
-                          className={`w-full px-4 py-3 rounded-2xl border ${validationErrors.vehicleYear ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'} focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white`}
-                          placeholder="2020"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Vehicle Make *</label>
-                        <input
-                          type="text"
-                          required
-                          value={sendFormData.vehicleMake}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSendFormData(prev => ({ ...prev, vehicleMake: e.target.value }))}
-                          className={`w-full px-4 py-3 rounded-2xl border ${validationErrors.vehicleMake ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'} focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white`}
-                          placeholder="Honda"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Vehicle Model *</label>
-                        <input
-                          type="text"
-                          required
-                          value={sendFormData.vehicleModel}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSendFormData(prev => ({ ...prev, vehicleModel: e.target.value }))}
-                          className={`w-full px-4 py-3 rounded-2xl border ${validationErrors.vehicleModel ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'} focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white`}
-                          placeholder="Civic"
-                        />
-                      </div>
-
+                      {/* VIN Field - First */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Vehicle VIN *</label>
-                        <input
-                          type="text"
-                          required
-                          maxLength={17}
-                          value={sendFormData.vehicleVin}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                            const value = e.target.value.toUpperCase();
-                            // Only allow valid VIN characters (A-Z, 0-9, excluding I, O, Q)
-                            if (value === '' || /^[A-HJ-NPR-Z0-9]{0,17}$/.test(value)) {
-                              setSendFormData(prev => ({ ...prev, vehicleVin: value }));
-                            }
-                          }}
-                          className={`w-full px-4 py-3 rounded-2xl border ${validationErrors.vehicleVin ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'} focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white uppercase`}
-                          placeholder="1HGBH41JXMN109186"
-                        />
-                        <p className="mt-1 text-xs text-gray-500">Must be exactly 17 characters (letters and numbers, excluding I, O, Q)</p>
+                        <div className="flex gap-3">
+                          <div className="flex-1 relative">
+                            <input
+                              type="text"
+                              required
+                              maxLength={17}
+                              value={sendFormData.vehicleVin}
+                              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                const value = e.target.value.toUpperCase();
+                                // Only allow valid VIN characters (A-Z, 0-9, excluding I, O, Q)
+                                if (value === '' || /^[A-HJ-NPR-Z0-9]{0,17}$/.test(value)) {
+                                  setSendFormData(prev => ({ ...prev, vehicleVin: value }));
+                                  setVinDecodeResult(null);
+                                }
+                              }}
+                              className={`w-full px-4 py-3 rounded-2xl border ${
+                                validationErrors.vehicleVin 
+                                  ? 'border-red-500 ring-2 ring-red-200' 
+                                  : vinDecodeResult?.valid 
+                                  ? 'border-green-500 ring-2 ring-green-200' 
+                                  : 'border-gray-300'
+                              } focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white uppercase`}
+                              placeholder="1HGBH41JXMN109186"
+                            />
+                            {vinDecoding && (
+                              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                <div className="animate-spin rounded-full h-5 w-5 border-2 border-green-500 border-t-transparent"></div>
+                              </div>
+                            )}
+                            {!vinDecoding && vinDecodeResult?.valid && (
+                              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                <CheckCircle className="w-5 h-5 text-green-500" />
+                              </div>
+                            )}
+                          </div>
+                          
+                          {/* Verify VIN Button */}
+                          <button
+                            type="button"
+                            onClick={handleDecodeVIN}
+                            disabled={vinDecoding || sendFormData.vehicleVin.length !== 17}
+                            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-2xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                          >
+                            {vinDecoding ? (
+                              <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                                <span>Verifying...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Search className="w-4 h-4" />
+                                <span>Verify VIN</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                        
+                        {/* Character count and format validation */}
+                        {sendFormData.vehicleVin.length > 0 && sendFormData.vehicleVin.length < 17 && !vinDecoding && (
+                          <p className="mt-2 text-xs text-orange-600 flex items-center">
+                            <AlertCircle className="w-3 h-3 mr-1" />
+                            VIN must be exactly 17 characters ({sendFormData.vehicleVin.length}/17)
+                          </p>
+                        )}
+                        
+                        {sendFormData.vehicleVin.length === 0 && (
+                          <p className="mt-2 text-xs text-gray-500">
+                            Enter 17-character VIN (letters and numbers, excluding I, O, Q)
+                          </p>
+                        )}
+                        
+                        {/* VIN Decode Status Messages */}
+                        {vinDecodeResult && vinDecodeResult.valid && (
+                          <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-xl">
+                            <div className="flex items-start space-x-2">
+                              <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                              <div className="flex-1">
+                                <p className="text-sm font-semibold text-green-900">✓ VIN Verified</p>
+                                <p className="text-xs text-green-700 mt-1">
+                                  {vinDecodeResult.year} {vinDecodeResult.make} {vinDecodeResult.model}
+                                  {vinDecodeResult.trim && ` ${vinDecodeResult.trim}`}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {vinDecodeResult && !vinDecodeResult.valid && (
+                          <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-xl">
+                            <div className="flex items-start space-x-2">
+                              <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
+                              <div className="flex-1">
+                                <p className="text-sm font-semibold text-red-900">VIN Validation Failed</p>
+                                <p className="text-xs text-red-700 mt-1">{vinDecodeResult.errorText}</p>
+                                <p className="text-xs text-red-600 mt-2 font-medium">
+                                  Please verify the VIN and try again. A valid VIN is required to proceed.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
+
+                      {/* Year, Make, Model - Only show after successful VIN decode (Read-only to prevent fraud) */}
+                      {vinDecodeResult?.valid && (
+                        <>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Vehicle Year *
+                              <span className="ml-2 text-xs text-green-600 font-normal">(Verified from VIN)</span>
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              readOnly
+                              value={sendFormData.vehicleYear}
+                              className="w-full px-4 py-3 rounded-2xl border border-gray-300 bg-gray-100 text-gray-900 cursor-not-allowed"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Vehicle Make *
+                              <span className="ml-2 text-xs text-green-600 font-normal">(Verified from VIN)</span>
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              readOnly
+                              value={sendFormData.vehicleMake}
+                              className="w-full px-4 py-3 rounded-2xl border border-gray-300 bg-gray-100 text-gray-900 cursor-not-allowed"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Vehicle Model *
+                              <span className="ml-2 text-xs text-green-600 font-normal">(Verified from VIN)</span>
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              readOnly
+                              value={sendFormData.vehicleModel}
+                              className="w-full px-4 py-3 rounded-2xl border border-gray-300 bg-gray-100 text-gray-900 cursor-not-allowed"
+                            />
+                          </div>
+                        </>
+                      )}
                     </div>
 
                     {/* Organization Information (Auto-populated) */}
