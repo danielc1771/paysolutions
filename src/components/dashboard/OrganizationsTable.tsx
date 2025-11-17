@@ -2,9 +2,11 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import { Building2, Users, DollarSign, Calendar, Edit, Trash2, Eye } from 'lucide-react';
+import { Building2, Users, DollarSign, Edit, Trash2, Eye } from 'lucide-react';
 import CustomSelect from '@/components/CustomSelect';
 import AddOrganizationForm from '@/components/dashboard/AddOrganizationForm';
+import DataTable, { Column, Action } from '@/components/ui/DataTable';
+import { toProperCase, formatStatus } from '@/utils/textFormatters';
 
 interface Organization {
   id: string;
@@ -162,6 +164,158 @@ export default function OrganizationsTable() {
     { value: 'cancelled', label: 'Cancelled' },
   ];
 
+  const columns: Column<Organization>[] = [
+    {
+      key: 'organization',
+      label: 'Organization',
+      render: (org) => (
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-teal-500 rounded-xl flex items-center justify-center flex-shrink-0">
+            <Building2 className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <div className="text-sm font-semibold text-gray-900">{toProperCase(org.name)}</div>
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${org.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+              {org.is_active ? 'Active' : 'Inactive'}
+            </span>
+          </div>
+        </div>
+      ),
+      mobileRender: (org) => (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-teal-500 rounded-xl flex items-center justify-center flex-shrink-0">
+              <Building2 className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-gray-900">{toProperCase(org.name)}</div>
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${org.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                {org.is_active ? 'Active' : 'Inactive'}
+              </span>
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'contact',
+      label: 'Contact',
+      render: (org) => (
+        <div>
+          <div className="text-sm text-gray-900">{toProperCase(org.contact_person || 'N/A')}</div>
+          <div className="text-sm text-gray-500">{org.email.toLowerCase()}</div>
+          <div className="text-sm text-gray-500">{org.phone}</div>
+        </div>
+      ),
+      mobileRender: (org) => (
+        <div className="space-y-1 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-gray-500">Contact:</span>
+            <span className="text-gray-900 font-medium">{toProperCase(org.contact_person || 'N/A')}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-gray-500">Email:</span>
+            <span className="text-gray-900 text-xs">{org.email.toLowerCase()}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-gray-500">Phone:</span>
+            <span className="text-gray-900">{org.phone}</span>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'subscription',
+      label: 'Subscription',
+      render: (org) => (
+        <div>
+          <div className="flex items-center space-x-2">
+            <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${getStatusColor(org.subscription_status)}`}>
+              {formatStatus(org.subscription_status)}
+            </span>
+          </div>
+          <div className="text-xs text-gray-500 mt-1">
+            Ends: {formatDate(org.subscription_end_date)}
+          </div>
+        </div>
+      ),
+      mobileRender: (org) => (
+        <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+          <span className="text-gray-500 text-sm">Subscription:</span>
+          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(org.subscription_status)}`}>
+            {formatStatus(org.subscription_status)}
+          </span>
+        </div>
+      ),
+    },
+    {
+      key: 'usage',
+      label: 'Usage',
+      render: (org) => (
+        <div className="flex items-center space-x-4 text-sm text-gray-900">
+          <div className="flex items-center space-x-1">
+            <Users className="w-4 h-4 text-blue-500" />
+            <span>{org.user_count}/{org.total_users_limit}</span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <DollarSign className="w-4 h-4 text-green-500" />
+            <span>{org.loan_count}/{org.monthly_loan_limit}</span>
+          </div>
+          <div className="text-gray-500 text-xs">{org.borrower_count} borrowers</div>
+        </div>
+      ),
+      mobileRender: (org) => (
+        <div className="flex items-center justify-between space-x-4 text-sm">
+          <div className="flex items-center space-x-1">
+            <Users className="w-4 h-4 text-blue-500" />
+            <span className="text-gray-900">{org.user_count}/{org.total_users_limit}</span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <DollarSign className="w-4 h-4 text-green-500" />
+            <span className="text-gray-900">{org.loan_count}/{org.monthly_loan_limit}</span>
+          </div>
+          <div className="text-gray-500 text-xs">{org.borrower_count} borrowers</div>
+        </div>
+      ),
+    },
+    {
+      key: 'created',
+      label: 'Created',
+      render: (org) => (
+        <div className="text-sm text-gray-500">
+          {formatDate(org.created_at)}
+        </div>
+      ),
+    },
+  ];
+
+  const actions: Action<Organization>[] = [
+    {
+      icon: Eye,
+      label: 'View Details',
+      onClick: (org) => {
+        // TODO: Implement view details
+        console.log('View org:', org.id);
+      },
+      color: 'blue',
+    },
+    {
+      icon: Edit,
+      label: 'Edit Organization',
+      onClick: (org) => {
+        // TODO: Implement edit
+        console.log('Edit org:', org.id);
+      },
+      color: 'green',
+    },
+    {
+      icon: Trash2,
+      label: 'Delete Organization',
+      onClick: (org) => setDeleteConfirm({ show: true, org }),
+      color: 'red',
+    },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -205,237 +359,35 @@ export default function OrganizationsTable() {
         </div>
       </div>
 
-      {/* Organizations Table */}
-      <div className="bg-white/70 backdrop-blur-sm rounded-3xl shadow-xl border border-white/20 overflow-hidden">
-        <div className="px-8 py-6 bg-gradient-to-r from-gray-50 to-gray-100/50">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">All Organizations</h3>
-              <p className="text-gray-600">
-                {filteredOrganizations.length} of {organizations.length} organizations
-                {filterStatus !== 'all' && ` • Filtered by: ${statusOptions.find(s => s.value === filterStatus)?.label}`}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="p-12 text-center">
-            <div className="relative">
-              <div className="animate-spin rounded-full h-12 w-12 border-4 border-green-200 border-t-green-500 mx-auto"></div>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-              </div>
-            </div>
-            <p className="mt-4 text-gray-600 font-medium">Loading organizations...</p>
-          </div>
-        ) : error ? (
-          <div className="p-12 text-center">
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Unable to load organizations</h3>
-            <p className="text-red-600 mb-4">{error}</p>
-            <button 
-              onClick={fetchOrganizations}
-              className="bg-red-500 text-white px-6 py-3 rounded-2xl font-semibold hover:bg-red-600 transition-colors"
-            >
-              Try Again
-            </button>
-          </div>
-        ) : filteredOrganizations.length === 0 ? (
-          <div className="p-12 text-center">
-            <div className="w-20 h-20 bg-gradient-to-br from-green-100 to-teal-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Building2 className="w-10 h-10 text-green-500" />
-            </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-3">
-              {searchTerm || filterStatus !== 'all' ? 'No organizations match your criteria' : 'No organizations yet'}
-            </h3>
-            <p className="text-gray-600 mb-6 max-w-md mx-auto">
-              {searchTerm || filterStatus !== 'all' 
-                ? 'Try adjusting your search terms or filters to find what you&apos;re looking for.'
-                : 'Get started by adding your first organization to the platform.'
-              }
+      {/* Stats Header */}
+      <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-white/20">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">All Organizations</h3>
+            <p className="text-gray-600">
+              {filteredOrganizations.length} of {organizations.length} organizations
+              {filterStatus !== 'all' && ` • Filtered by: ${statusOptions.find(s => s.value === filterStatus)?.label}`}
             </p>
           </div>
-        ) : (
-          <>
-            {/* Desktop Table View */}
-            <div className="hidden lg:block overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50/80">
-                  <tr>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Organization</th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subscription</th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usage</th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200/50">
-                  {filteredOrganizations.map((org) => (
-                    <tr key={org.id} className="hover:bg-white/50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0">
-                          <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-teal-500 rounded-xl flex items-center justify-center">
-                            <Building2 className="w-5 h-5 text-white" />
-                          </div>
-                        </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">{org.name}</div>
-                          <div className="text-sm text-gray-500">
-                            {org.is_active ? (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                Active
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                Inactive
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-gray-900">{org.contact_person || 'N/A'}</div>
-                      <div className="text-sm text-gray-500">{org.email}</div>
-                      <div className="text-sm text-gray-500">{org.phone}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center space-x-2">
-                        <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${getStatusColor(org.subscription_status)}`}>
-                          {org.subscription_status}
-                        </span>
-                      </div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        Ends: {formatDate(org.subscription_end_date)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center space-x-4 text-sm text-gray-900">
-                        <div className="flex items-center space-x-1">
-                          <Users className="w-4 h-4 text-blue-500" />
-                          <span>{org.user_count}/{org.total_users_limit}</span>
-                        </div>
-                        <div className="flex items-center space-x-1">
-                          <DollarSign className="w-4 h-4 text-green-500" />
-                          <span>{org.loan_count}/{org.monthly_loan_limit}</span>
-                        </div>
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {org.borrower_count} borrowers
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center text-sm text-gray-500">
-                        <Calendar className="w-4 h-4 mr-2" />
-                        {formatDate(org.created_at)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center space-x-2">
-                        <button className="p-2 text-gray-400 hover:text-blue-500 rounded-lg hover:bg-blue-50 transition-colors">
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button className="p-2 text-gray-400 hover:text-green-500 rounded-lg hover:bg-green-50 transition-colors">
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => setDeleteConfirm({ show: true, org })}
-                          className="p-2 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile Card View */}
-            <div className="lg:hidden space-y-4 p-4">
-              {filteredOrganizations.map((org) => (
-                <div key={org.id} className="bg-white/50 rounded-2xl p-4 shadow-sm space-y-3">
-                  {/* Organization Name */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-teal-500 rounded-xl flex items-center justify-center flex-shrink-0">
-                        <Building2 className="w-5 h-5 text-white" />
-                      </div>
-                      <div>
-                        <div className="text-sm font-semibold text-gray-900">{org.name}</div>
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${org.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                          {org.is_active ? 'Active' : 'Inactive'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Contact Info */}
-                  <div className="space-y-1 text-sm">
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-500">Contact:</span>
-                      <span className="text-gray-900 font-medium">{org.contact_person || 'N/A'}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-500">Email:</span>
-                      <span className="text-gray-900 text-xs">{org.email}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-500">Phone:</span>
-                      <span className="text-gray-900">{org.phone}</span>
-                    </div>
-                  </div>
-
-                  {/* Subscription */}
-                  <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-                    <span className="text-gray-500 text-sm">Subscription:</span>
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(org.subscription_status)}`}>
-                      {org.subscription_status}
-                    </span>
-                  </div>
-
-                  {/* Usage Stats */}
-                  <div className="flex items-center justify-between space-x-4 text-sm">
-                    <div className="flex items-center space-x-1">
-                      <Users className="w-4 h-4 text-blue-500" />
-                      <span className="text-gray-900">{org.user_count}/{org.total_users_limit}</span>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <DollarSign className="w-4 h-4 text-green-500" />
-                      <span className="text-gray-900">{org.loan_count}/{org.monthly_loan_limit}</span>
-                    </div>
-                    <div className="text-gray-500 text-xs">{org.borrower_count} borrowers</div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center justify-end space-x-2 pt-2 border-t border-gray-200">
-                    <button className="p-2 text-gray-400 hover:text-blue-500 rounded-lg hover:bg-blue-50 transition-colors">
-                      <Eye className="w-4 h-4" />
-                    </button>
-                    <button className="p-2 text-gray-400 hover:text-green-500 rounded-lg hover:bg-green-50 transition-colors">
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button 
-                      onClick={() => setDeleteConfirm({ show: true, org })}
-                      className="p-2 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
+        </div>
       </div>
+
+      {/* Organizations Table */}
+      <DataTable
+        data={filteredOrganizations}
+        columns={columns}
+        actions={actions}
+        loading={loading}
+        error={error}
+        emptyState={{
+          icon: <Building2 className="w-10 h-10 text-green-500" />,
+          title: searchTerm || filterStatus !== 'all' ? 'No organizations match your criteria' : 'No organizations yet',
+          description: searchTerm || filterStatus !== 'all' 
+            ? 'Try adjusting your search terms or filters to find what you\'re looking for.'
+            : 'Get started by adding your first organization to the platform.',
+        }}
+        getItemKey={(org) => org.id}
+      />
 
       {/* Add Organization Form Modal */}
       {showAddForm && (

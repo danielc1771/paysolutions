@@ -69,7 +69,6 @@ export async function middleware(request: NextRequest) {
   const publicRoutes = [
     '/',
     '/login',
-    '/signup',
     '/accept-invite',
     '/auth/callback',
     '/apply/',
@@ -111,8 +110,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Handle login/signup redirects for authenticated users
-  if (path === '/login' || path === '/signup') {
+  // Handle login redirect for authenticated users
+  if (path === '/login') {
     // For authenticated users, let layout handle role-based redirect
     return NextResponse.redirect(new URL('/', request.url))
   }

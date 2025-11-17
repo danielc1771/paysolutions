@@ -76,7 +76,6 @@ export const ROLE_HOMEPAGES: Record<Role, string> = {
 export const PUBLIC_ROUTES = [
   '/',
   '/login',
-  '/signup',
   '/accept-invite',
   '/auth/callback',
   '/apply/*',

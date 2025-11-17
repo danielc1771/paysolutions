@@ -160,15 +160,6 @@ export default function LoginPage() {
               )}
             </button>
           </form>
-
-          <div className="mt-8 text-center">
-            <p className="text-gray-600 text-sm">
-              Don&apos;t have an account?{' '}
-              <Link href="/signup" className="font-medium text-purple-600 hover:text-purple-500 transition-colors">
-                Sign up here
-              </Link>
-            </p>
-          </div>
         </div>
 
         {/* Additional Features */}

@@ -5,6 +5,9 @@ import Link from 'next/link';
 import React, { useEffect, useState, useMemo } from 'react';
 import CustomSelect from '@/components/CustomSelect';
 import { useUserProfile } from '@/components/auth/RoleRedirect';
+import DataTable, { Column, Action } from '@/components/ui/DataTable';
+import { Eye, Trash2, Mail, Phone, Calendar } from 'lucide-react';
+import { toProperCase, formatStatus } from '@/utils/textFormatters';
 
 interface Borrower {
   id: string;
@@ -256,6 +259,111 @@ export default function UserBorrowers() {
     { value: 'expired', label: 'Expired' },
   ];
 
+  const columns: Column<Borrower>[] = [
+    {
+      key: 'borrower',
+      label: 'Borrower',
+      render: (borrower) => (
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-teal-500 rounded-xl flex items-center justify-center flex-shrink-0">
+            <span className="text-white font-bold text-sm">
+              {borrower.first_name?.[0]}{borrower.last_name?.[0]}
+            </span>
+          </div>
+          <div>
+            <div className="text-sm font-semibold text-gray-900">
+              {toProperCase(borrower.first_name)} {toProperCase(borrower.last_name)}
+            </div>
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getKycStatusColor(borrower.kyc_status)}`}>
+              KYC: {formatStatus(borrower.kyc_status)}
+            </span>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'contact',
+      label: 'Contact',
+      render: (borrower) => (
+        <div className="space-y-1">
+          {borrower.email && (
+            <div className="flex items-center text-sm text-gray-600">
+              <Mail className="w-3 h-3 mr-1 text-blue-500" />
+              {borrower.email.toLowerCase()}
+            </div>
+          )}
+          {borrower.phone && (
+            <div className="flex items-center text-sm text-gray-600">
+              <Phone className="w-3 h-3 mr-1 text-green-500" />
+              {borrower.phone}
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'organization',
+      label: 'Organization',
+      render: (borrower) => (
+        <div className="text-sm text-gray-900">
+          {toProperCase(borrower.organization?.name || 'N/A')}
+        </div>
+      ),
+      show: () => isAdmin,
+    },
+    {
+      key: 'loans',
+      label: 'Loans',
+      render: (borrower) => (
+        <div className="text-center">
+          <p className="text-lg font-bold text-gray-900">
+            {borrower.loans?.length || 0}
+          </p>
+          <p className="text-xs text-gray-500">
+            {borrower.loans?.length === 1 ? 'Loan' : 'Loans'}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: 'created',
+      label: 'Joined',
+      render: (borrower) => (
+        <div className="flex items-center text-sm text-gray-500">
+          <Calendar className="w-4 h-4 mr-1" />
+          {formatDate(borrower.created_at)}
+        </div>
+      ),
+    },
+  ];
+
+  const actions: Action<Borrower>[] = [
+    {
+      icon: Eye,
+      label: 'View Details',
+      onClick: (borrower) => {
+        window.location.href = `/dashboard/borrowers/${borrower.id}`;
+      },
+      color: 'blue',
+    },
+    {
+      icon: Trash2,
+      label: 'Delete Borrower',
+      onClick: (borrower) => {
+        openDeleteConfirm(borrower.id, `${borrower.first_name} ${borrower.last_name}`, borrower.loans || []);
+      },
+      color: 'red',
+    },
+  ];
+
+  // Filter out organization column if not admin
+  const visibleColumns = columns.filter(col => {
+    if ('show' in col && col.show) {
+      return col.show();
+    }
+    return true;
+  });
+
   return (
     <div className={`min-h-screen ${isAdmin ? 'bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100' : 'bg-gradient-to-br from-green-50 via-blue-50 to-teal-100'}`}>
           <div className="p-8">
@@ -429,148 +537,43 @@ export default function UserBorrowers() {
                     Try Again
                   </button>
                 </div>
-              ) : filteredBorrowers.length === 0 ? (
-                <div className="p-12 text-center">
-                  <div className="w-20 h-20 bg-gradient-to-br from-green-100 to-teal-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <svg className="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-3">
-                    {searchTerm || filterKyc !== 'all' ? 'No borrowers match your criteria' : 'No borrowers yet'}
-                  </h3>
-                  <p className="text-gray-600 mb-6 max-w-md mx-auto">
-                    {searchTerm || filterKyc !== 'all' 
+              ) : (
+                <DataTable
+                  data={filteredBorrowers}
+                  columns={visibleColumns}
+                  actions={actions}
+                  loading={loading}
+                  error={error}
+                  emptyState={{
+                    icon: (
+                      <svg className="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
+                    ),
+                    title: searchTerm || filterKyc !== 'all' ? 'No borrowers match your criteria' : 'No borrowers yet',
+                    description: searchTerm || filterKyc !== 'all' 
                       ? 'Try adjusting your search terms or filters to find what you\'re looking for.'
                       : isAdmin
                         ? 'Borrowers from all organizations will appear here.'
-                        : 'Borrowers will appear here once you create loan applications for customers.'
-                    }
-                  </p>
-                  {(!searchTerm && filterKyc === 'all' && !isAdmin) && (
-                    <Link
-                      href="/dashboard/loans/create"
-                      className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-2xl font-bold hover:from-green-600 hover:to-teal-600 transition-all duration-300 shadow-lg hover:shadow-xl space-x-2"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                      </svg>
-                      <span>Create Your First Loan</span>
-                    </Link>
-                  )}
-                </div>
-              ) : (
-                <div className="p-6">
-                  <div className="space-y-4">
-                    {filteredBorrowers.map((borrower) => (
+                        : 'Borrowers will appear here once you create loan applications for customers.',
+                    action: (!searchTerm && filterKyc === 'all' && !isAdmin) ? (
                       <Link
-                        key={borrower.id}
-                        href={`/dashboard/borrowers/${borrower.id}`}
-                        className="group bg-white/60 backdrop-blur-sm rounded-2xl p-6 shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer hover:-translate-y-1 border border-white/30 block"
+                        href="/dashboard/loans/create"
+                        className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-2xl font-bold hover:from-green-600 hover:to-teal-600 transition-all duration-300 shadow-lg hover:shadow-xl space-x-2"
                       >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-6">
-                            <div className="flex-shrink-0">
-                              <div className="w-14 h-14 bg-gradient-to-br from-green-400 to-teal-500 rounded-2xl flex items-center justify-center shadow-lg">
-                                <span className="text-white font-bold text-lg">
-                                  {borrower.first_name?.[0]}{borrower.last_name?.[0]}
-                                </span>
-                              </div>
-                            </div>
-                            
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center space-x-3 mb-2">
-                                <h3 className="text-lg font-bold text-gray-900 truncate">
-                                  {borrower.first_name} {borrower.last_name}
-                                </h3>
-                                <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${getKycStatusColor(borrower.kyc_status)}`}>
-                                  KYC: {borrower.kyc_status}
-                                </span>
-                              </div>
-                              <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
-                                {isAdmin && borrower.organization?.name && (
-                                  <span className="flex items-center">
-                                    <svg className="w-4 h-4 mr-1 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                                    </svg>
-                                    {borrower.organization.name}
-                                  </span>
-                                )}
-                                {borrower.email && (
-                                  <span className="flex items-center">
-                                    <svg className="w-4 h-4 mr-1 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                    </svg>
-                                    {borrower.email}
-                                  </span>
-                                )}
-                                {borrower.phone && (
-                                  <span className="flex items-center">
-                                    <svg className="w-4 h-4 mr-1 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                                    </svg>
-                                    {borrower.phone}
-                                  </span>
-                                )}
-                                <span className="flex items-center">
-                                  <svg className="w-4 h-4 mr-1 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                  </svg>
-                                  Joined {formatDate(borrower.created_at)}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          <div className="flex items-center space-x-8">
-                            <div className="text-right">
-                              <p className="text-xl font-bold text-gray-900">
-                                {borrower.loans?.length || 0}
-                              </p>
-                              <p className="text-sm text-gray-500 font-medium">
-                                {borrower.loans?.length === 1 ? 'Loan' : 'Loans'}
-                              </p>
-                            </div>
-                            
-                            <div className="flex items-center space-x-2">
-                              <button 
-                                className="p-3 bg-blue-100 text-blue-600 rounded-2xl transition-all duration-300 group-hover:scale-110 hover:bg-blue-200"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  window.location.href = `/dashboard/borrowers/${borrower.id}`;
-                                }}
-                                title="View Details"
-                              >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                </svg>
-                              </button>
-                              
-                              <button 
-                                className="p-3 bg-red-100 text-red-600 rounded-2xl transition-all duration-300 group-hover:scale-110 hover:bg-red-200"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  openDeleteConfirm(borrower.id, `${borrower.first_name} ${borrower.last_name}`, borrower.loans || []);
-                                }}
-                                title="Delete Borrower"
-                              >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                              </button>
-                            </div>
-                          </div>
-                        </div>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                        <span>Create Your First Loan</span>
                       </Link>
-                    ))}
-                  </div>
-                </div>
+                    ) : undefined,
+                  }}
+                  getItemKey={(borrower) => borrower.id}
+                />
               )}
             </div>
           </div>
+
 
         {/* Success Modal */}
         {showSuccessModal && (
