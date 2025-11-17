@@ -59,8 +59,8 @@ export function LoanApplicationTemplate({
             }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img 
-                src="https://iPayUs.net/logoMain.png"
-                alt="iPayUS Logo" 
+                src="https://framerusercontent.com/images/lclNoKfRTrilOCywAs49FSfrG6E.png?scale-down-to=512&width=2790&height=1854"
+                alt="iOpes Logo" 
                 width="60"
                 height="60"
                 style={{
@@ -75,7 +75,7 @@ export function LoanApplicationTemplate({
               fontWeight: '700',
               letterSpacing: '-0.025em'
             }}>
-              iPayUS
+              iOpes
             </h1>
             <p style={{
               color: 'rgba(255, 255, 255, 0.9)',
@@ -103,7 +103,7 @@ export function LoanApplicationTemplate({
               fontSize: '16px',
               lineHeight: '1.6'
             }}>
-              Thank you for your interest in a loan with iPayUS. We&apos;re excited to help you with your financing needs. 
+              Thank you for your interest in a loan with iOpes. We&apos;re excited to help you with your financing needs. 
               Your personalized application is ready and waiting for you to complete.
             </p>
 
@@ -305,7 +305,7 @@ export function LoanApplicationTemplate({
                 margin: 0,
                 fontSize: '12px'
               }}>
-                © 2024 iPayUS. All rights reserved.
+                © 2025 iOpes. All rights reserved.
               </p>
             </div>
           </div>
