@@ -22,6 +22,24 @@ export default function CreateLoan() {
   const [validationErrors, setValidationErrors] = useState<{[key: string]: boolean}>({});
   const [vinDecoding, setVinDecoding] = useState(false);
   const [vinDecodeResult, setVinDecodeResult] = useState<VINDecodeResult | null>(null);
+  const [duplicateCheck, setDuplicateCheck] = useState<{
+    checking: boolean;
+    hasDuplicate: boolean;
+    duplicates: Array<{
+      id: string;
+      loanNumber: string;
+      status: string;
+      vehicleVin: string;
+      vehicleMake: string;
+      vehicleModel: string;
+      vehicleYear: string;
+      borrower?: {
+        firstName: string;
+        lastName: string;
+        email?: string;
+      };
+    }>;
+  }>({ checking: false, hasDuplicate: false, duplicates: [] });
   const supabase = createClient();
 
   // Send Application Form State
@@ -63,7 +81,12 @@ export default function CreateLoan() {
           }
 
           if (profile?.organizations) {
-            setOrganizationInfo(profile.organizations);
+            const orgInfo = {
+              id: profile.organization_id,
+              ...profile.organizations
+            };
+            console.log('✅ Organization info loaded:', orgInfo);
+            setOrganizationInfo(orgInfo);
           }
         }
       } catch (err) {
@@ -75,7 +98,7 @@ export default function CreateLoan() {
     fetchOrganizationInfo();
   }, [supabase]);
 
-  // VIN Decode Handler
+  // VIN Decode Handler with Duplicate Check
   const handleDecodeVIN = async () => {
     const vin = sendFormData.vehicleVin.trim();
     
@@ -94,8 +117,10 @@ export default function CreateLoan() {
 
     setVinDecoding(true);
     setVinDecodeResult(null);
+    setDuplicateCheck({ checking: true, hasDuplicate: false, duplicates: [] });
 
     try {
+      // Step 1: Decode VIN
       const result = await decodeVIN(vin);
       setVinDecodeResult(result);
 
@@ -107,6 +132,40 @@ export default function CreateLoan() {
           vehicleMake: result.make || prev.vehicleMake,
           vehicleModel: result.model || prev.vehicleModel,
         }));
+
+        // Step 2: Check for duplicate loans
+        if (organizationInfo?.id) {
+          const duplicateResponse = await fetch('/api/loans/check-duplicate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              vin: vin,
+              email: sendFormData.customerEmail || undefined,
+              organizationId: organizationInfo.id,
+            }),
+          });
+
+          if (duplicateResponse.ok) {
+            const duplicateData = await duplicateResponse.json();
+            console.log('Duplicate check result:', duplicateData);
+            setDuplicateCheck({
+              checking: false,
+              hasDuplicate: duplicateData.hasDuplicate,
+              duplicates: duplicateData.duplicates || [],
+            });
+            
+            if (duplicateData.hasDuplicate) {
+              console.log('⚠️ DUPLICATE DETECTED:', duplicateData.duplicates);
+            }
+          } else {
+            console.error('Duplicate check failed:', duplicateResponse.status);
+            setDuplicateCheck({ checking: false, hasDuplicate: false, duplicates: [] });
+          }
+        } else {
+          console.log('No organization ID available for duplicate check');
+        }
+      } else {
+        console.log('VIN decode failed, skipping duplicate check');
       }
     } catch (error) {
       console.error('Error decoding VIN:', error);
@@ -115,6 +174,7 @@ export default function CreateLoan() {
         valid: false,
         errorText: 'Failed to decode VIN. Please try again.',
       });
+      setDuplicateCheck({ checking: false, hasDuplicate: false, duplicates: [] });
     } finally {
       setVinDecoding(false);
     }
@@ -209,6 +269,14 @@ export default function CreateLoan() {
     setLoading(true);
     setError(null);
     setValidationErrors({});
+
+    // Check for duplicate loans first
+    if (duplicateCheck.hasDuplicate) {
+      setError('Cannot create loan: A duplicate loan already exists for this VIN or client. Please resolve the existing loan first.');
+      setLoading(false);
+      setTimeout(scrollToError, 100);
+      return;
+    }
 
     // Validate form before submission
     if (!validateForm()) {
@@ -444,6 +512,7 @@ export default function CreateLoan() {
                                 if (value === '' || /^[A-HJ-NPR-Z0-9]{0,17}$/.test(value)) {
                                   setSendFormData(prev => ({ ...prev, vehicleVin: value }));
                                   setVinDecodeResult(null);
+                                  setDuplicateCheck({ checking: false, hasDuplicate: false, duplicates: [] });
                                 }
                               }}
                               className={`w-full px-4 py-3 rounded-2xl border ${
@@ -528,6 +597,54 @@ export default function CreateLoan() {
                                 <p className="text-xs text-red-600 mt-2 font-medium">
                                   Please verify the VIN and try again. A valid VIN is required to proceed.
                                 </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Duplicate Loan Alert - Simplified */}
+                        {duplicateCheck.hasDuplicate && duplicateCheck.duplicates.length > 0 && (
+                          <div className="mt-2 p-3 bg-red-50 border-2 border-red-500 rounded-xl">
+                            <div className="flex items-start space-x-2">
+                              <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+                              <div className="flex-1">
+                                <p className="text-sm font-bold text-red-900">Duplicate Loan Detected</p>
+                                <p className="text-xs text-red-700 mt-1">
+                                  This VIN already has an existing loan. Cannot create duplicate.
+                                </p>
+                                <div className="mt-2 space-y-1.5">
+                                  {duplicateCheck.duplicates.map((duplicate, index: number) => (
+                                    <div key={index} className="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-red-200">
+                                      <div className="flex items-center space-x-3">
+                                        <span className="text-xs font-semibold text-gray-900">
+                                          #{duplicate.loanNumber}
+                                        </span>
+                                        {duplicate.borrower && (
+                                          <span className="text-xs text-gray-600">
+                                            {duplicate.borrower.firstName} {duplicate.borrower.lastName}
+                                          </span>
+                                        )}
+                                        <span className={`px-2 py-0.5 text-xs font-medium rounded ${
+                                          duplicate.status === 'funded' ? 'bg-green-100 text-green-700' :
+                                          duplicate.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                                          duplicate.status === 'derogatory' ? 'bg-red-100 text-red-700' :
+                                          duplicate.status === 'closed' ? 'bg-gray-100 text-gray-700' :
+                                          'bg-blue-100 text-blue-700'
+                                        }`}>
+                                          {duplicate.status}
+                                        </span>
+                                      </div>
+                                      <a
+                                        href={`/dashboard/loans/${duplicate.id}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline"
+                                      >
+                                        View →
+                                      </a>
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -690,8 +807,8 @@ export default function CreateLoan() {
                     </button>
                     <button
                       type="submit"
-                      disabled={loading}
-                      className="px-8 py-3 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-2xl font-semibold hover:from-green-600 hover:to-teal-600 transition-all duration-300 disabled:opacity-50 flex items-center space-x-2"
+                      disabled={loading || duplicateCheck.hasDuplicate}
+                      className="px-8 py-3 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-2xl font-semibold hover:from-green-600 hover:to-teal-600 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                     >
                       {loading ? (
                         <>

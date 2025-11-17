@@ -1,7 +1,218 @@
-# Derogatory Accounts & Loan Closure - Project Specification
+# iOpes Dealer Dashboard - Project Specification
 
 ## Overview
-Implementation of derogatory account management and loan closure functionality for dealer organizations to handle non-performing loans, repossessions, accidents, and early closures.
+Comprehensive dealer dashboard implementation including derogatory account management, loan closure functionality, VIN verification, reporting, client profiles, and verification services for dealer organizations.
+
+---
+
+## Phase 2: Dealer Dashboard & Reports Enhancement
+
+### Overview
+Phase 2 extends the existing iOpes Dealer Dashboard with enhanced reporting, risk tracking, verification capabilities, and improved dealer workflows. The app already includes multi-tenant role architecture, DocuSign signing flows, Stripe payments and KYC, Twilio verification, Supabase RLS, and role-based dashboards.
+
+---
+
+## Phase 2 Feature Checklist
+
+### Feature 2.1: VIN Verification (Create Loan Tab)
+- [x] **2.1.1** Integrate NHTSA VIN Decoder API
+  - [x] Create VIN decoder utility (`/utils/vin-decoder.ts`)
+  - [x] Implement VIN format validation (17 chars, no I/O/Q)
+  - [x] Auto-fill Year, Make, Model, Trim from NHTSA API
+- [x] **2.1.2** Add VIN verification UI to Create Loan form
+  - [x] VIN input field with character validation
+  - [x] "Verify VIN" button (manual trigger)
+  - [x] Display verification status (loading, success, error)
+  - [x] Show verified vehicle details (read-only fields)
+  - [x] Character counter and format validation feedback
+- [x] **2.1.3** Duplicate VIN/Client Detection
+  - [x] Check for duplicate loans by VIN immediately on verification (before form submission)
+  - [x] Check for duplicate loans by client (email, phone, full name + DOB)
+  - [x] Query all loan statuses (open, pending, funded, closed, derogatory, settled)
+  - [x] Display red banner alert with existing loan # if duplicate found
+  - [x] Prevent loan creation if duplicate exists (no admin override)
+  - [x] Add database query to check for existing loans
+  - [x] Create API endpoint `/api/loans/check-duplicate`
+  - [x] Simplified UI banner showing loan #, customer name, status, and view link
+
+### Feature 2.2: Reports Tab (Dealer Analytics)
+- [ ] **2.2.1** Create Reports Tab Navigation
+  - [ ] Add "Reports" to dashboard sidebar
+  - [ ] Create `/dashboard/reports` route
+  - [ ] Implement role-based access control
+- [ ] **2.2.2** Funding & Collection Report
+  - [ ] Design report layout and metrics
+  - [ ] Calculate total funded amount
+  - [ ] Calculate total collected amount
+  - [ ] Calculate outstanding balance
+  - [ ] Show collection rate percentage
+  - [ ] Display by date range: Last 7 days, Last 30 days, Last 90 days, Custom
+  - [ ] Define and implement risk color thresholds (to be determined and provided)
+- [ ] **2.2.3** Account Status Report
+  - [ ] Show breakdown by loan status (Active, Late, Derogatory, Closed)
+  - [ ] Display count and percentage for each status
+  - [ ] Calculate dealer longevity from account creation date
+  - [ ] Show derogatory rate percentage
+  - [ ] Include risk indicators with color coding
+- [ ] **2.2.4** Report Generation & Download
+  - [ ] Implement in-app report viewing
+  - [ ] Add PDF export functionality
+  - [ ] Auto date-stamp PDFs
+  - [ ] Include Dealer ID in PDF filename
+  - [ ] Create PDF template with branding
+- [ ] **2.2.5** Batch Report Generation (Cron)
+  - [ ] Create cron job for weekly report generation
+  - [ ] Schedule for Friday morning execution (use UTC for simplicity)
+  - [ ] Generate reports for all active dealers
+  - [ ] Store generated reports in database/storage
+  - [ ] Send email notification with report link
+- [ ] **2.2.6** Consolidated Admin Reports
+  - [ ] Create admin-level consolidated reports
+  - [ ] Aggregate data across all dealers
+  - [ ] Add dealer comparison metrics
+
+### Feature 2.3: Dashboard Navigation Enhancement
+- [ ] **2.3.1** Update Dashboard Sidebar
+  - [ ] Add new navigation items to existing sidebar:
+    - [ ] Reports
+    - [ ] Collections
+  - [ ] Maintain existing navigation items (Create Loan, Clients, Settings already exist)
+  - [ ] Role-based visibility already implemented
+  - [ ] Add icons for new navigation items
+  - [ ] Ensure mobile responsiveness
+  - [ ] Note: Derogatory Accounts accessible via Loans page filter (no separate nav needed)
+
+### Feature 2.4: Client Profile Enhancements
+- [ ] **2.4.1** DocuSign Contract Integration
+  - [ ] Display DocuSign contract link in client profile
+  - [ ] Add PDF preview/viewer for contract
+  - [ ] Show contract status (signed, pending, terminated)
+- [ ] **2.4.2** Reference Information Display
+  - [ ] Show client references in profile
+  - [ ] Display reference contact information
+  - [ ] Add reference verification status
+- **Note:** Credit card display, ID verification, and loan discharge functionality already handled by existing Stripe integration and Close Loan feature
+
+### Feature 2.5: Derogatory Accounts Tab Enhancement
+- [x] **2.5.1** Automatic Derogatory Population (2 weeks past due)
+  - [x] Create cron job to detect late payments
+  - [x] Add `is_late` and `days_overdue` fields to loans
+  - [x] Flag accounts 2 weeks past scheduled payment date
+  - [x] Display in Derogatory Accounts tab
+- [x] **2.5.2** Manual Derogatory Marking
+  - [x] Add "Mark as Derogatory" button
+  - [x] Create derogatory reason selection dialog
+  - [x] Implement standardized reason field
+- [x] **2.5.3** Derogatory Notes Section
+  - [x] Add notes field to derogatory dialog
+  - [x] Store notes with derogatory record
+- [ ] **2.5.4** Derogatory Notifications
+  - [ ] Send email notification to dealer who created the loan when marked derogatory
+  - [ ] Send email notification to borrower when marked derogatory
+  - [ ] Send immediately when loan is marked as derogatory
+  - [ ] Use Resend for email notifications
+  - [ ] Include loan details and reason in notification
+
+### Feature 2.6: Double Loan Alert System
+- [ ] **2.6.1** Duplicate Detection Logic
+  - [ ] Check for existing open/pending loans by VIN
+  - [ ] Check for existing open/pending loans by client
+  - [ ] Query database on loan creation attempt
+- [ ] **2.6.2** Alert Display
+  - [ ] Show banner call-out with existing loan #
+  - [ ] Display alert prominently on create loan page
+  - [ ] Include link to existing loan details
+  - [ ] Prevent form submission if duplicate exists
+- [ ] **2.6.3** No Override Mechanism
+  - [ ] Ensure no admin override capability
+  - [ ] Block loan creation at API level
+  - [ ] Return clear error message
+
+### Feature 2.7: Client Notes System
+- **Status:** Deferred to future phase
+
+### Feature 2.8: iOpes Verified Product (Separate Dashboard)
+- [ ] **2.8.1** Verified Dashboard Route Setup
+  - [ ] Create `/verified/*` route structure
+  - [ ] Build separate dashboard layout
+  - [ ] Implement role-based access
+- [ ] **2.8.2** Verification Form (Simplified)
+  - [ ] Create verification form with fields: Name, Email, Phone, Address only
+  - [ ] Implement form validation
+  - [ ] Do NOT store private information (SSN, DOB, etc.)
+  - [ ] Store only: name, email, phone, address
+- [ ] **2.8.3** Stripe Identity Verification Integration
+  - [ ] Use Stripe Identity Verification service (paid API)
+  - [ ] Integrate Stripe verification modal
+  - [ ] Handle verification session creation
+  - [ ] Process verification results from Stripe
+  - [ ] Handle API errors and edge cases
+  - [ ] No local storage of verification documents
+- [ ] **2.8.4** Client Verified Certification PDF
+  - [ ] Design PDF certificate template
+  - [ ] Include iOpes branding
+  - [ ] Add dealer logo
+  - [ ] Include timestamp and verification ID
+  - [ ] Generate PDF after successful verification
+  - [ ] Store PDF in secure storage (Supabase Storage)
+- [ ] **2.8.5** Stripe Billing for Verifications
+  - [ ] Require credit card connection for dealers
+  - [ ] Implement Stripe Checkout for instant charge
+  - [ ] Set pricing at $5.00 per verification
+  - [ ] Charge immediately upon verification request
+  - [ ] Handle payment success/failure
+  - [ ] Send receipt to dealer
+- [ ] **2.8.6** Verified Clients Section in Main Dashboard
+  - [ ] Create "Verified Clients" section (separate from loan clients)
+  - [ ] Display verified clients list
+  - [ ] Show verification status and date
+  - [ ] Link to verification certificate
+  - [ ] No cross-reference with loan clients (completely separate)
+
+### Feature 2.9: Derogatory Reason Button (Manual Flagging)
+- [x] **2.9.1** Derogatory Reason Selection
+  - [x] Implement predefined reasons:
+    - Accident
+    - Repo
+    - Trade-In
+    - Return
+    - Exchange
+    - Disaster
+    - Other (with notes)
+  - [x] Create confirmation modal
+  - [x] Require reason selection before finalizing
+
+---
+
+## Phase 2 Implementation Summary
+
+### ✅ Completed Features:
+1. **VIN Verification (2.1.1 & 2.1.2)** - NHTSA API integration with UI
+2. **Duplicate VIN/Client Detection (2.1.3)** - Real-time duplicate checking with clean UI
+3. **Late Payment Detection (2.5.1)** - Cron job and database fields
+4. **Manual Derogatory Marking (2.5.2 & 2.5.3)** - Dialog with reasons and notes
+5. **Derogatory Reason Button (2.9.1)** - Confirmation modal
+
+### 🚧 Priority Implementation Order:
+1. **Derogatory Notifications (2.5.4)** - Email to dealer and borrower
+4. **Reports Tab (2.2)** - Dealer analytics and metrics
+5. **Dashboard Navigation (2.3)** - Add Reports and Collections
+6. **Client Profile Enhancements (2.4)** - DocuSign and references
+7. **iOpes Verified Product (2.8)** - Separate verification service
+
+### 📋 Deferred Features:
+- **Client Notes System (2.7)** - Future phase
+- **VIN Verification Audit Trail (2.1.4)** - Not needed (VIN verification complete)
+
+### 🔑 Key Technical Notes:
+- **Duplicate Detection:** Check all loan statuses (open, pending, funded, closed, derogatory, settled)
+- **Duplicate Criteria:** VIN + Client (email, phone, name+DOB)
+- **Reports Date Ranges:** Last 7/30/90 days + Custom
+- **Batch Reports:** Friday morning UTC
+- **Verification Pricing:** $5.00 per verification
+- **Stripe Integration:** Use Stripe Identity Verification (no local storage)
+- **Notifications:** Immediate email via Resend to dealer + borrower
+- **Navigation:** Add to existing sidebar (Reports, Collections only)
 
 ---
 
