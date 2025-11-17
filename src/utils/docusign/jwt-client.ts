@@ -44,17 +44,21 @@ export async function checkToken(): Promise<string> {
     const dsApiClient = new docusign.ApiClient();
     dsApiClient.setBasePath(BASE_PATH);
 
-    // Read the private key from the file
-    const privateKeyPath = path.join(process.cwd(), 'private.key');
+    // Read the private key from environment variable (preferred) or file (local dev fallback)
+    let privateKey = process.env.DOCUSIGN_PRIVATE_KEY;
     
-    if (!fs.existsSync(privateKeyPath)) {
-      throw new Error('private.key file not found. Please add your RSA private key to the root directory.');
+    // Fallback to file for local development only
+    if (!privateKey) {
+      const privateKeyPath = path.join(process.cwd(), 'private.key');
+      
+      if (fs.existsSync(privateKeyPath)) {
+        privateKey = fs.readFileSync(privateKeyPath, 'utf8');
+        console.log('⚠️  Using private.key file (local dev only). Use DOCUSIGN_PRIVATE_KEY env var in production.');
+      }
     }
-
-    const privateKey = fs.readFileSync(privateKeyPath, 'utf8');
     
     if (!privateKey || privateKey.trim().length === 0) {
-      throw new Error('private.key file is empty. Please add your RSA private key from DocuSign.');
+      throw new Error('DocuSign private key not found. Set DOCUSIGN_PRIVATE_KEY environment variable or add private.key file for local development.');
     }
 
     // Request JWT User Token with 1 hour expiration

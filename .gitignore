@@ -35,6 +35,11 @@ yarn-error.log*
 .env.local
 .env*.local
 
+# DocuSign private keys and sensitive files
+private.key
+*.key
+*.pem
+
 # vercel
 .vercel
 
