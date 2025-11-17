@@ -5,7 +5,11 @@ import Link from 'next/link';
 import { useEffect, useState, useMemo } from 'react';
 import { LoanListItem, AdminLoanListItem } from '@/types/loan';
 import { useUserProfile } from '@/components/auth/RoleRedirect';
-import { LoanCard } from '@/components/LoanCard';
+import DataTable, { Column } from '@/components/ui/DataTable';
+import { FileText, Calendar, Car, Eye } from 'lucide-react';
+import { SigningProgressDots, getSigningProgressText } from '@/components/SigningProgressIndicator';
+import { formatLoanStatus } from '@/utils/formatters';
+import { toProperCase } from '@/utils/textFormatters';
 
 interface DashboardStats {
   totalLoans: number;
@@ -31,6 +35,135 @@ export default function UserDashboard() {
   const isAdmin = profile?.role === 'admin';
 
   const supabase = useMemo(() => createClient(), []);
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'new': return 'bg-blue-100 text-blue-800';
+      case 'application_sent': return 'bg-yellow-100 text-yellow-800';
+      case 'application_completed': return 'bg-orange-100 text-orange-800';
+      case 'ipay_approved': return 'bg-purple-100 text-purple-800';
+      case 'dealer_approved': return 'bg-indigo-100 text-indigo-800';
+      case 'fully_signed': return 'bg-emerald-100 text-emerald-800';
+      case 'review': return 'bg-orange-100 text-orange-800';
+      case 'funded': return 'bg-green-100 text-green-800';
+      case 'active': return 'bg-green-100 text-green-800';
+      case 'closed': return 'bg-gray-100 text-gray-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
+  const columns: Column<LoanListItem | AdminLoanListItem>[] = [
+    {
+      key: 'borrower',
+      label: 'Borrower',
+      render: (loan) => (
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-teal-500 rounded-xl flex items-center justify-center flex-shrink-0">
+            <span className="text-white font-bold text-sm">
+              {loan.borrower?.first_name?.[0]}{loan.borrower?.last_name?.[0]}
+            </span>
+          </div>
+          <div>
+            <div className="text-sm font-semibold text-gray-900">
+              {toProperCase(loan.borrower?.first_name || '')} {toProperCase(loan.borrower?.last_name || '')}
+            </div>
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(loan.status)}`}>
+              {formatLoanStatus(loan.status)}
+            </span>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'loan_details',
+      label: 'Loan Details',
+      render: (loan) => (
+        <div className="space-y-1">
+          <div className="flex items-center text-sm text-gray-900">
+            <FileText className="w-3 h-3 mr-1 text-green-500" />
+            {loan.loan_number}
+          </div>
+          {loan.vehicle_make && (
+            <div className="flex items-center text-sm text-gray-600">
+              <Car className="w-3 h-3 mr-1 text-gray-500" />
+              {loan.vehicle_year} {toProperCase(loan.vehicle_make)} {toProperCase(loan.vehicle_model)}
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'organization',
+      label: 'Organization',
+      render: (loan) => (
+        <div className="text-sm text-gray-900">
+          {toProperCase(('organization' in loan && loan.organization?.name) || 'N/A')}
+        </div>
+      ),
+      show: () => isAdmin,
+    },
+    {
+      key: 'amount',
+      label: 'Amount',
+      render: (loan) => (
+        <div className="text-right">
+          <p className="text-lg font-bold text-gray-900">
+            ${parseFloat(loan.principal_amount).toLocaleString()}
+          </p>
+          <p className="text-xs text-gray-500">Principal</p>
+        </div>
+      ),
+    },
+    {
+      key: 'progress',
+      label: 'Progress',
+      render: (loan) => {
+        const showProgress = loan.status === 'application_completed' ||
+                           loan.status === 'ipay_approved' ||
+                           loan.status === 'dealer_approved' ||
+                           loan.status === 'fully_signed';
+        if (!showProgress) return <span className="text-sm text-gray-500">-</span>;
+        
+        return (
+          <div className="flex items-center space-x-2">
+            <SigningProgressDots
+              ipayComplete={loan.status === 'ipay_approved' || loan.status === 'dealer_approved' || loan.status === 'fully_signed'}
+              organizationComplete={loan.status === 'dealer_approved' || loan.status === 'fully_signed'}
+              borrowerComplete={loan.status === 'fully_signed'}
+            />
+            <span className="text-xs text-gray-600">
+              {getSigningProgressText(loan.status)}
+            </span>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'created',
+      label: 'Created',
+      render: (loan) => (
+        <div className="flex items-center text-sm text-gray-500">
+          <Calendar className="w-4 h-4 mr-1" />
+          {formatDate(loan.created_at)}
+        </div>
+      ),
+    },
+  ];
+
+  const visibleColumns = columns.filter(col => {
+    if ('show' in col && col.show) {
+      return col.show();
+    }
+    return true;
+  });
 
   useEffect(() => {
     const fetchData = async () => {
@@ -420,18 +553,30 @@ export default function UserDashboard() {
                   )}
                 </div>
               ) : (
-                <div className="p-6">
-                  <div className="space-y-4">
-                    {loans.slice(0, 5).map((loan) => (
-                      <LoanCard 
-                        key={loan.id} 
-                        loan={loan} 
-                        isAdmin={isAdmin}
-                        showActions={false}
-                      />
-                    ))}
-                  </div>
-                </div>
+                <DataTable
+                  data={loans.slice(0, 5)}
+                  columns={visibleColumns}
+                  actions={[
+                    {
+                      icon: Eye,
+                      label: 'View Details',
+                      onClick: (loan) => {
+                        window.location.href = `/dashboard/loans/${loan.id}`;
+                      },
+                      color: 'blue',
+                    },
+                  ]}
+                  loading={false}
+                  error={null}
+                  emptyState={{
+                    icon: <FileText className="w-10 h-10 text-green-500" />,
+                    title: 'No loans yet',
+                    description: isAdmin
+                      ? 'No loans have been created yet across the platform.'
+                      : 'Get started by creating your first loan application for a customer.',
+                  }}
+                  getItemKey={(loan) => loan.id}
+                />
               )}
             </div>
           </div>
