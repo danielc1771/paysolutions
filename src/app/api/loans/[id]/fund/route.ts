@@ -149,6 +149,7 @@ export async function POST(
     console.log(`📄 Creating ${loan.term_weeks} invoices with automatic scheduling...`);
 
     const weeklyPaymentAmount = Math.round(parseFloat(loan.weekly_payment) * 100); // Convert to cents
+    const convenienceFee = 500; // $5.00 in cents
     const startDate = Math.floor(Date.now() / 1000); // Today
     const invoiceIds: string[] = [];
 
@@ -160,6 +161,14 @@ export async function POST(
 
       // Calculate absolute due date 
       const dueDateTimestamp = startDate + ((week * 7) * 24 * 60 * 60);
+
+      // Calculate Stripe processing fee surcharge
+      // Stripe charges: 2.9% + $0.30 per transaction
+      // We pass this cost to the customer
+      const subtotal = weeklyPaymentAmount + convenienceFee; // Base amount before processing fee
+      const stripePercentageFee = Math.round(subtotal * 0.029); // 2.9% of subtotal
+      const stripeFixedFee = 30; // $0.30 in cents
+      const stripeSurcharge = stripePercentageFee + stripeFixedFee;
 
       // Create invoice as DRAFT with auto-finalize (or finalize immediately for first invoice)
       const invoice = await stripe.invoices.create({
@@ -174,11 +183,14 @@ export async function POST(
           borrower_id: borrower.id,
           payment_number: week.toString(),
           total_payments: loan.term_weeks.toString(),
+          weekly_payment_amount: weeklyPaymentAmount.toString(),
+          convenience_fee: convenienceFee.toString(),
+          stripe_surcharge: stripeSurcharge.toString(),
         },
         description: `Loan ${loan.loan_number} - Payment ${week} of ${loan.term_weeks}`,
       });
 
-      // Add both line items in a single call using addLines
+      // Add all line items: weekly payment, convenience fee, and Stripe processing fee
       await stripe.invoices.addLines(invoice.id, {
         lines: [
           {
@@ -187,15 +199,25 @@ export async function POST(
             metadata: {
               loan_id: loanId,
               payment_number: week.toString(),
+              type: 'weekly_payment',
             },
           },
           {
-            description: 'Convenience Fee',
-            amount: 500, // $5.00 in cents
+            description: 'Processing Fee',
+            amount: convenienceFee,
             metadata: {
               loan_id: loanId,
               payment_number: week.toString(),
               type: 'convenience_fee',
+            },
+          },
+          {
+            description: 'Credit Card Processing Fee (2.9% + $0.30)',
+            amount: stripeSurcharge,
+            metadata: {
+              loan_id: loanId,
+              payment_number: week.toString(),
+              type: 'stripe_surcharge',
             },
           },
         ],
