@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { Users, UserPlus, Mail, CheckCircle, Clock, Trash2 } from 'lucide-react';
 import { useUserProfile } from '@/components/auth/RoleRedirect';
-import CustomSelect from '@/components/CustomSelect';
 
 interface TeamMember {
   id: string;
@@ -18,16 +17,9 @@ interface TeamMember {
   };
 }
 
-interface Organization {
-  id: string;
-  name: string;
-}
-
 export default function TeamPage() {
   const [loading, setLoading] = useState(false);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [selectedOrganization, setSelectedOrganization] = useState<string>('all');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [showInviteForm, setShowInviteForm] = useState(false);
@@ -52,19 +44,7 @@ export default function TeamPage() {
       }
 
       if (isAdmin) {
-        // Admin: Fetch all users and organizations
-        const { data: orgsData, error: orgsError } = await supabase
-          .from('organizations')
-          .select('id, name')
-          .order('name', { ascending: true });
-
-        if (orgsError) {
-          console.error('Error fetching organizations:', orgsError);
-        } else {
-          setOrganizations(orgsData || []);
-        }
-
-        // Get all users (exclude borrowers)
+        // Admin: Fetch only admin users (system administrators)
         const { data: members, error: membersError } = await supabase
           .from('profiles')
           .select(`
@@ -72,18 +52,14 @@ export default function TeamPage() {
             full_name,
             email,
             role,
-            status,
-            organization:organizations(
-              id,
-              name
-            )
+            status
           `)
-          .neq('role', 'borrower')
+          .eq('role', 'admin')
           .order('full_name', { ascending: true });
 
         if (membersError) {
           console.error('Supabase error:', membersError);
-          setError(`Failed to fetch users: ${membersError.message}`);
+          setError(`Failed to fetch admin users: ${membersError.message}`);
           return;
         }
 
@@ -91,9 +67,8 @@ export default function TeamPage() {
           id: member.id,
           fullName: member.full_name || '',
           email: member.email || '',
-          role: member.role || 'team_member',
-          status: member.status || 'INVITED',
-          organization: Array.isArray(member.organization) ? member.organization[0] : member.organization
+          role: member.role || 'admin',
+          status: member.status || 'INVITED'
         })) || []);
       } else {
         // Organization users: Fetch org team members
@@ -217,41 +192,20 @@ export default function TeamPage() {
     }
   }, [fetchTeamMembers, profile]);
 
-  // Filter team members by organization
-  const filteredTeamMembers = teamMembers.filter(member => {
-    if (selectedOrganization === 'all') return true;
-    return member.organization?.id === selectedOrganization;
-  });
+  // No filtering needed - admins see only admins, non-admins see their org members
+  const filteredTeamMembers = teamMembers;
 
   return (
-    <div className={`min-h-screen ${isAdmin ? 'bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100' : 'bg-gradient-to-br from-green-50 via-blue-50 to-teal-100'}`}>
-          <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
             {/* Header */}
             <div className="mb-8">
               <h1 className="text-4xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent mb-3">
-                {isAdmin ? 'Platform Users' : 'Team Management'}
+                {isAdmin ? 'System Administrators' : 'Team Management'}
               </h1>
               <p className="text-gray-600 text-lg">
-                {isAdmin ? 'Manage all users across the platform' : 'Manage your organization\'s team members and staff'}
+                {isAdmin ? 'Manage system administrator accounts' : 'Manage your organization\'s team members and staff'}
               </p>
             </div>
-
-            {/* Admin Organization Filter */}
-            {isAdmin && organizations.length > 0 && (
-              <div className="mb-6 bg-white/70 backdrop-blur-sm rounded-3xl p-4 shadow-lg border border-white/20">
-                <div className="w-64">
-                  <CustomSelect
-                    options={[
-                      { value: 'all', label: 'All Organizations' },
-                      ...organizations.map(org => ({ value: org.id, label: org.name }))
-                    ]}
-                    value={selectedOrganization}
-                    onChange={setSelectedOrganization}
-                    placeholder="Filter by organization"
-                  />
-                </div>
-              </div>
-            )}
 
             {/* Status Messages */}
             {error && (
@@ -279,8 +233,7 @@ export default function TeamPage() {
               <div className="flex items-center">
                 <Users className="w-5 h-5 text-gray-600 mr-2" />
                 <span className="text-gray-700 font-medium">
-                  {filteredTeamMembers.length} {isAdmin ? 'User' : 'Team Member'}{filteredTeamMembers.length !== 1 ? 's' : ''}
-                  {isAdmin && selectedOrganization !== 'all' && ` (filtered)`}
+                  {filteredTeamMembers.length} {isAdmin ? 'Administrator' : 'Team Member'}{filteredTeamMembers.length !== 1 ? 's' : ''}
                 </span>
               </div>
               {!isAdmin && (
@@ -457,7 +410,6 @@ export default function TeamPage() {
                 </div>
               )}
             </div>
-          </div>
-        </div>
+    </div>
   );
 }

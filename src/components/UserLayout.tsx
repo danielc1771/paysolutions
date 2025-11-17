@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { createClient } from '@/utils/supabase/client';
-import { LayoutDashboard, FileText, Plus, Users, Bell, UserPlus } from 'lucide-react';
+import { LayoutDashboard, FileText, Plus, Users, Bell, UserPlus, Building2, Menu, X } from 'lucide-react';
 import { useUserProfile } from '@/components/auth/RoleRedirect';
 
 interface UserLayoutProps {
@@ -46,6 +46,7 @@ export default function UserLayout({ children }: UserLayoutProps) {
   const router = useRouter();
   const [showAccountDropdown, setShowAccountDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [user, setUser] = useState<any>(null);
   // Removed unused notification state variables
@@ -172,7 +173,14 @@ export default function UserLayout({ children }: UserLayoutProps) {
       icon: <Users className="w-5 h-5" />,
     },
     {
-      name: profile?.role === 'admin' ? 'Users' : 'Team',
+      name: 'Organizations',
+      href: '/dashboard/organizations',
+      icon: <Building2 className="w-5 h-5" />,
+      // Only show for admins
+      roles: ['admin'],
+    },
+    {
+      name: profile?.role === 'admin' ? 'Administrators' : 'Team',
       href: '/dashboard/team',
       icon: <UserPlus className="w-5 h-5" />,
       // Only show for admins, users and organization owners, not team members
@@ -205,17 +213,33 @@ export default function UserLayout({ children }: UserLayoutProps) {
   
   return (
     <div className={`flex h-screen bg-gradient-to-br ${currentTheme.bgGradient}`}>
+      {/* Mobile sidebar overlay */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      
       {/* Sidebar */}
-      <div className="w-72 bg-white/20 backdrop-blur-xl border-r border-white/30 flex flex-col">
-        {/* Logo */}
-        <div className="flex items-center justify-center h-24 pt-6 border-b border-white/20">
+      <div className={`fixed lg:static inset-y-0 left-0 z-50 w-72 bg-white/20 backdrop-blur-xl border-r border-white/30 flex flex-col transform transition-transform duration-300 ease-in-out ${
+        sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+      }`}>
+        {/* Logo and Close Button */}
+        <div className="flex items-center justify-between h-24 px-6 pt-6 border-b border-white/20">
           <Image 
             src={logoUrl} 
             alt="Organization Logo" 
-            width={200} 
-            height={200}
+            width={150} 
+            height={150}
             className="rounded-xl shadow-lg"
           />
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="lg:hidden p-2 rounded-lg hover:bg-white/20 transition-colors"
+          >
+            <X className="w-6 h-6 text-gray-700" />
+          </button>
         </div>
 
         {/* Navigation */}
@@ -227,6 +251,7 @@ export default function UserLayout({ children }: UserLayoutProps) {
               <Link
                 key={item.name}
                 href={item.href}
+                onClick={() => setSidebarOpen(false)}
                 className={`group flex items-center px-4 py-4 text-sm font-semibold rounded-2xl transition-all duration-300 ${
                   isActive
                     ? `bg-gradient-to-r ${currentTheme.gradient} text-white shadow-lg ${currentTheme.shadow}`
@@ -253,26 +278,36 @@ export default function UserLayout({ children }: UserLayoutProps) {
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="bg-white/20 backdrop-blur-xl border-b border-white/30 relative z-50">
-          <div className="px-8 py-4">
+        <header className="bg-white/20 backdrop-blur-xl border-b border-white/30 relative z-30">
+          <div className="px-4 sm:px-8 py-4">
             <div className="flex items-center justify-between">
-              {/* Left side - Page title and search */}
-              <div className="flex items-center space-x-6">
-                <h1 className="text-xl font-semibold text-gray-700">
+              {/* Left side - Hamburger and Page title */}
+              <div className="flex items-center space-x-4">
+                {/* Hamburger Menu Button */}
+                <button
+                  onClick={() => setSidebarOpen(true)}
+                  className="lg:hidden p-2 rounded-lg hover:bg-white/20 transition-colors"
+                >
+                  <Menu className="w-6 h-6 text-gray-700" />
+                </button>
+                
+                <h1 className="text-lg sm:text-xl font-semibold text-gray-700">
                   {pathname === '/dashboard' ? 'Dashboard' : 
                    pathname === '/dashboard/loans' ? 'Loans' :
                    pathname === '/dashboard/borrowers' ? 'Borrowers' :
-                   pathname === '/dashboard/team' ? 'Team Management' :
+                   pathname === '/dashboard/organizations' ? 'Organizations' :
+                   pathname === '/dashboard/team' ? (profile?.role === 'admin' ? 'Administrators' : 'Team Management') :
                    pathname.includes('/dashboard/loans/') ? 'Loan Details' :
                    pathname.includes('/dashboard/borrowers/') ? 'Borrower Details' :
                    'Dashboard'}
                 </h1>
                 
-                <div className="relative">
+                {/* Search - Hidden on mobile */}
+                <div className="relative hidden md:block">
                   <input 
                     type="text" 
                     placeholder="Search..."
-                    className="pl-10 pr-4 py-2 w-80 rounded-2xl border-0 bg-white/60 backdrop-blur-sm shadow-sm focus:ring-2 focus:ring-green-500 focus:outline-none text-sm text-gray-900 placeholder-gray-500"
+                    className="pl-10 pr-4 py-2 w-64 lg:w-80 rounded-2xl border-0 bg-white/60 backdrop-blur-sm shadow-sm focus:ring-2 focus:ring-green-500 focus:outline-none text-sm text-gray-900 placeholder-gray-500"
                   />
                   <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />

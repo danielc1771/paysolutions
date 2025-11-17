@@ -107,8 +107,7 @@ export async function middleware(request: NextRequest) {
     if (!user) {
       return NextResponse.redirect(new URL('/login', request.url))
     }
-    // For authenticated users, we'll let the layout handle the redirect
-    // based on their role rather than hardcoding /admin
+    // For authenticated users, let the layout handle role-based redirect to /dashboard
     return NextResponse.next()
   }
 
@@ -118,8 +117,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/', request.url))
   }
 
-  // Basic route protection - admin routes require authentication
-  if (path.startsWith('/admin') || path.startsWith('/dashboard') || path.startsWith('/borrower')) {
+  // Basic route protection - dashboard and borrower routes require authentication
+  if (path.startsWith('/dashboard') || path.startsWith('/borrower')) {
     if (!user) {
       return NextResponse.redirect(new URL('/login', request.url))
     }

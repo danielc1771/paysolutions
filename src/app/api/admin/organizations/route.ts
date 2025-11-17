@@ -11,8 +11,8 @@ const createOrganizationSchema = z.object({
   subscriptionStatus: z.enum(['trial', 'active', 'suspended', 'cancelled']),
   subscriptionStartDate: z.string().optional(),
   subscriptionEndDate: z.string().optional(),
-  monthlyLoanLimit: z.number().min(1, 'Monthly loan limit must be at least 1'),
-  totalUsersLimit: z.number().min(1, 'Total users limit must be at least 1'),
+  monthlyLoanLimit: z.number().min(1, 'Monthly loan limit must be at least 1').optional().default(100),
+  totalUsersLimit: z.number().min(1, 'Total users limit must be at least 1').optional().default(10),
   // Optional fields
   address: z.string().optional(),
   city: z.string().optional(),
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
 
     const {
       name,
-      email,
+      email: rawEmail,
       contactPerson,
       phone,
       subscriptionStatus,
@@ -60,6 +60,18 @@ export async function POST(request: NextRequest) {
       totalUsersLimit,
       ...optionalFields
     } = validationResult.data;
+
+    // Trim and normalize email
+    const email = rawEmail.trim().toLowerCase();
+
+    // Additional email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return NextResponse.json(
+        { error: 'Invalid email format' },
+        { status: 400 }
+      );
+    }
 
     // Get current user's profile and verify they are a system admin
     const { data: currentProfile, error: profileError } = await supabase
@@ -83,7 +95,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if email already exists in any organization
+    // Check if email already exists in profiles
     const { data: existingUser } = await supabase
       .from('profiles')
       .select('id')
@@ -95,6 +107,20 @@ export async function POST(request: NextRequest) {
         { error: 'A user with this email address already exists in the system' },
         { status: 400 }
       );
+    }
+
+    // Also check auth.users table using admin client
+    const supabaseAdmin = await createAdminClient();
+    const { data: authUsers, error: authCheckError } = await supabaseAdmin.auth.admin.listUsers();
+    
+    if (!authCheckError && authUsers) {
+      const existingAuthUser = authUsers.users.find(u => u.email?.toLowerCase() === email);
+      if (existingAuthUser) {
+        return NextResponse.json(
+          { error: 'A user with this email address already exists in the authentication system' },
+          { status: 400 }
+        );
+      }
     }
 
     // Check if organization name already exists
@@ -138,7 +164,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Create organization_owner invitation via Supabase Auth using admin client
-    const supabaseAdmin = await createAdminClient();
+    console.log('🔍 Attempting to invite user:', {
+      email: email,
+      emailLength: email.length,
+      emailType: typeof email,
+      contactPerson,
+      orgId: newOrg.id,
+      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback?type=invite`
+    });
+
     const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
       email,
       {
@@ -153,7 +187,13 @@ export async function POST(request: NextRequest) {
     );
 
     if (inviteError) {
-      console.error('Supabase invite error:', inviteError);
+      console.error('Supabase invite error:', {
+        error: inviteError,
+        message: inviteError.message,
+        code: inviteError.code,
+        email: email,
+        status: inviteError.status
+      });
 
       // Try to clean up the organization if invite failed
       await supabase.from('organizations').delete().eq('id', newOrg.id);
@@ -166,8 +206,15 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      if (inviteError.code === 'email_address_invalid') {
+        return NextResponse.json(
+          { error: `The email address "${email}" is invalid. Please check and try again.` },
+          { status: 400 }
+        );
+      }
+
       return NextResponse.json(
-        { error: 'Failed to send invitation email' },
+        { error: `Failed to send invitation email: ${inviteError.message}` },
         { status: 500 }
       );
     }

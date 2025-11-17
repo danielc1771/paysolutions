@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { Building2, Users, DollarSign, Calendar, Edit, Trash2, Eye } from 'lucide-react';
 import CustomSelect from '@/components/CustomSelect';
-import AddOrganizationForm from './AddOrganizationForm';
+import AddOrganizationForm from '@/components/dashboard/AddOrganizationForm';
 
 interface Organization {
   id: string;
@@ -31,8 +31,41 @@ export default function OrganizationsTable() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [showAddForm, setShowAddForm] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; org: Organization | null }>({ show: false, org: null });
+  const [deleting, setDeleting] = useState(false);
 
   const supabase = createClient();
+
+  const handleDelete = async (org: Organization) => {
+    setDeleting(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/admin/organizations/${org.id}`, {
+        method: 'DELETE',
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to delete organization');
+      }
+
+      console.log('✅ Organization deleted:', result);
+      
+      // Close confirmation dialog
+      setDeleteConfirm({ show: false, org: null });
+      
+      // Refresh organizations list
+      await fetchOrganizations();
+
+    } catch (err) {
+      console.error('Delete error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to delete organization');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const fetchOrganizations = useCallback(async () => {
     setLoading(true);
@@ -132,12 +165,12 @@ export default function OrganizationsTable() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Organization Management</h2>
-          <p className="text-gray-600">Manage all organizations and their subscriptions</p>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Organization Management</h2>
+          <p className="text-sm sm:text-base text-gray-600">Manage all organizations and their subscriptions</p>
         </div>
-        <button className="bg-gradient-to-r from-green-500 to-teal-500 text-white px-6 py-3 rounded-2xl font-semibold hover:from-green-600 hover:to-teal-600 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center space-x-2" onClick={() => setShowAddForm(true)}>
+        <button className="bg-gradient-to-r from-green-500 to-teal-500 text-white px-4 sm:px-6 py-3 rounded-2xl font-semibold hover:from-green-600 hover:to-teal-600 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center space-x-2 whitespace-nowrap" onClick={() => setShowAddForm(true)}>
           <Building2 className="w-5 h-5" />
           <span>Add Organization</span>
         </button>
@@ -228,21 +261,23 @@ export default function OrganizationsTable() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50/80">
-                <tr>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Organization</th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subscription</th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usage</th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200/50">
-                {filteredOrganizations.map((org) => (
-                  <tr key={org.id} className="hover:bg-white/50 transition-colors">
+          <>
+            {/* Desktop Table View */}
+            <div className="hidden lg:block overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50/80">
+                  <tr>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Organization</th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subscription</th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usage</th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200/50">
+                  {filteredOrganizations.map((org) => (
+                    <tr key={org.id} className="hover:bg-white/50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center">
                         <div className="flex-shrink-0">
@@ -310,16 +345,95 @@ export default function OrganizationsTable() {
                         <button className="p-2 text-gray-400 hover:text-green-500 rounded-lg hover:bg-green-50 transition-colors">
                           <Edit className="w-4 h-4" />
                         </button>
-                        <button className="p-2 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors">
+                        <button 
+                          onClick={() => setDeleteConfirm({ show: true, org })}
+                          className="p-2 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors"
+                        >
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="lg:hidden space-y-4 p-4">
+              {filteredOrganizations.map((org) => (
+                <div key={org.id} className="bg-white/50 rounded-2xl p-4 shadow-sm space-y-3">
+                  {/* Organization Name */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-teal-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <Building2 className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-semibold text-gray-900">{org.name}</div>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${org.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                          {org.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Contact Info */}
+                  <div className="space-y-1 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-500">Contact:</span>
+                      <span className="text-gray-900 font-medium">{org.contact_person || 'N/A'}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-500">Email:</span>
+                      <span className="text-gray-900 text-xs">{org.email}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-500">Phone:</span>
+                      <span className="text-gray-900">{org.phone}</span>
+                    </div>
+                  </div>
+
+                  {/* Subscription */}
+                  <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                    <span className="text-gray-500 text-sm">Subscription:</span>
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(org.subscription_status)}`}>
+                      {org.subscription_status}
+                    </span>
+                  </div>
+
+                  {/* Usage Stats */}
+                  <div className="flex items-center justify-between space-x-4 text-sm">
+                    <div className="flex items-center space-x-1">
+                      <Users className="w-4 h-4 text-blue-500" />
+                      <span className="text-gray-900">{org.user_count}/{org.total_users_limit}</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <DollarSign className="w-4 h-4 text-green-500" />
+                      <span className="text-gray-900">{org.loan_count}/{org.monthly_loan_limit}</span>
+                    </div>
+                    <div className="text-gray-500 text-xs">{org.borrower_count} borrowers</div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center justify-end space-x-2 pt-2 border-t border-gray-200">
+                    <button className="p-2 text-gray-400 hover:text-blue-500 rounded-lg hover:bg-blue-50 transition-colors">
+                      <Eye className="w-4 h-4" />
+                    </button>
+                    <button className="p-2 text-gray-400 hover:text-green-500 rounded-lg hover:bg-green-50 transition-colors">
+                      <Edit className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => setDeleteConfirm({ show: true, org })}
+                      className="p-2 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
 
@@ -329,6 +443,71 @@ export default function OrganizationsTable() {
           onClose={() => setShowAddForm(false)}
           onSuccess={fetchOrganizations}
         />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {deleteConfirm.show && deleteConfirm.org && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8">
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="p-3 bg-red-100 rounded-2xl">
+                <Trash2 className="w-6 h-6 text-red-600" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Delete Organization</h2>
+                <p className="text-gray-600">This action cannot be undone</p>
+              </div>
+            </div>
+
+            {error && (
+              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-2xl">
+                <p className="text-sm text-red-600">{error}</p>
+              </div>
+            )}
+
+            <div className="mb-6 p-4 bg-gray-50 rounded-2xl">
+              <p className="text-sm text-gray-700 mb-2">
+                Are you sure you want to delete <strong>{deleteConfirm.org.name}</strong>?
+              </p>
+              <p className="text-sm text-gray-600">
+                This will permanently delete:
+              </p>
+              <ul className="mt-2 space-y-1 text-sm text-gray-600">
+                <li>• The organization</li>
+                <li>• All {deleteConfirm.org.user_count || 0} associated users</li>
+                <li>• All {deleteConfirm.org.loan_count || 0} associated loans</li>
+                <li>• All authentication accounts</li>
+              </ul>
+            </div>
+
+            <div className="flex space-x-4">
+              <button
+                onClick={() => setDeleteConfirm({ show: false, org: null })}
+                disabled={deleting}
+                className="flex-1 px-6 py-3 border border-gray-300 rounded-2xl text-gray-700 hover:bg-gray-50 transition-colors font-semibold disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => deleteConfirm.org && handleDelete(deleteConfirm.org)}
+                disabled={deleting}
+                className="flex-1 px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-2xl font-semibold hover:from-red-600 hover:to-red-700 transition-all duration-300 disabled:opacity-50 flex items-center justify-center space-x-2"
+              >
+                {deleting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-5 h-5" />
+                    <span>Delete</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
