@@ -168,25 +168,46 @@ export function LoanApplicationTemplate({
               </ul>
             </div>
 
-            {/* CTA Button */}
-            <div style={{ textAlign: 'center' as const, margin: '32px 0' }}>
-              <a 
-                href={applicationUrl}
-                style={{
-                  display: 'inline-block',
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  color: 'white',
-                  padding: '16px 32px',
-                  textDecoration: 'none',
-                  borderRadius: '12px',
-                  fontWeight: '600',
-                  fontSize: '16px',
-                  boxShadow: '0 10px 15px -3px rgba(102, 126, 234, 0.4)'
-                }}
-              >
-                Complete Your Application
-              </a>
-            </div>
+            {/* CTA Button - Gmail Mobile Compatible */}
+            <table width="100%" cellPadding="0" cellSpacing="0" border={0} style={{ margin: '32px 0' }}>
+              <tr>
+                <td align="center">
+                  <table cellPadding="0" cellSpacing="0" border={0}>
+                    <tr>
+                      <td 
+                        align="center" 
+                        style={{
+                          background: '#667eea',
+                          borderRadius: '12px',
+                          padding: '0'
+                        }}
+                      >
+                        <a 
+                          href={applicationUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            display: 'block',
+                            color: '#ffffff',
+                            backgroundColor: 'transparent',
+                            padding: '16px 48px',
+                            textDecoration: 'none',
+                            fontWeight: '600',
+                            fontSize: '16px',
+                            lineHeight: '1.5',
+                            minWidth: '200px',
+                            textAlign: 'center' as const,
+                            WebkitTextSizeAdjust: 'none'
+                          }}
+                        >
+                          <span style={{ color: '#ffffff', textDecoration: 'none' }}>Complete Your Application</span>
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
 
             {/* Security Note */}
             <div style={{
