@@ -23,9 +23,14 @@ export const loanStatusEnum = pgEnum('loan_status', [
   'approved', 
   'funded', 
   'active',
+  'pending_derogatory_review',
+  'derogatory',
+  'settled',
   'closed', 
   'defaulted'
 ]);
+
+export const derogatoryTypeEnum = pgEnum('derogatory_type', ['manual', 'automatic']);
 
 export const organization = pgTable("organizations", {
 	id: uuid("id").defaultRandom().primaryKey(),
@@ -48,6 +53,7 @@ export const organization = pgTable("organizations", {
 	monthlyLoanLimit: integer("monthly_loan_limit").default(100),
 	totalUsersLimit: integer("total_users_limit").default(10),
 	isActive: boolean("is_active").default(true),
+	missedPaymentThreshold: integer("missed_payment_threshold").default(2),
 });
 
 // This table stores user-specific data, linking them to an organization and a role.
@@ -172,6 +178,11 @@ export const loans = pgTable("loans", { // Added vehicle fields
 	remainingBalance: numeric("remaining_balance", { precision: 12, scale:  2 }),
 	docusignEnvelopeId: varchar("docusign_envelope_id", { length: 255 }),
 	docusignCompletedAt: timestamp("docusign_completed_at", { withTimezone: true, mode: 'string' }),
+	// DocuSign signer emails (stored for reference)
+	docusignIpayEmail: varchar("docusign_ipay_email", { length: 255 }),
+	docusignOrgEmail: varchar("docusign_org_email", { length: 255 }),
+	docusignOrgName: varchar("docusign_org_name", { length: 255 }),
+	docusignBorrowerEmail: varchar("docusign_borrower_email", { length: 255 }),
 	// Signing URL cache for embedded signing flow (24-hour validity)
 	ipaySigningUrl: text("ipay_signing_url"),
 	organizationSigningUrl: text("organization_signing_url"),
@@ -199,6 +210,20 @@ export const loans = pgTable("loans", { // Added vehicle fields
 	stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }), // Stripe subscription for recurring payments
 	stripeProductId: varchar("stripe_product_id", { length: 255 }), // Stripe product for the loan
 	stripePriceId: varchar("stripe_price_id", { length: 255 }), // Stripe price for weekly payments
+	// Derogatory account fields
+	derogatoryStatus: boolean("derogatory_status").default(false),
+	derogatoryReason: text("derogatory_reason"),
+	derogatoryDate: timestamp("derogatory_date", { withTimezone: true, mode: 'string' }),
+	derogatoryMarkedBy: uuid("derogatory_marked_by").references(() => profiles.id),
+	derogatoryType: derogatoryTypeEnum('derogatory_type'),
+	// Loan closure fields
+	closureReason: text("closure_reason"),
+	closureDate: timestamp("closure_date", { withTimezone: true, mode: 'string' }),
+	closedBy: uuid("closed_by").references(() => profiles.id),
+	// Late payment tracking
+	isLate: boolean("is_late").default(false),
+	daysOverdue: integer("days_overdue").default(0),
+	lastPaymentCheck: timestamp("last_payment_check", { withTimezone: true, mode: 'string' }),
 }, (table) => [
 	index("idx_loans_borrower_id").using("btree", table.borrowerId.asc().nullsLast().op("uuid_ops")),
 	index("idx_loans_docusign_envelope_id").using("btree", table.docusignEnvelopeId.asc().nullsLast().op("text_ops")),

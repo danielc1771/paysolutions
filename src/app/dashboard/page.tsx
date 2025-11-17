@@ -8,8 +8,8 @@ import { useUserProfile } from '@/components/auth/RoleRedirect';
 import DataTable, { Column } from '@/components/ui/DataTable';
 import { FileText, Calendar, Car, Eye } from 'lucide-react';
 import { SigningProgressDots, getSigningProgressText } from '@/components/SigningProgressIndicator';
-import { formatLoanStatus } from '@/utils/formatters';
 import { toProperCase } from '@/utils/textFormatters';
+import LoanStatusBadge from '@/components/LoanStatusBadge';
 
 interface DashboardStats {
   totalLoans: number;
@@ -36,22 +36,6 @@ export default function UserDashboard() {
 
   const supabase = useMemo(() => createClient(), []);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'new': return 'bg-blue-100 text-blue-800';
-      case 'application_sent': return 'bg-yellow-100 text-yellow-800';
-      case 'application_completed': return 'bg-orange-100 text-orange-800';
-      case 'ipay_approved': return 'bg-purple-100 text-purple-800';
-      case 'dealer_approved': return 'bg-indigo-100 text-indigo-800';
-      case 'fully_signed': return 'bg-emerald-100 text-emerald-800';
-      case 'review': return 'bg-orange-100 text-orange-800';
-      case 'funded': return 'bg-green-100 text-green-800';
-      case 'active': return 'bg-green-100 text-green-800';
-      case 'closed': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
@@ -75,9 +59,13 @@ export default function UserDashboard() {
             <div className="text-sm font-semibold text-gray-900">
               {toProperCase(loan.borrower?.first_name || '')} {toProperCase(loan.borrower?.last_name || '')}
             </div>
-            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(loan.status)}`}>
-              {formatLoanStatus(loan.status)}
-            </span>
+            <LoanStatusBadge 
+              status={loan.status}
+              derogatoryStatus={loan.derogatory_status}
+              derogatoryReason={loan.derogatory_reason}
+              isLate={loan.is_late}
+              daysOverdue={loan.days_overdue}
+            />
           </div>
         </div>
       ),

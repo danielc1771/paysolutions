@@ -5,12 +5,15 @@ import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
 import CustomSelect from '@/components/CustomSelect';
 import { LoanListItem, AdminLoanListItem } from '@/types/loan';
-import { Plus, Search, Check, FileText, Trash2, Eye, PenTool, CheckCircle, Calendar, Car } from 'lucide-react';
+import { Plus, Search, Check, FileText, Trash2, Eye, PenTool, CheckCircle, Calendar, Car, AlertTriangle, XCircle } from 'lucide-react';
 import { useUserProfile } from '@/components/auth/RoleRedirect';
 import DataTable, { Column, Action } from '@/components/ui/DataTable';
 import { SigningProgressDots, getSigningProgressText } from '@/components/SigningProgressIndicator';
-import { formatLoanStatus } from '@/utils/formatters';
 import { toProperCase } from '@/utils/textFormatters';
+import MarkDerogatoryDialog from '@/components/dialogs/MarkDerogatoryDialog';
+import CloseLoanDialog from '@/components/dialogs/CloseLoanDialog';
+import LoanStatusFilters, { LoanFilterStatus, filterLoansByStatus } from '@/components/LoanStatusFilters';
+import LoanStatusBadge from '@/components/LoanStatusBadge';
 
 interface Organization {
   id: string;
@@ -23,6 +26,7 @@ export default function UserLoans() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<LoanFilterStatus>('all');
   const [selectedOrganization, setSelectedOrganization] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -38,6 +42,36 @@ export default function UserLoans() {
     loanId: '',
     loanNumber: '',
     borrowerName: ''
+  });
+  const [derogatoryDialog, setDerogatoryDialog] = useState<{
+    isOpen: boolean;
+    loanId: string;
+    loanNumber: string;
+    borrowerName: string;
+    remainingBalance: string;
+    remainingPayments: number;
+  }>({
+    isOpen: false,
+    loanId: '',
+    loanNumber: '',
+    borrowerName: '',
+    remainingBalance: '0',
+    remainingPayments: 0,
+  });
+  const [closeLoanDialog, setCloseLoanDialog] = useState<{
+    isOpen: boolean;
+    loanId: string;
+    loanNumber: string;
+    borrowerName: string;
+    remainingBalance: string;
+    remainingPayments: number;
+  }>({
+    isOpen: false,
+    loanId: '',
+    loanNumber: '',
+    borrowerName: '',
+    remainingBalance: '0',
+    remainingPayments: 0,
   });
   const { profile } = useUserProfile();
   const isAdmin = profile?.role === 'admin';
@@ -148,30 +182,34 @@ export default function UserLoans() {
   }, [supabase, isAdmin, profile]);
 
   // Filter loans based on status, organization, and search term
-  const filteredLoans = loans.filter(loan => {
-    let matchesStatus = false;
+  const filteredLoans = useMemo(() => {
+    // First apply status filter
+    let filtered = filterLoansByStatus(loans, statusFilter);
     
-    if (filterStatus === 'all') {
-      matchesStatus = true;
-    } else if (filterStatus === 'action_required') {
-      // Action required: application completed, needs organization signing, or fully signed ready for funding
-      matchesStatus = loan.status === 'application_completed' || 
-                     loan.status === 'ipay_approved' ||
-                     loan.status === 'fully_signed';
-    } else {
-      matchesStatus = loan.status === filterStatus;
-    }
+    // Then apply other filters
+    filtered = filtered.filter(loan => {
+      let matchesStatus = true;
+      if (filterStatus === 'action_required') {
+        matchesStatus = loan.status === 'application_completed' || 
+                       loan.status === 'ipay_approved' ||
+                       loan.status === 'fully_signed';
+      } else if (filterStatus !== 'all') {
+        matchesStatus = loan.status === filterStatus;
+      }
+      
+      const matchesOrganization = selectedOrganization === 'all' || 
+        ('organization' in loan && loan.organization?.id === selectedOrganization);
+      
+      const matchesSearch = searchTerm === '' || 
+        loan.loan_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        loan.borrower?.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        loan.borrower?.last_name?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      return matchesStatus && matchesOrganization && matchesSearch;
+    });
     
-    const matchesOrganization = selectedOrganization === 'all' || 
-      ('organization' in loan && loan.organization?.id === selectedOrganization);
-    
-    const matchesSearch = searchTerm === '' || 
-      loan.loan_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      loan.borrower?.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      loan.borrower?.last_name?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    return matchesStatus && matchesOrganization && matchesSearch;
-  });
+    return filtered;
+  }, [loans, filterStatus, selectedOrganization, searchTerm, statusFilter]);
 
   // Add success modal trigger function
   const showSuccessMessage = (message: string) => {
@@ -242,7 +280,116 @@ export default function UserLoans() {
   };
 
   const closeDeleteConfirm = () => {
-    setDeleteConfirm({ isOpen: false, loanId: '', loanNumber: '', borrowerName: '' });
+    setDeleteConfirm({
+      isOpen: false,
+      loanId: '',
+      loanNumber: '',
+      borrowerName: ''
+    });
+  };
+
+  const openDerogatoryDialog = (loanId: string, loanNumber: string, borrowerName: string, remainingBalance: string, termWeeks: number) => {
+    // Calculate remaining payments based on loan status
+    // For now, we'll use termWeeks as a placeholder
+    // In production, this should calculate based on paid invoices
+    setDerogatoryDialog({
+      isOpen: true,
+      loanId,
+      loanNumber,
+      borrowerName,
+      remainingBalance,
+      remainingPayments: termWeeks, // This will be refined in the API
+    });
+  };
+
+  const closeDerogatoryDialog = () => {
+    setDerogatoryDialog({
+      isOpen: false,
+      loanId: '',
+      loanNumber: '',
+      borrowerName: '',
+      remainingBalance: '0',
+      remainingPayments: 0,
+    });
+  };
+
+  const handleMarkDerogatory = async (reason: string, customReason?: string) => {
+    try {
+      const response = await fetch(`/api/loans/${derogatoryDialog.loanId}/mark-derogatory`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ reason, customReason }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to mark loan as derogatory');
+      }
+
+      setSuccessMessage(`Loan ${derogatoryDialog.loanNumber} has been marked as derogatory. A final balance invoice has been created.`);
+      setShowSuccessModal(true);
+      closeDerogatoryDialog();
+      
+      // Refresh loans list
+      window.location.reload();
+    } catch (error) {
+      console.error('Error marking loan as derogatory:', error);
+      alert(error instanceof Error ? error.message : 'Failed to mark loan as derogatory');
+    }
+  };
+
+  const openCloseLoanDialog = (loanId: string, loanNumber: string, borrowerName: string, remainingBalance: string, termWeeks: number) => {
+    setCloseLoanDialog({
+      isOpen: true,
+      loanId,
+      loanNumber,
+      borrowerName,
+      remainingBalance,
+      remainingPayments: termWeeks,
+    });
+  };
+
+  const closeCloseLoanDialog = () => {
+    setCloseLoanDialog({
+      isOpen: false,
+      loanId: '',
+      loanNumber: '',
+      borrowerName: '',
+      remainingBalance: '0',
+      remainingPayments: 0,
+    });
+  };
+
+  const handleCloseLoan = async (reason: string, customReason?: string, waiveBalance?: boolean) => {
+    try {
+      const response = await fetch(`/api/loans/${closeLoanDialog.loanId}/close`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ reason, customReason, waiveBalance }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to close loan');
+      }
+
+      const balanceMsg = waiveBalance ? ' Balance has been waived.' : (data.data.remaining_balance > 0 ? ' A final balance invoice has been created.' : '');
+      setSuccessMessage(`Loan ${closeLoanDialog.loanNumber} has been closed.${balanceMsg}`);
+      setShowSuccessModal(true);
+      closeCloseLoanDialog();
+      
+      // Refresh loans list
+      window.location.reload();
+    } catch (error) {
+      console.error('Error closing loan:', error);
+      alert(error instanceof Error ? error.message : 'Failed to close loan');
+    }
   };
 
   const handleSignDocuSign = async (loanId: string, e: React.MouseEvent) => {
@@ -302,22 +449,6 @@ export default function UserLoans() {
     { value: 'closed', label: 'Closed' },
   ];
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'new': return 'bg-blue-100 text-blue-800';
-      case 'application_sent': return 'bg-yellow-100 text-yellow-800';
-      case 'application_completed': return 'bg-orange-100 text-orange-800';
-      case 'ipay_approved': return 'bg-purple-100 text-purple-800';
-      case 'dealer_approved': return 'bg-indigo-100 text-indigo-800';
-      case 'fully_signed': return 'bg-emerald-100 text-emerald-800';
-      case 'review': return 'bg-orange-100 text-orange-800';
-      case 'funded': return 'bg-green-100 text-green-800';
-      case 'active': return 'bg-green-100 text-green-800';
-      case 'closed': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
@@ -348,10 +479,14 @@ export default function UserLoans() {
               {toProperCase(loan.borrower?.first_name || '')} {toProperCase(loan.borrower?.last_name || '')}
             </div>
             <div className="flex items-center gap-2 mt-1">
-              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(loan.status)}`}>
-                {formatLoanStatus(loan.status)}
-              </span>
-              {needsAction(loan) && (
+              <LoanStatusBadge 
+                status={loan.status}
+                derogatoryStatus={loan.derogatory_status}
+                derogatoryReason={loan.derogatory_reason}
+                isLate={loan.is_late}
+                daysOverdue={loan.days_overdue}
+              />
+              {needsAction(loan) && !loan.derogatory_status && (
                 <span className="inline-flex items-center px-2 py-0.5 text-xs font-bold rounded-full bg-orange-100 text-orange-800">
                   🚨
                 </span>
@@ -479,6 +614,36 @@ export default function UserLoans() {
       color: 'blue',
     },
     {
+      icon: AlertTriangle,
+      label: 'Mark as Derogatory',
+      onClick: (loan) => {
+        openDerogatoryDialog(
+          loan.id,
+          loan.loan_number,
+          `${loan.borrower?.first_name} ${loan.borrower?.last_name}`,
+          loan.remaining_balance || loan.principal_amount,
+          loan.term_weeks
+        );
+      },
+      color: 'red',
+      show: (loan) => loan.status === 'funded' || loan.status === 'active',
+    },
+    {
+      icon: XCircle,
+      label: 'Close Loan',
+      onClick: (loan) => {
+        openCloseLoanDialog(
+          loan.id,
+          loan.loan_number,
+          `${loan.borrower?.first_name} ${loan.borrower?.last_name}`,
+          loan.remaining_balance || loan.principal_amount,
+          loan.term_weeks
+        );
+      },
+      color: 'gray',
+      show: (loan) => loan.status === 'funded' || loan.status === 'active',
+    },
+    {
       icon: Trash2,
       label: 'Delete Loan',
       onClick: (loan) => {
@@ -518,6 +683,13 @@ export default function UserLoans() {
                 )}
               </div>
             </div>
+
+            {/* Status Filters */}
+            <LoanStatusFilters
+              selectedFilter={statusFilter}
+              onFilterChange={setStatusFilter}
+              loans={loans}
+            />
 
             {/* Filters */}
             <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 mb-8 shadow-lg border border-white/20">
@@ -656,6 +828,28 @@ export default function UserLoans() {
             </div>
           </div>
         )}
+
+      {/* Mark as Derogatory Dialog */}
+      <MarkDerogatoryDialog
+        isOpen={derogatoryDialog.isOpen}
+        onClose={closeDerogatoryDialog}
+        onConfirm={handleMarkDerogatory}
+        loanNumber={derogatoryDialog.loanNumber}
+        borrowerName={derogatoryDialog.borrowerName}
+        remainingBalance={derogatoryDialog.remainingBalance}
+        remainingPayments={derogatoryDialog.remainingPayments}
+      />
+
+      {/* Close Loan Dialog */}
+      <CloseLoanDialog
+        isOpen={closeLoanDialog.isOpen}
+        onClose={closeCloseLoanDialog}
+        onConfirm={handleCloseLoan}
+        loanNumber={closeLoanDialog.loanNumber}
+        borrowerName={closeLoanDialog.borrowerName}
+        remainingBalance={closeLoanDialog.remainingBalance}
+        remainingPayments={closeLoanDialog.remainingPayments}
+      />
 
       {/* Delete Confirmation Dialog */}
       {deleteConfirm.isOpen && (

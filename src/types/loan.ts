@@ -74,6 +74,20 @@ export interface BaseLoan {
   phone_verification_session_id?: string;
   phone_verification_status: string;
   verified_phone_number?: string;
+  // Derogatory fields
+  derogatory_status?: boolean;
+  derogatory_reason?: string;
+  derogatory_date?: string;
+  derogatory_marked_by?: string;
+  derogatory_type?: 'manual' | 'automatic';
+  // Closure fields
+  closure_reason?: string;
+  closure_date?: string;
+  closed_by?: string;
+  // Late payment tracking
+  is_late?: boolean;
+  days_overdue?: number;
+  last_payment_check?: string;
 }
 
 // Loan with populated borrower information
@@ -114,6 +128,11 @@ export interface LoanListItem {
   vehicle_make: string;
   vehicle_model: string;
   vehicle_year: string;
+  derogatory_status?: boolean;
+  derogatory_reason?: string;
+  derogatory_date?: string;
+  is_late?: boolean;
+  days_overdue?: number;
 }
 
 // Admin loan list item with organization info
@@ -248,10 +267,37 @@ export interface UpdateLoanData {
   phone_verification_session_id?: string;
   phone_verification_status?: string;
   verified_phone_number?: string;
+  derogatory_status?: boolean;
+  derogatory_reason?: string;
+  derogatory_date?: string;
+  derogatory_marked_by?: string;
+  derogatory_type?: 'manual' | 'automatic';
+  closure_reason?: string;
+  closure_date?: string;
+  closed_by?: string;
 }
 
 // Loan status enum
-export type LoanStatus = 'new' | 'pending' | 'approved' | 'funded' | 'active' | 'paid_off' | 'defaulted' | 'cancelled';
+export type LoanStatus = 
+  | 'new' 
+  | 'application_sent' 
+  | 'application_in_progress' 
+  | 'application_completed'
+  | 'pending_ipay_signature'
+  | 'pending_org_signature'
+  | 'pending_borrower_signature'
+  | 'ipay_approved'
+  | 'dealer_approved'
+  | 'fully_signed'
+  | 'review'
+  | 'approved' 
+  | 'funded' 
+  | 'active'
+  | 'pending_derogatory_review'
+  | 'derogatory'
+  | 'settled'
+  | 'closed' 
+  | 'defaulted';
 
 // DocuSign status enum
 export type DocuSignStatus = 'not_sent' | 'sent' | 'delivered' | 'signed' | 'completed' | 'declined' | 'voided';
