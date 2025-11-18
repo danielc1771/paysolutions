@@ -125,6 +125,11 @@ export default function ApplyPage() {
             stripeVerificationStatus: mapVerificationStatus(data.loan.stripeVerificationStatus || 'pending'),
           }));
           setStep(sessionData.currentStep || data.loan.applicationStep || 1);
+          
+          // Restore selected language from session
+          if (sessionData.selectedLanguage) {
+            setSelectedLanguage(sessionData.selectedLanguage as Language);
+          }
         } else {
           // Clean application state - only prefill basic identity and loan data
           setFormData(prev => ({
@@ -207,12 +212,12 @@ export default function ApplyPage() {
   useEffect(() => {
     if (step > 0 && step < 9) { // Only save during active form steps
       const timeoutId = setTimeout(() => {
-        saveToSession({ ...formData, currentStep: step });
+        saveToSession({ ...formData, currentStep: step, selectedLanguage });
       }, 500); // Debounce for 500ms
 
       return () => clearTimeout(timeoutId);
     }
-  }, [formData, step, saveToSession]);
+  }, [formData, step, selectedLanguage, saveToSession]);
 
   // Real-time status updates using Supabase Realtime
   useEffect(() => {
@@ -332,7 +337,7 @@ export default function ApplyPage() {
     try {
       
       // Save to sessionStorage for immediate persistence
-      const sessionData = { ...data, currentStep };
+      const sessionData = { ...data, currentStep, selectedLanguage };
       saveToSession(sessionData);
       
       // Also save to database for staff visibility
@@ -355,12 +360,15 @@ export default function ApplyPage() {
   const handlePrev = () => {
     const prevStep = step - 1;
     // Save current form data when going back
-    saveToSession({ ...formData, currentStep: prevStep });
+    saveToSession({ ...formData, currentStep: prevStep, selectedLanguage });
     setStep(prevStep);
   };
 
   const handleLanguageSelection = async (language: Language) => {
     setSelectedLanguage(language);
+    
+    // Save language to session storage immediately
+    saveToSession({ ...formData, currentStep: step, selectedLanguage: language });
     
     try {
       // Save language preference to borrower record
