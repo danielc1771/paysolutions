@@ -79,11 +79,21 @@ export default function UserLoans() {
   const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
-    // Check for action_required filter from URL params
+    // Check for filter from URL params
     const urlParams = new URLSearchParams(window.location.search);
     const filterParam = urlParams.get('filter');
-    if (filterParam === 'action_required') {
-      setFilterStatus('action_required');
+    
+    // Map URL filter param to statusFilter
+    if (filterParam) {
+      const validFilters: LoanFilterStatus[] = ['all', 'on_time', 'late', 'pending_review', 'derogatory', 'settled', 'closed', 'active'];
+      if (validFilters.includes(filterParam as LoanFilterStatus)) {
+        setStatusFilter(filterParam as LoanFilterStatus);
+      }
+      
+      // Legacy support for action_required
+      if (filterParam === 'action_required') {
+        setFilterStatus('action_required');
+      }
     }
 
     const fetchLoans = async () => {

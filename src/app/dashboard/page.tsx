@@ -354,7 +354,7 @@ export default function UserDashboard() {
               ) : (
                 <>
                   {/* Organization Stats */}
-                  <Link href="/dashboard/loans?filter=action_required" className="block">
+                  <Link href="/dashboard/loans?filter=pending_review" className="block">
                     <div className="group bg-white/70 backdrop-blur-sm rounded-3xl p-8 shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-white/20 cursor-pointer">
                       <div className="flex items-center justify-between mb-6">
                         <div className="p-4 bg-gradient-to-br from-orange-400 to-red-500 rounded-2xl shadow-lg group-hover:scale-110 transition-transform duration-300">
@@ -371,35 +371,39 @@ export default function UserDashboard() {
                     </div>
                   </Link>
 
-                  <div className="group bg-white/70 backdrop-blur-sm rounded-3xl p-8 shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-white/20">
-                    <div className="flex items-center justify-between mb-6">
-                      <div className="p-4 bg-gradient-to-br from-green-400 to-emerald-500 rounded-2xl shadow-lg group-hover:scale-110 transition-transform duration-300">
-                        <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
+                  <Link href="/dashboard/loans?filter=active" className="block">
+                    <div className="group bg-white/70 backdrop-blur-sm rounded-3xl p-8 shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-white/20">
+                      <div className="flex items-center justify-between mb-6">
+                        <div className="p-4 bg-gradient-to-br from-green-400 to-emerald-500 rounded-2xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                          <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-3xl font-bold text-gray-800">{stats.activeLoans}</p>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-3xl font-bold text-gray-800">{stats.activeLoans}</p>
-                      </div>
+                      <h3 className="text-gray-700 font-semibold text-lg">Active Loans</h3>
+                      <p className="text-gray-500 text-sm mt-1">Currently funded</p>
                     </div>
-                    <h3 className="text-gray-700 font-semibold text-lg">Active Loans</h3>
-                    <p className="text-gray-500 text-sm mt-1">Currently funded</p>
-                  </div>
+                  </Link>
 
-                  <div className="group bg-white/70 backdrop-blur-sm rounded-3xl p-8 shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-white/20">
-                    <div className="flex items-center justify-between mb-6">
-                      <div className="p-4 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-2xl shadow-lg group-hover:scale-110 transition-transform duration-300">
-                        <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
+                  <Link href="/dashboard/loans?filter=all" className="block">
+                    <div className="group bg-white/70 backdrop-blur-sm rounded-3xl p-8 shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-white/20">
+                      <div className="flex items-center justify-between mb-6">
+                        <div className="p-4 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-2xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                          <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-3xl font-bold text-gray-800">{stats.totalLoans}</p>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-3xl font-bold text-gray-800">{stats.totalLoans}</p>
-                      </div>
+                      <h3 className="text-gray-700 font-semibold text-lg">Total Loans</h3>
+                      <p className="text-gray-500 text-sm mt-1">All applications</p>
                     </div>
-                    <h3 className="text-gray-700 font-semibold text-lg">Total Loans</h3>
-                    <p className="text-gray-500 text-sm mt-1">All applications</p>
-                  </div>
+                  </Link>
 
                   <div className="group bg-white/70 backdrop-blur-sm rounded-3xl p-8 shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-white/20">
                     <div className="flex items-center justify-between mb-6">
