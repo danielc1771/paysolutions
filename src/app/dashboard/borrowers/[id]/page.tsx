@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Mail, Phone, MapPin, Briefcase, DollarSign, Shield, Calendar, User, CreditCard, Users, Download } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, MapPin, Briefcase, DollarSign, Shield, Calendar, User, CreditCard, Users, Download, MessageSquare, Send, Trash2 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { LoanListItem } from '@/types/loan';
 
@@ -43,11 +43,23 @@ interface Borrower {
   loans?: Array<LoanListItem>;
 }
 
+interface Note {
+  id: string;
+  note: string;
+  createdAt: string;
+  createdBy: string;
+  createdByName: string;
+}
+
 export default function BorrowerDetail({ params }: BorrowerDetailProps) {
   const [borrower, setBorrower] = useState<Borrower | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [downloadingContract, setDownloadingContract] = useState<string | null>(null);
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [newNote, setNewNote] = useState('');
+  const [savingNote, setSavingNote] = useState(false);
+  const [loadingNotes, setLoadingNotes] = useState(true);
 
   const supabase = createClient();
 
@@ -95,6 +107,66 @@ export default function BorrowerDetail({ params }: BorrowerDetailProps) {
       alert(`Failed to download contract: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setDownloadingContract(null);
+    }
+  };
+
+  const fetchNotes = async (borrowerId: string) => {
+    try {
+      setLoadingNotes(true);
+      const response = await fetch(`/api/borrowers/${borrowerId}/notes`);
+      if (response.ok) {
+        const data = await response.json();
+        setNotes(data.notes || []);
+      }
+    } catch (err) {
+      console.error('Error fetching notes:', err);
+    } finally {
+      setLoadingNotes(false);
+    }
+  };
+
+  const handleAddNote = async () => {
+    if (!newNote.trim() || !borrower) return;
+
+    try {
+      setSavingNote(true);
+      const response = await fetch(`/api/borrowers/${borrower.id}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note: newNote.trim() }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setNotes([data.note, ...notes]);
+        setNewNote('');
+      } else {
+        alert('Failed to save note');
+      }
+    } catch (err) {
+      console.error('Error saving note:', err);
+      alert('Failed to save note');
+    } finally {
+      setSavingNote(false);
+    }
+  };
+
+  const handleDeleteNote = async (noteId: string) => {
+    if (!confirm('Are you sure you want to delete this note?')) return;
+
+    try {
+      const response = await fetch(`/api/borrowers/${borrower?.id}/notes?noteId=${noteId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        setNotes(notes.filter(n => n.id !== noteId));
+      } else {
+        alert('Failed to delete note');
+      }
+    } catch (err) {
+      console.error('Error deleting note:', err);
+      alert('Failed to delete note');
     }
   };
 
@@ -164,6 +236,9 @@ export default function BorrowerDetail({ params }: BorrowerDetailProps) {
         }
 
         setBorrower(borrowerData);
+        
+        // Fetch notes for this borrower
+        await fetchNotes(id);
       } catch (err) {
         setError('Failed to load borrower');
         console.error('Error fetching borrower:', err);
@@ -532,49 +607,29 @@ export default function BorrowerDetail({ params }: BorrowerDetailProps) {
             )}
 
             {/* Loans Table */}
-            <div className="bg-white/70 backdrop-blur-sm rounded-3xl shadow-xl border border-white/20">
+            <div className="bg-white/70 backdrop-blur-sm rounded-3xl shadow-xl border border-white/20 mb-8">
               <div className="px-6 py-4 border-b border-gray-200">
                 <h2 className="text-lg font-semibold text-gray-900 flex items-center">
                   <CreditCard className="w-5 h-5 mr-2 text-blue-600" />
                   Loan History ({totalLoans})
                 </h2>
-                <p className="text-sm text-gray-500 mt-1">All loans associated with this borrower</p>
               </div>
-              
               {!borrower.loans || borrower.loans.length === 0 ? (
-                <div className="p-8 text-center">
-                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <CreditCard className="w-8 h-8 text-gray-400" />
-                  </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No loans found</h3>
-                  <p className="text-gray-500">This borrower has not applied for any loans yet</p>
-                </div>
+                <p className="text-gray-500 text-center py-8">No loans found for this borrower.</p>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="min-w-full">
+                  <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50/50">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Loan Number
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Amount
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Paid / Owed
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Standing
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Status
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Contract
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Action
-                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Loan #</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Term</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Paid / Owed</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Standing</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contract</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white/50 divide-y divide-gray-200">
@@ -666,6 +721,98 @@ export default function BorrowerDetail({ params }: BorrowerDetailProps) {
                   </table>
                 </div>
               )}
+            </div>
+
+            {/* Notes Section */}
+            <div className="bg-white/70 backdrop-blur-sm rounded-3xl shadow-xl border border-white/20">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+                  <MessageSquare className="w-5 h-5 mr-2 text-blue-600" />
+                  Notes ({notes.length})
+                </h2>
+              </div>
+
+              {/* Add Note Form */}
+              <div className="p-6 border-b border-gray-200 bg-gray-50/30">
+                <div className="flex gap-3">
+                  <textarea
+                    value={newNote}
+                    onChange={(e) => setNewNote(e.target.value)}
+                    placeholder="Add a note about this borrower..."
+                    className="flex-1 px-4 py-3 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-gray-900 placeholder-gray-400"
+                    rows={3}
+                    disabled={savingNote}
+                  />
+                  <button
+                    onClick={handleAddNote}
+                    disabled={!newNote.trim() || savingNote}
+                    className="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-2xl font-semibold hover:from-blue-600 hover:to-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 h-fit"
+                  >
+                    {savingNote ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        Add Note
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Notes List */}
+              <div className="p-6 space-y-4">
+                {loadingNotes ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-200 border-t-blue-500 mx-auto"></div>
+                  </div>
+                ) : notes.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <MessageSquare className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                    <p>No notes yet. Add your first note above.</p>
+                  </div>
+                ) : (
+                  notes.map((note) => (
+                    <div
+                      key={note.id}
+                      className="bg-gray-50 rounded-2xl p-5 border border-gray-100 hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center">
+                            <span className="text-white text-xs font-bold">
+                              {note.createdByName.split(' ').map(n => n[0]).join('')}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="font-semibold text-gray-900">{note.createdByName}</p>
+                            <p className="text-xs text-gray-500">
+                              {new Date(note.createdAt).toLocaleString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                                hour: 'numeric',
+                                minute: '2-digit',
+                              })}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleDeleteNote(note.id)}
+                          className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-lg hover:bg-red-50"
+                          title="Delete note"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <p className="text-gray-700 whitespace-pre-wrap">{note.note}</p>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
         </div>

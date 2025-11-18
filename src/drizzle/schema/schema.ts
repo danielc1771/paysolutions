@@ -263,3 +263,32 @@ export const organizationSettings = pgTable("organization_settings", {
 	}).onDelete("cascade"),
 	pgPolicy("Enable all operations for service role", { as: "permissive", for: "all", to: ["public"], using: sql`true` }),
 ]);
+
+export const borrowerNotes = pgTable("borrower_notes", {
+	id: uuid("id").defaultRandom().primaryKey().notNull(),
+	borrowerId: uuid("borrower_id").references(() => borrowers.id).notNull(),
+	organizationId: uuid("organization_id").references(() => organization.id).notNull(),
+	createdBy: uuid("created_by").references(() => profiles.id).notNull(),
+	note: text("note").notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_borrower_notes_borrower_id").using("btree", table.borrowerId.asc().nullsLast().op("uuid_ops")),
+	index("idx_borrower_notes_organization_id").using("btree", table.organizationId.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+		columns: [table.borrowerId],
+		foreignColumns: [borrowers.id],
+		name: "borrower_notes_borrower_id_fkey"
+	}).onDelete("cascade"),
+	foreignKey({
+		columns: [table.organizationId],
+		foreignColumns: [organization.id],
+		name: "borrower_notes_organization_id_fkey"
+	}).onDelete("cascade"),
+	foreignKey({
+		columns: [table.createdBy],
+		foreignColumns: [profiles.id],
+		name: "borrower_notes_created_by_fkey"
+	}).onDelete("cascade"),
+	pgPolicy("Enable all operations for service role", { as: "permissive", for: "all", to: ["public"], using: sql`true` }),
+]);
