@@ -4,16 +4,21 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { AlertCircle, CheckCircle, Loader2, User, Lock } from 'lucide-react';
+import { AlertCircle, CheckCircle, Loader2, User, Lock, Phone, Building2 } from 'lucide-react';
 
 export default function AcceptInvitePage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [cellPhone, setCellPhone] = useState('');
+  const [dealerLicenseNumber, setDealerLicenseNumber] = useState('');
+  const [einNumber, setEinNumber] = useState('');
+  const [businessPhone, setBusinessPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isValidInvite, setIsValidInvite] = useState<boolean | null>(null);
+  const [organizationId, setOrganizationId] = useState<string | null>(null);
 
   const router = useRouter();
   const supabase = createClient();
@@ -27,7 +32,7 @@ export default function AcceptInvitePage() {
 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('status')
+      .select('status, organization_id')
       .eq('id', (session.user as Record<string, unknown>).id)
       .single();
 
@@ -39,6 +44,20 @@ export default function AcceptInvitePage() {
       setError('This invitation has already been used or is no longer valid.');
     } else {
       setIsValidInvite(true);
+      setOrganizationId(profile.organization_id);
+      
+      // Pre-fill business phone if organization exists
+      if (profile.organization_id) {
+        const { data: org } = await supabase
+          .from('organizations')
+          .select('phone')
+          .eq('id', profile.organization_id)
+          .single();
+        
+        if (org?.phone) {
+          setBusinessPhone(org.phone);
+        }
+      }
     }
   }, [supabase]);
 
@@ -70,6 +89,7 @@ export default function AcceptInvitePage() {
     setLoading(true);
     setError(null);
 
+    // Validation
     if (password !== confirmPassword) {
       setError('Passwords do not match');
       setLoading(false);
@@ -77,6 +97,26 @@ export default function AcceptInvitePage() {
     }
     if (password.length < 6) {
       setError('Password must be at least 6 characters long');
+      setLoading(false);
+      return;
+    }
+    if (!cellPhone.trim()) {
+      setError('Cell phone is required');
+      setLoading(false);
+      return;
+    }
+    if (!dealerLicenseNumber.trim()) {
+      setError('Dealer license number is required');
+      setLoading(false);
+      return;
+    }
+    if (!einNumber.trim()) {
+      setError('EIN number is required');
+      setLoading(false);
+      return;
+    }
+    if (!businessPhone.trim()) {
+      setError('Business phone is required');
       setLoading(false);
       return;
     }
@@ -90,19 +130,40 @@ export default function AcceptInvitePage() {
       if (userError) {
         setError(userError.message);
       } else if (user) {
+        // Update profile with cell phone
         const { error: profileError } = await supabase
           .from('profiles')
-          .update({ full_name: fullName, status: 'ACTIVE' })
+          .update({ 
+            full_name: fullName, 
+            cell_phone: cellPhone,
+            status: 'ACTIVE' 
+          })
           .eq('id', user.id);
 
         if (profileError) {
           setError(profileError.message);
+        } else if (organizationId) {
+          // Update organization with business info
+          const { error: orgError } = await supabase
+            .from('organizations')
+            .update({
+              dealer_license_number: dealerLicenseNumber,
+              ein_number: einNumber,
+              phone: businessPhone
+            })
+            .eq('id', organizationId);
+
+          if (orgError) {
+            setError(orgError.message);
+          } else {
+            setSuccess(true);
+            // Redirect to dashboard after a brief delay to show success message
+            setTimeout(() => {
+              router.push('/dashboard');
+            }, 1500);
+          }
         } else {
-          setSuccess(true);
-          // Redirect to dashboard after a brief delay to show success message
-          setTimeout(() => {
-            router.push('/dashboard');
-          }, 1500);
+          setError('Organization not found');
         }
       }
     } catch {
@@ -240,6 +301,90 @@ export default function AcceptInvitePage() {
                   </div>
                 </div>
 
+                {/* Contact Information Section */}
+                <div className="pt-4 border-t border-gray-200">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-4">Contact Information</h3>
+                  
+                  <div>
+                    <label htmlFor="cellPhone" className="block text-sm font-semibold text-gray-700 mb-2">
+                      Cell Phone
+                    </label>
+                    <div className="relative">
+                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input
+                        type="tel"
+                        id="cellPhone"
+                        value={cellPhone}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCellPhone(e.target.value)}
+                        className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-2xl bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition-all duration-300"
+                        placeholder="(555) 123-4567"
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Business Information Section */}
+                <div className="pt-4 border-t border-gray-200">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-4">Business Information</h3>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label htmlFor="dealerLicenseNumber" className="block text-sm font-semibold text-gray-700 mb-2">
+                        Dealer License Number
+                      </label>
+                      <div className="relative">
+                        <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                        <input
+                          type="text"
+                          id="dealerLicenseNumber"
+                          value={dealerLicenseNumber}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDealerLicenseNumber(e.target.value)}
+                          className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-2xl bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition-all duration-300"
+                          placeholder="DL123456"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label htmlFor="einNumber" className="block text-sm font-semibold text-gray-700 mb-2">
+                        EIN Number
+                      </label>
+                      <div className="relative">
+                        <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                        <input
+                          type="text"
+                          id="einNumber"
+                          value={einNumber}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEinNumber(e.target.value)}
+                          className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-2xl bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition-all duration-300"
+                          placeholder="12-3456789"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label htmlFor="businessPhone" className="block text-sm font-semibold text-gray-700 mb-2">
+                        Business Phone
+                      </label>
+                      <div className="relative">
+                        <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                        <input
+                          type="tel"
+                          id="businessPhone"
+                          value={businessPhone}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBusinessPhone(e.target.value)}
+                          className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-2xl bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition-all duration-300"
+                          placeholder="(555) 987-6543"
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <button
                   type="submit"
                   disabled={loading}
@@ -251,7 +396,7 @@ export default function AcceptInvitePage() {
                       Setting up account...
                     </div>
                   ) : (
-                    'Create Account & Login'
+                    'Complete Setup & Login'
                   )}
                 </button>
               </form>

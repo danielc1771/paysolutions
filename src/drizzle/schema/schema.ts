@@ -47,6 +47,8 @@ export const organization = pgTable("organizations", {
 	description: text("description"),
 	contactPerson: varchar("contact_person", { length: 255 }),
 	taxId: varchar("tax_id", { length: 255 }),
+	dealerLicenseNumber: varchar("dealer_license_number", { length: 100 }),
+	einNumber: varchar("ein_number", { length: 20 }),
 	subscriptionStatus: subscriptionStatusEnum('subscription_status').default('trial'),
 	subscriptionStartDate: timestamp("subscription_start_date"),
 	subscriptionEndDate: timestamp("subscription_end_date"),
@@ -64,6 +66,7 @@ export const profiles = pgTable("profiles", {
 	role: roleEnum('role').default('team_member'),
 	fullName: varchar("full_name", { length: 255 }),
 	email: varchar("email", { length: 255 }),
+	cellPhone: varchar("cell_phone", { length: 20 }),
 	status: profileStatusEnum('status').default('INVITED'),
 });
 
