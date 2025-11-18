@@ -158,6 +158,7 @@ export async function POST(request: Request) {
         principal_amount: loanCalculation.principalAmount,
         status: 'application_sent',
         organization_id: profile.organization_id,
+        created_by: user.id, // Track who created the loan
         interest_rate: loanCalculation.annualInterestRate,
         term_weeks: loanCalculation.termWeeks,
         weekly_payment: loanCalculation.weeklyPayment,

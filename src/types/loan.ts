@@ -93,6 +93,9 @@ export interface BaseLoan {
 // Loan with populated borrower information
 export interface LoanWithBorrower extends BaseLoan {
   borrower: BaseBorrower;
+  creator?: {
+    full_name: string;
+  };
 }
 
 // Loan with populated organization information

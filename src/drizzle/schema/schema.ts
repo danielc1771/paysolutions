@@ -198,6 +198,7 @@ export const loans = pgTable("loans", { // Added vehicle fields
 	vehicleVin: varchar("vehicle_vin", { length: 17 }).notNull(),
 	customerFirstName: varchar("customer_first_name", { length: 255 }), // Customer name used for this specific loan
 	customerLastName: varchar("customer_last_name", { length: 255 }),
+	createdBy: uuid("created_by").references(() => profiles.id), // Team member who created the loan
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	organizationId: uuid('organization_id').references(() => organization.id),

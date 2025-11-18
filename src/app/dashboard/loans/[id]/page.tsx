@@ -71,6 +71,9 @@ export default function LoanDetail({ params }: LoanDetailProps) {
               reference3_phone,
               reference3_email,
               kyc_status
+            ),
+            creator:profiles!created_by(
+              full_name
             )
           `)
           .eq('id', id);
@@ -501,7 +504,15 @@ export default function LoanDetail({ params }: LoanDetailProps) {
                     <h1 className="text-2xl font-bold text-gray-900 mb-1">
                       {loan.borrower.first_name} {loan.borrower.last_name}
                     </h1>
-                    <p className="text-sm text-gray-500 mb-3">Loan #{loan.loan_number}</p>
+                    <div className="flex items-center gap-3 mb-3">
+                      <p className="text-sm text-gray-500">#{loan.loan_number}</p>
+                      {loan.creator && (
+                        <>
+                          <span className="text-gray-300">•</span>
+                          <p className="text-sm text-blue-600 font-medium">Created by {loan.creator.full_name}</p>
+                        </>
+                      )}
+                    </div>
                     
                     {/* Quick Actions */}
                     <div className="flex items-center space-x-2">
