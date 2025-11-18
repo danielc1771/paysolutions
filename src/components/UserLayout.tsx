@@ -144,7 +144,7 @@ export default function UserLayout({ children }: UserLayoutProps) {
       // Fetch organization data to check if onboarding is complete
       const { data: org } = await supabase
         .from('organizations')
-        .select('dealer_license_number, ein_number, phone')
+        .select('dealer_license_number, ein_number, phone, address, city, state, zip_code')
         .eq('id', profile.organizationId)
         .single();
 
@@ -159,6 +159,10 @@ export default function UserLayout({ children }: UserLayoutProps) {
         org?.dealer_license_number &&
         org?.ein_number &&
         org?.phone &&
+        org?.address &&
+        org?.city &&
+        org?.state &&
+        org?.zip_code &&
         profileData?.cell_phone
       );
 

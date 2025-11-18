@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Building2, Mail, User, Phone, X } from 'lucide-react';
+import { Building2, Mail, User, X } from 'lucide-react';
 
 interface AddOrganizationFormProps {
   onClose: () => void;
@@ -13,8 +13,9 @@ interface OrganizationFormData {
   name: string;
   email: string;
   contactPerson: string;
-  phone: string;
   subscriptionStatus: 'trial' | 'active' | 'suspended' | 'cancelled';
+  // Phone will be collected during onboarding
+  phone?: string;
   // Optional fields - can be added later via admin dashboard
   subscriptionStartDate?: string;
   subscriptionEndDate?: string;
@@ -75,10 +76,8 @@ export default function AddOrganizationForm({ onClose, onSuccess }: AddOrganizat
       errors.email = 'Please enter a valid email address';
     }
 
-    // Validate phone
-    if (!formData.phone || formData.phone.trim().length === 0) {
-      errors.phone = 'Phone number is required';
-    } else if (formData.phone.trim().length < 10) {
+    // Phone is optional - will be collected during onboarding
+    if (formData.phone && formData.phone.trim().length > 0 && formData.phone.trim().length < 10) {
       errors.phone = 'Please enter a valid phone number';
     }
 
@@ -257,7 +256,7 @@ export default function AddOrganizationForm({ onClose, onSuccess }: AddOrganizat
               </div>
 
               {/* Email */}
-              <div>
+              <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Contact Email *
                 </label>
@@ -275,27 +274,7 @@ export default function AddOrganizationForm({ onClose, onSuccess }: AddOrganizat
                 {fieldErrors.email && (
                   <p className="mt-1 text-sm text-red-600">{fieldErrors.email}</p>
                 )}
-              </div>
-
-              {/* Phone */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Phone Number *
-                </label>
-                <div className="relative">
-                  <Phone className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${fieldErrors.phone ? 'text-red-400' : 'text-gray-400'}`} />
-                  <input
-                    type="tel"
-                    required
-                    value={formData.phone}
-                    onChange={(e) => handleInputChange('phone', e.target.value)}
-                    className={`w-full pl-12 pr-4 py-3 rounded-2xl border ${fieldErrors.phone ? 'border-red-300 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'} focus:ring-2 focus:border-transparent text-gray-900 bg-white`}
-                    placeholder="+1 (555) 123-4567"
-                  />
-                </div>
-                {fieldErrors.phone && (
-                  <p className="mt-1 text-sm text-red-600">{fieldErrors.phone}</p>
-                )}
+                <p className="mt-1 text-xs text-gray-500">Phone and business details will be collected during owner onboarding</p>
               </div>
 
               {/* Subscription Status */}

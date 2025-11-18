@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import { X, Phone, Building2, CheckCircle, Loader2 } from 'lucide-react';
+import { X, Phone, Building2, CheckCircle, Loader2, MapPin } from 'lucide-react';
 
 interface OnboardingModalProps {
   onClose: () => void;
@@ -30,6 +30,10 @@ export default function OnboardingModal({
   const [dealerLicenseNumber, setDealerLicenseNumber] = useState('');
   const [einNumber, setEinNumber] = useState('');
   const [businessPhone, setBusinessPhone] = useState(initialBusinessPhone);
+  const [address, setAddress] = useState('');
+  const [city, setCity] = useState('');
+  const [state, setState] = useState('');
+  const [zipCode, setZipCode] = useState('');
   
   const supabase = createClient();
 
@@ -82,6 +86,26 @@ export default function OnboardingModal({
       setLoading(false);
       return;
     }
+    if (!address.trim()) {
+      setError('Business address is required');
+      setLoading(false);
+      return;
+    }
+    if (!city.trim()) {
+      setError('City is required');
+      setLoading(false);
+      return;
+    }
+    if (!state.trim()) {
+      setError('State is required');
+      setLoading(false);
+      return;
+    }
+    if (!zipCode.trim()) {
+      setError('ZIP code is required');
+      setLoading(false);
+      return;
+    }
 
     try {
       const { error: orgError } = await supabase
@@ -89,7 +113,11 @@ export default function OnboardingModal({
         .update({
           dealer_license_number: dealerLicenseNumber,
           ein_number: einNumber,
-          phone: businessPhone
+          phone: businessPhone,
+          address: address,
+          city: city,
+          state: state,
+          zip_code: zipCode
         })
         .eq('id', organizationId);
 
@@ -205,58 +233,139 @@ export default function OnboardingModal({
             )}
 
             <form onSubmit={handleBusinessSubmit} className="space-y-4">
-              <div>
-                <label htmlFor="dealerLicenseNumber" className="block text-sm font-semibold text-gray-700 mb-2">
-                  Dealer License Number
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label htmlFor="dealerLicenseNumber" className="block text-sm font-semibold text-gray-700 mb-2">
+                    Dealer License Number
+                  </label>
+                  <div className="relative">
+                    <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                      type="text"
+                      id="dealerLicenseNumber"
+                      value={dealerLicenseNumber}
+                      onChange={(e) => setDealerLicenseNumber(e.target.value)}
+                      className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-2xl bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition-all duration-300"
+                      placeholder="DL123456"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="col-span-2">
+                  <label htmlFor="einNumber" className="block text-sm font-semibold text-gray-700 mb-2">
+                    EIN Number
+                  </label>
+                  <div className="relative">
+                    <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                      type="text"
+                      id="einNumber"
+                      value={einNumber}
+                      onChange={(e) => setEinNumber(e.target.value)}
+                      className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-2xl bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition-all duration-300"
+                      placeholder="12-3456789"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="col-span-2">
+                  <label htmlFor="businessPhone" className="block text-sm font-semibold text-gray-700 mb-2">
+                    Business Phone
+                  </label>
+                  <div className="relative">
+                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                      type="tel"
+                      id="businessPhone"
+                      value={businessPhone}
+                      onChange={(e) => setBusinessPhone(e.target.value)}
+                      className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-2xl bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition-all duration-300"
+                      placeholder="(555) 987-6543"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Business Address Section */}
+                <div className="col-span-2 pt-2 border-t border-gray-200">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3">Business Location</h4>
+                </div>
+
+                <div className="col-span-2">
+                <label htmlFor="address" className="block text-sm font-semibold text-gray-700 mb-2">
+                  Street Address
                 </label>
                 <div className="relative">
-                  <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input
                     type="text"
-                    id="dealerLicenseNumber"
-                    value={dealerLicenseNumber}
-                    onChange={(e) => setDealerLicenseNumber(e.target.value)}
+                    id="address"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
                     className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-2xl bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition-all duration-300"
-                    placeholder="DL123456"
+                    placeholder="123 Main Street"
                     required
                   />
                 </div>
               </div>
 
               <div>
-                <label htmlFor="einNumber" className="block text-sm font-semibold text-gray-700 mb-2">
-                  EIN Number
+                <label htmlFor="city" className="block text-sm font-semibold text-gray-700 mb-2">
+                  City
                 </label>
                 <div className="relative">
-                  <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input
                     type="text"
-                    id="einNumber"
-                    value={einNumber}
-                    onChange={(e) => setEinNumber(e.target.value)}
+                    id="city"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
                     className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-2xl bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition-all duration-300"
-                    placeholder="12-3456789"
+                    placeholder="Los Angeles"
                     required
                   />
                 </div>
               </div>
 
               <div>
-                <label htmlFor="businessPhone" className="block text-sm font-semibold text-gray-700 mb-2">
-                  Business Phone
+                <label htmlFor="state" className="block text-sm font-semibold text-gray-700 mb-2">
+                  State
                 </label>
                 <div className="relative">
-                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input
-                    type="tel"
-                    id="businessPhone"
-                    value={businessPhone}
-                    onChange={(e) => setBusinessPhone(e.target.value)}
+                    type="text"
+                    id="state"
+                    value={state}
+                    onChange={(e) => setState(e.target.value)}
                     className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-2xl bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition-all duration-300"
-                    placeholder="(555) 987-6543"
+                    placeholder="CA"
+                    maxLength={2}
                     required
                   />
                 </div>
+              </div>
+
+              <div>
+                <label htmlFor="zipCode" className="block text-sm font-semibold text-gray-700 mb-2">
+                  ZIP Code
+                </label>
+                <div className="relative">
+                  <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    id="zipCode"
+                    value={zipCode}
+                    onChange={(e) => setZipCode(e.target.value)}
+                    className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-2xl bg-white text-gray-900 placeholder-gray-500 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 focus:outline-none transition-all duration-300"
+                    placeholder="90001"
+                    maxLength={10}
+                    required
+                  />
+                </div>
+              </div>
               </div>
 
               <div className="flex gap-3 pt-2">
