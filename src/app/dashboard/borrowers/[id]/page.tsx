@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Mail, Phone, MapPin, Briefcase, DollarSign, Shield, Calendar, User, CreditCard } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, MapPin, Briefcase, DollarSign, Shield, Calendar, User, CreditCard, Users, Download } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { LoanListItem } from '@/types/loan';
 
@@ -31,6 +31,15 @@ interface Borrower {
   created_at: string;
   updated_at: string;
   organization_id: string;
+  reference1_name: string;
+  reference1_phone: string;
+  reference1_email: string;
+  reference2_name: string;
+  reference2_phone: string;
+  reference2_email: string;
+  reference3_name: string;
+  reference3_phone: string;
+  reference3_email: string;
   loans?: Array<LoanListItem>;
 }
 
@@ -38,8 +47,56 @@ export default function BorrowerDetail({ params }: BorrowerDetailProps) {
   const [borrower, setBorrower] = useState<Borrower | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [downloadingContract, setDownloadingContract] = useState<string | null>(null);
 
   const supabase = createClient();
+
+  const handleDownloadContract = async (envelopeId: string, loanNumber: string) => {
+    try {
+      setDownloadingContract(envelopeId);
+      
+      console.log('🔵 Starting contract download for envelope:', envelopeId);
+      
+      const response = await fetch('/api/docusign/download-document', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ envelopeId }),
+      });
+
+      console.log('🔵 Response status:', response.status, response.statusText);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('❌ API Error:', errorData);
+        throw new Error(errorData.error || `Failed to download contract (${response.status})`);
+      }
+
+      console.log('🔵 Creating blob from response...');
+      // Create a blob from the response
+      const blob = await response.blob();
+      console.log('🔵 Blob created, size:', blob.size, 'type:', blob.type);
+      
+      const url = window.URL.createObjectURL(blob);
+      
+      // Create a temporary link and trigger download
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `loan-contract-${loanNumber}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      
+      console.log('✅ Download triggered successfully');
+      
+      // Cleanup
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('❌ Error downloading contract:', err);
+      alert(`Failed to download contract: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setDownloadingContract(null);
+    }
+  };
 
   useEffect(() => {
     const fetchBorrowerData = async () => {
@@ -81,7 +138,10 @@ export default function BorrowerDetail({ params }: BorrowerDetailProps) {
               created_at,
               weekly_payment,
               interest_rate,
-              term_weeks
+              term_weeks,
+              docusign_envelope_id,
+              remaining_balance,
+              funding_date
             )
           `)
           .eq('id', id);
@@ -379,6 +439,98 @@ export default function BorrowerDetail({ params }: BorrowerDetailProps) {
               </div>
             </div>
 
+            {/* Client References */}
+            {(borrower.reference1_name || borrower.reference2_name || borrower.reference3_name) && (
+              <div className="bg-white/70 backdrop-blur-sm rounded-3xl shadow-xl border border-white/20 p-8 mb-8">
+                <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+                  <Users className="w-5 h-5 mr-2 text-purple-600" />
+                  Client References
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {borrower.reference1_name && (
+                    <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-6 border border-purple-200/50">
+                      <div className="flex items-center mb-4">
+                        <div className="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center text-white font-bold">
+                          1
+                        </div>
+                        <h3 className="ml-3 font-semibold text-gray-900">{borrower.reference1_name}</h3>
+                      </div>
+                      {borrower.reference1_phone && (
+                        <div className="flex items-center text-sm text-gray-700 mb-2">
+                          <Phone className="w-4 h-4 mr-2 text-purple-600" />
+                          <a href={`tel:${borrower.reference1_phone}`} className="hover:text-purple-600">
+                            {borrower.reference1_phone}
+                          </a>
+                        </div>
+                      )}
+                      {borrower.reference1_email && (
+                        <div className="flex items-center text-sm text-gray-700">
+                          <Mail className="w-4 h-4 mr-2 text-purple-600" />
+                          <a href={`mailto:${borrower.reference1_email}`} className="hover:text-purple-600 truncate">
+                            {borrower.reference1_email}
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {borrower.reference2_name && (
+                    <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-6 border border-blue-200/50">
+                      <div className="flex items-center mb-4">
+                        <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">
+                          2
+                        </div>
+                        <h3 className="ml-3 font-semibold text-gray-900">{borrower.reference2_name}</h3>
+                      </div>
+                      {borrower.reference2_phone && (
+                        <div className="flex items-center text-sm text-gray-700 mb-2">
+                          <Phone className="w-4 h-4 mr-2 text-blue-600" />
+                          <a href={`tel:${borrower.reference2_phone}`} className="hover:text-blue-600">
+                            {borrower.reference2_phone}
+                          </a>
+                        </div>
+                      )}
+                      {borrower.reference2_email && (
+                        <div className="flex items-center text-sm text-gray-700">
+                          <Mail className="w-4 h-4 mr-2 text-blue-600" />
+                          <a href={`mailto:${borrower.reference2_email}`} className="hover:text-blue-600 truncate">
+                            {borrower.reference2_email}
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {borrower.reference3_name && (
+                    <div className="bg-gradient-to-br from-green-50 to-teal-50 rounded-2xl p-6 border border-green-200/50">
+                      <div className="flex items-center mb-4">
+                        <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center text-white font-bold">
+                          3
+                        </div>
+                        <h3 className="ml-3 font-semibold text-gray-900">{borrower.reference3_name}</h3>
+                      </div>
+                      {borrower.reference3_phone && (
+                        <div className="flex items-center text-sm text-gray-700 mb-2">
+                          <Phone className="w-4 h-4 mr-2 text-green-600" />
+                          <a href={`tel:${borrower.reference3_phone}`} className="hover:text-green-600">
+                            {borrower.reference3_phone}
+                          </a>
+                        </div>
+                      )}
+                      {borrower.reference3_email && (
+                        <div className="flex items-center text-sm text-gray-700">
+                          <Mail className="w-4 h-4 mr-2 text-green-600" />
+                          <a href={`mailto:${borrower.reference3_email}`} className="hover:text-green-600 truncate">
+                            {borrower.reference3_email}
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Loans Table */}
             <div className="bg-white/70 backdrop-blur-sm rounded-3xl shadow-xl border border-white/20">
               <div className="px-6 py-4 border-b border-gray-200">
@@ -409,19 +561,16 @@ export default function BorrowerDetail({ params }: BorrowerDetailProps) {
                           Amount
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Weekly Payment
+                          Paid / Owed
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Term
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Rate
+                          Standing
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Status
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Applied
+                          Contract
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Action
@@ -429,44 +578,90 @@ export default function BorrowerDetail({ params }: BorrowerDetailProps) {
                       </tr>
                     </thead>
                     <tbody className="bg-white/50 divide-y divide-gray-200">
-                      {borrower.loans.map((loan) => (
-                        <tr key={loan.id} className="hover:bg-gray-50/70 cursor-pointer">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">
-                            {loan.loan_number}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            ${parseFloat(loan.principal_amount).toLocaleString()}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            ${parseFloat(loan.weekly_payment).toLocaleString()}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {loan.term_weeks} weeks
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {(parseFloat(loan.interest_rate) * 100).toFixed(2)}%
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getLoanStatusColor(loan.status)}`}>
-                              {loan.status}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {new Date(loan.created_at).toLocaleDateString()}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <Link
-                              href={`/dashboard/loans/${loan.id}`}
-                              className="text-blue-600 hover:text-blue-700 p-2 rounded-xl hover:bg-blue-50 transition-colors"
-                            >
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                              </svg>
-                            </Link>
-                          </td>
-                        </tr>
-                      ))}
+                      {borrower.loans.map((loan) => {
+                        const principalAmount = parseFloat(loan.principal_amount);
+                        const remainingBalance = loan.remaining_balance ? parseFloat(loan.remaining_balance) : principalAmount;
+                        const totalPaid = principalAmount - remainingBalance;
+                        // Calculate days late based on loan status and funding date
+                        // This is a simplified calculation - in production you'd check payment schedules
+                        const daysLate = loan.days_late || loan.days_overdue || 0;
+                        
+                        // Determine payment standing
+                        let standing = 'Current';
+                        let standingColor = 'bg-green-100 text-green-800';
+                        
+                        if (loan.status === 'derogatory') {
+                          standing = 'Derogatory';
+                          standingColor = 'bg-red-100 text-red-800';
+                        } else if (daysLate > 0) {
+                          standing = 'Late';
+                          standingColor = 'bg-yellow-100 text-yellow-800';
+                        } else if (loan.status === 'closed' || loan.status === 'settled') {
+                          standing = 'Closed';
+                          standingColor = 'bg-gray-100 text-gray-800';
+                        }
+                        
+                        return (
+                          <tr key={loan.id} className="hover:bg-gray-50/70">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">
+                              {loan.loan_number}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              ${principalAmount.toLocaleString()}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              <div className="flex flex-col">
+                                <span className="font-semibold text-green-600">${totalPaid.toLocaleString()}</span>
+                                <span className="text-xs text-gray-500">/ ${principalAmount.toLocaleString()}</span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${standingColor}`}>
+                                {standing}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getLoanStatusColor(loan.status)}`}>
+                                {loan.status}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                              {loan.docusign_envelope_id ? (
+                                <button
+                                  onClick={() => loan.docusign_envelope_id && handleDownloadContract(loan.docusign_envelope_id, loan.loan_number)}
+                                  disabled={downloadingContract === loan.docusign_envelope_id}
+                                  className="inline-flex items-center px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50"
+                                >
+                                  {downloadingContract === loan.docusign_envelope_id ? (
+                                    <>
+                                      <div className="animate-spin rounded-full h-3 w-3 border-2 border-blue-600 border-t-transparent mr-2"></div>
+                                      Downloading...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Download className="w-3 h-3 mr-1" />
+                                      PDF
+                                    </>
+                                  )}
+                                </button>
+                              ) : (
+                                <span className="text-gray-400 text-xs">No contract</span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                              <Link
+                                href={`/dashboard/loans/${loan.id}`}
+                                className="text-blue-600 hover:text-blue-700 p-2 rounded-xl hover:bg-blue-50 transition-colors inline-block"
+                              >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                              </Link>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

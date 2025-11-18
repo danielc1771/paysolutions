@@ -122,9 +122,11 @@ export interface LoanListItem {
     kyc_status?: string;
   };
   docusign_status: string;
+  docusign_envelope_id?: string;
   created_at: string;
   purpose: string;
   remaining_balance: string;
+  funding_date?: string;
   vehicle_make: string;
   vehicle_model: string;
   vehicle_year: string;
@@ -133,6 +135,7 @@ export interface LoanListItem {
   derogatory_date?: string;
   is_late?: boolean;
   days_overdue?: number;
+  days_late?: number;
 }
 
 // Admin loan list item with organization info
