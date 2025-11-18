@@ -20,21 +20,40 @@ export async function GET(
       referer: request.headers.get('referer')
     });
 
-    // Retrieve the verification session from Stripe
-    const verificationSession = await stripe.identity.verificationSessions.retrieve(sessionId);
+    // Retrieve the verification session from Stripe with expanded verification report
+    const verificationSession = await stripe.identity.verificationSessions.retrieve(sessionId, {
+      expand: ['last_verification_report'],
+    });
 
+    // Extract verification report data
+    const verificationReport = verificationSession.last_verification_report as Stripe.Identity.VerificationReport | null;
+    
     console.log('✅ Retrieved verification session:', {
       sessionId,
       status: verificationSession.status,
       lastError: verificationSession.last_error,
       metadata: verificationSession.metadata,
-      verifiedOutputs: verificationSession.verified_outputs ? 'present' : 'missing'
+      verifiedOutputs: verificationSession.verified_outputs ? 'present' : 'missing',
+      documentStatus: verificationReport?.document?.status,
+      selfieStatus: verificationReport?.selfie?.status,
+      documentError: verificationReport?.document?.error,
+      selfieError: verificationReport?.selfie?.error
     });
 
     return NextResponse.json({
       status: verificationSession.status,
       last_error: verificationSession.last_error,
       verified_outputs: verificationSession.verified_outputs,
+      verification_report: verificationReport ? {
+        document: {
+          status: verificationReport.document?.status,
+          error: verificationReport.document?.error,
+        },
+        selfie: {
+          status: verificationReport.selfie?.status,
+          error: verificationReport.selfie?.error,
+        },
+      } : null,
     });
 
   } catch (error: unknown) {

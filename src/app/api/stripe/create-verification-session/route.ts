@@ -21,11 +21,16 @@ export async function POST(request: Request) {
       referer: request.headers.get('referer')
     });
     
-    // Create the verification session
+    // Create the verification session with selfie check
     const verificationSession = await stripe.identity.verificationSessions.create({
       type: 'document',
       provided_details: {
         email: email,
+      },
+      options: {
+        document: {
+          require_matching_selfie: true, // Enable selfie verification
+        },
       },
       metadata: {
         loan_id: loanId,

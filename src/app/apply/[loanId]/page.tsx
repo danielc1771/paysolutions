@@ -1837,6 +1837,20 @@ function StripeVerificationStep({ formData, setFormData, initialData, handleNext
             
             console.log(`📊 Poll attempt ${pollAttempts + 1}: Status =`, statusData.status);
             
+            // Log selfie and document verification details
+            if (statusData.verification_report) {
+              console.log('📸 Document verification:', statusData.verification_report.document);
+              console.log('🤳 Selfie verification:', statusData.verification_report.selfie);
+              
+              // Check for specific failures
+              if (statusData.verification_report.document?.error) {
+                console.error('❌ Document check failed:', statusData.verification_report.document.error);
+              }
+              if (statusData.verification_report.selfie?.error) {
+                console.error('❌ Selfie check failed:', statusData.verification_report.selfie.error);
+              }
+            }
+            
             if (statusData.status === 'verified') {
               // Update formData with completed status
               const updatedData = { 
