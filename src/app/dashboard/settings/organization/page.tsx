@@ -556,7 +556,12 @@ export default function OrganizationSettings() {
                                 alt="Logo Preview"
                                 width={200}
                                 height={200}
-                                className="rounded-xl shadow-lg"
+                                className="rounded-xl shadow-lg object-contain"
+                                unoptimized
+                                onError={(e) => {
+                                  console.error('Image load error:', e);
+                                  setLogoPreview('');
+                                }}
                               />
                             ) : (
                               <div className="text-gray-400 text-sm">No logo selected</div>
@@ -584,7 +589,8 @@ export default function OrganizationSettings() {
                           alt="Current Logo"
                           width={200}
                           height={200}
-                          className="rounded-xl shadow-lg"
+                          className="rounded-xl shadow-lg object-contain"
+                          unoptimized
                         />
                       </div>
                     </div>
