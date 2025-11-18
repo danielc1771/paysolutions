@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "iPayUS",
+  title: "iOpes",
   description: "Your trusted lending partner",
 };
 

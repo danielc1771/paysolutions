@@ -7,6 +7,8 @@ import Image from 'next/image';
 import { createClient } from '@/utils/supabase/client';
 import { LayoutDashboard, FileText, Plus, Users, Bell, UserPlus, Building2, Menu, X } from 'lucide-react';
 import { useUserProfile } from '@/components/auth/RoleRedirect';
+import OnboardingModal from '@/components/dashboard/OnboardingModal';
+import OnboardingBanner from '@/components/dashboard/OnboardingBanner';
 
 interface UserLayoutProps {
   children: React.ReactNode;
@@ -53,6 +55,10 @@ export default function UserLayout({ children }: UserLayoutProps) {
   // orgSettings is used for fetching but not directly rendered
   const [logoUrl, setLogoUrl] = useState('/logoMain.png'); // Default logo
   const [colorTheme, setColorTheme] = useState('default'); // Default theme
+  const [showOnboardingModal, setShowOnboardingModal] = useState(false);
+  const [showOnboardingBanner, setShowOnboardingBanner] = useState(false);
+  const [onboardingComplete, setOnboardingComplete] = useState(true);
+  const [organizationPhone, setOrganizationPhone] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
   const supabase = useMemo(() => createClient(), []);
@@ -125,6 +131,55 @@ export default function UserLayout({ children }: UserLayoutProps) {
     
     fetchOrgSettings();
   }, [profile?.organizationId, profile?.role, supabase]);
+
+  // Check onboarding status for organization owners
+  useEffect(() => {
+    const checkOnboarding = async () => {
+      if (profile?.role !== 'organization_owner' || !profile?.organizationId || !user?.id) return;
+
+      // Check if coming from invite with onboarding flag
+      const urlParams = new URLSearchParams(window.location.search);
+      const showOnboarding = urlParams.get('onboarding') === 'true';
+
+      // Fetch organization data to check if onboarding is complete
+      const { data: org } = await supabase
+        .from('organizations')
+        .select('dealer_license_number, ein_number, phone')
+        .eq('id', profile.organizationId)
+        .single();
+
+      // Fetch profile data to check cell phone
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('cell_phone')
+        .eq('id', user.id)
+        .single();
+
+      const isComplete = !!(
+        org?.dealer_license_number &&
+        org?.ein_number &&
+        org?.phone &&
+        profileData?.cell_phone
+      );
+
+      setOnboardingComplete(isComplete);
+      setOrganizationPhone(org?.phone || '');
+
+      if (!isComplete) {
+        if (showOnboarding) {
+          // Show modal immediately if coming from invite
+          setShowOnboardingModal(true);
+          // Remove query param from URL
+          window.history.replaceState({}, '', pathname);
+        } else {
+          // Show banner if not complete and not from invite
+          setShowOnboardingBanner(true);
+        }
+      }
+    };
+
+    checkOnboarding();
+  }, [profile, user, supabase, pathname]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -412,8 +467,36 @@ export default function UserLayout({ children }: UserLayoutProps) {
 
         {/* Page content */}
         <main className="flex-1 overflow-y-auto">
-          {children}
+          <div className="p-6">
+            {/* Onboarding Banner */}
+            {showOnboardingBanner && !onboardingComplete && profile?.role === 'organization_owner' && (
+              <OnboardingBanner
+                onComplete={() => {
+                  setShowOnboardingBanner(false);
+                  setShowOnboardingModal(true);
+                }}
+                onDismiss={() => setShowOnboardingBanner(false)}
+              />
+            )}
+            
+            {children}
+          </div>
         </main>
+
+        {/* Onboarding Modal */}
+        {showOnboardingModal && user?.id && profile?.organizationId && (
+          <OnboardingModal
+            onClose={() => setShowOnboardingModal(false)}
+            onComplete={() => {
+              setShowOnboardingModal(false);
+              setOnboardingComplete(true);
+              setShowOnboardingBanner(false);
+            }}
+            organizationId={profile.organizationId}
+            userId={user.id}
+            initialBusinessPhone={organizationPhone}
+          />
+        )}
       </div>
     </div>
   );
