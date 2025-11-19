@@ -90,16 +90,26 @@ export default function UserLayout({ children }: UserLayoutProps) {
   // Fetch organization settings
   useEffect(() => {
     const fetchOrgSettings = async () => {
+      console.log('[UserLayout] Fetching org settings', {
+        role: profile?.role,
+        organizationId: profile?.organizationId
+      });
+
       // Admin users get purple theme
       if (profile?.role === 'admin') {
+        console.log('[UserLayout] Admin user detected, using purple theme');
         setColorTheme('purple');
         return;
       }
       
-      if (!profile?.organizationId) return;
+      if (!profile?.organizationId) {
+        console.log('[UserLayout] No organization ID, skipping settings fetch');
+        return;
+      }
       
       try {
         // Fetch organization settings
+        console.log('[UserLayout] Querying organization_settings for org:', profile.organizationId);
         const { data, error } = await supabase
           .from('organization_settings')
           .select('*')
@@ -107,24 +117,34 @@ export default function UserLayout({ children }: UserLayoutProps) {
           .single();
         
         if (error && error.code !== 'PGRST116') {
-          console.error('Error fetching organization settings:', error);
+          console.error('[UserLayout] Error fetching organization settings:', error);
           // Continue with defaults on error
           return;
         }
         
+        console.log('[UserLayout] Organization settings fetched:', data);
+        
         if (data) {
           // Set logo if available, otherwise keep default
           if (data.logo_url) {
+            console.log('[UserLayout] Setting custom logo:', data.logo_url);
             setLogoUrl(data.logo_url);
+          } else {
+            console.log('[UserLayout] No custom logo, using default /logoMain.png');
           }
           
           // Set color theme if available, otherwise keep default
           if (data.color_theme && COLOR_THEMES[data.color_theme]) {
+            console.log('[UserLayout] Setting color theme:', data.color_theme);
             setColorTheme(data.color_theme);
+          } else {
+            console.log('[UserLayout] No custom theme or invalid theme, using default');
           }
+        } else {
+          console.log('[UserLayout] No settings data found (PGRST116 - no rows)');
         }
       } catch (error) {
-        console.error('Error fetching organization settings:', error);
+        console.error('[UserLayout] Exception fetching organization settings:', error);
         // Keep defaults on error - no additional action needed
       }
     };
@@ -136,6 +156,8 @@ export default function UserLayout({ children }: UserLayoutProps) {
   useEffect(() => {
     const checkOnboarding = async () => {
       if (profile?.role !== 'organization_owner' || !profile?.organizationId || !user?.id) return;
+
+      console.log('[UserLayout] Checking onboarding status');
 
       // Check if coming from invite with onboarding flag
       const urlParams = new URLSearchParams(window.location.search);
@@ -166,6 +188,17 @@ export default function UserLayout({ children }: UserLayoutProps) {
         profileData?.cell_phone
       );
 
+      console.log('[UserLayout] Onboarding complete:', isComplete, {
+        dealer_license_number: !!org?.dealer_license_number,
+        ein_number: !!org?.ein_number,
+        phone: !!org?.phone,
+        address: !!org?.address,
+        city: !!org?.city,
+        state: !!org?.state,
+        zip_code: !!org?.zip_code,
+        cell_phone: !!profileData?.cell_phone
+      });
+
       setOnboardingComplete(isComplete);
       setOrganizationPhone(org?.phone || '');
 
@@ -179,10 +212,26 @@ export default function UserLayout({ children }: UserLayoutProps) {
           // Show banner if not complete and not from invite
           setShowOnboardingBanner(true);
         }
+      } else {
+        // Hide banner if onboarding is complete
+        console.log('[UserLayout] Onboarding complete, hiding banner');
+        setShowOnboardingBanner(false);
       }
     };
 
     checkOnboarding();
+
+    // Listen for custom event to re-check onboarding
+    const handleOnboardingUpdate = () => {
+      console.log('[UserLayout] Onboarding update event received, re-checking');
+      checkOnboarding();
+    };
+
+    window.addEventListener('onboardingUpdated', handleOnboardingUpdate);
+
+    return () => {
+      window.removeEventListener('onboardingUpdated', handleOnboardingUpdate);
+    };
   }, [profile, user, supabase, pathname]);
 
   // Close dropdowns when clicking outside
@@ -291,7 +340,13 @@ export default function UserLayout({ children }: UserLayoutProps) {
             alt="Organization Logo" 
             width={150} 
             height={150}
-            className="rounded-xl shadow-lg"
+            className="rounded-xl shadow-lg object-contain"
+            unoptimized
+            onLoad={() => console.log('[UserLayout] Logo loaded successfully:', logoUrl)}
+            onError={(e) => {
+              console.error('[UserLayout] Logo failed to load:', logoUrl, e);
+              setLogoUrl('/logoMain.png');
+            }}
           />
           <button
             onClick={() => setSidebarOpen(false)}

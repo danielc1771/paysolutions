@@ -124,6 +124,8 @@ export default function OnboardingModal({
       if (orgError) {
         setError(orgError.message);
       } else {
+        // Dispatch event to trigger onboarding re-check
+        window.dispatchEvent(new Event('onboardingUpdated'));
         onComplete();
       }
     } catch {

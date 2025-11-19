@@ -1,44 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { createClient } from '@/utils/supabase/client';
 import { useUserProfile } from '@/components/auth/RoleRedirect';
-
-// Color theme options with their gradient values
-const COLOR_THEMES = {
-  default: {
-    name: 'Default (Green/Teal)',
-    gradient: 'from-green-500 to-teal-500',
-    bgGradient: 'from-green-50 via-blue-50 to-teal-100',
-    shadow: 'shadow-green-500/25'
-  },
-  blue: {
-    name: 'Ocean Blue',
-    gradient: 'from-blue-500 to-cyan-500',
-    bgGradient: 'from-blue-50 via-cyan-50 to-blue-100',
-    shadow: 'shadow-blue-500/25'
-  },
-  purple: {
-    name: 'Royal Purple',
-    gradient: 'from-purple-500 to-indigo-500',
-    bgGradient: 'from-purple-50 via-indigo-50 to-purple-100',
-    shadow: 'shadow-purple-500/25'
-  },
-  amber: {
-    name: 'Sunset Amber',
-    gradient: 'from-amber-500 to-orange-500',
-    bgGradient: 'from-amber-50 via-yellow-50 to-orange-100',
-    shadow: 'shadow-amber-500/25'
-  },
-  rose: {
-    name: 'Rose Pink',
-    gradient: 'from-rose-500 to-pink-500',
-    bgGradient: 'from-rose-50 via-pink-50 to-rose-100',
-    shadow: 'shadow-rose-500/25'
-  }
-};
 
 export default function OrganizationSettings() {
   const [loading, setLoading] = useState(true);
@@ -52,6 +17,8 @@ export default function OrganizationSettings() {
     state?: string;
     zip_code?: string;
     phone?: string;
+    dealer_license_number?: string;
+    ein_number?: string;
   } | null>(null);
   const [isEditingInfo, setIsEditingInfo] = useState(false);
   const [editedOrg, setEditedOrg] = useState<{
@@ -63,17 +30,25 @@ export default function OrganizationSettings() {
     zip_code: string;
     phone: string;
   }>({ name: '', email: '', address: '', city: '', state: '', zip_code: '', phone: '' });
+  const [isEditingBusiness, setIsEditingBusiness] = useState(false);
+  const [editedBusiness, setEditedBusiness] = useState<{
+    dealer_license_number: string;
+    ein_number: string;
+    phone: string;
+    cell_phone: string;
+  }>({ dealer_license_number: '', ein_number: '', phone: '', cell_phone: '' });
+  const [userProfile, setUserProfile] = useState<{ cell_phone?: string } | null>(null);
   const [settings, setSettings] = useState<{
     id: string;
     logo_url: string;
     color_theme: string;
   } | null>(null);
-  const [selectedTheme, setSelectedTheme] = useState('default');
   const [logoUrl, setLogoUrl] = useState('');
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState('');
+  const [removeLogo, setRemoveLogo] = useState(false);
+  const [hasLogoChanges, setHasLogoChanges] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
-  const router = useRouter();
   const supabase = createClient();
   const { profile } = useUserProfile();
 
@@ -105,6 +80,27 @@ export default function OrganizationSettings() {
           phone: orgData.phone || ''
         });
 
+        // Fetch user profile for cell phone
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('cell_phone')
+          .eq('id', profile.id)
+          .single();
+
+        if (profileError) {
+          console.warn('Error fetching profile:', profileError);
+        } else {
+          setUserProfile(profileData);
+        }
+
+        // Set business information
+        setEditedBusiness({
+          dealer_license_number: orgData.dealer_license_number || '',
+          ein_number: orgData.ein_number || '',
+          phone: orgData.phone || '',
+          cell_phone: profileData?.cell_phone || ''
+        });
+
         // Fetch organization settings
         const { data: settingsData, error: settingsError } = await supabase
           .from('organization_settings')
@@ -119,9 +115,6 @@ export default function OrganizationSettings() {
 
         if (settingsData) {
           setSettings(settingsData);
-          if (settingsData.color_theme) {
-            setSelectedTheme(settingsData.color_theme);
-          }
           if (settingsData.logo_url) {
             setLogoUrl(settingsData.logo_url);
             setLogoPreview(settingsData.logo_url);
@@ -143,30 +136,260 @@ export default function OrganizationSettings() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    console.log('[Logo Upload] File selected:', {
+      name: file.name,
+      type: file.type,
+      size: file.size,
+      sizeInMB: (file.size / (1024 * 1024)).toFixed(2)
+    });
+
     // Validate file type - industry standard formats
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
     if (!allowedTypes.includes(file.type)) {
+      console.error('[Logo Upload] Invalid file type:', file.type);
       setMessage({ type: 'error', text: 'Please select a valid image file (JPEG, PNG, WebP, or GIF).' });
       return;
     }
 
     // Validate file size (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
+      console.error('[Logo Upload] File too large:', file.size);
       setMessage({ type: 'error', text: 'Logo image must be less than 2MB.' });
       return;
     }
 
     // Clear any previous error messages
     setMessage({ type: '', text: '' });
-
+    setRemoveLogo(false);
     setLogoFile(file);
+    setHasLogoChanges(true); // Enable save button
 
     // Create preview
     const reader = new FileReader();
     reader.onloadend = () => {
+      console.log('[Logo Upload] Preview created');
       setLogoPreview(reader.result as string);
     };
     reader.readAsDataURL(file);
+  };
+
+  // Handle logo removal with immediate save
+  const handleRemoveLogo = async () => {
+    if (!profile?.organizationId || profile?.role !== 'organization_owner') return;
+    
+    // Confirm removal
+    if (!window.confirm('Are you sure you want to remove your organization logo? The default iOpes logo will be used instead.')) {
+      return;
+    }
+
+    console.log('[Logo Upload] Removing logo immediately');
+    setSaving(true);
+    setMessage({ type: '', text: '' });
+
+    try {
+      let oldLogoPath = null;
+
+      // Extract old logo path for cleanup if it exists
+      if (logoUrl && logoUrl.includes('organization_assets')) {
+        const urlParts = logoUrl.split('/organization_assets/');
+        if (urlParts.length > 1) {
+          oldLogoPath = urlParts[1].split('?')[0];
+          console.log('[Logo Upload] Old logo path to delete:', oldLogoPath);
+        }
+      }
+
+      // Delete from storage if exists
+      if (oldLogoPath) {
+        console.log('[Logo Upload] Deleting logo from storage:', oldLogoPath);
+        const { error: deleteError } = await supabase.storage
+          .from('organization_assets')
+          .remove([oldLogoPath]);
+        
+        if (deleteError) {
+          console.warn('[Logo Upload] Failed to delete logo from storage:', deleteError);
+        } else {
+          console.log('[Logo Upload] Logo deleted from storage successfully');
+        }
+      }
+
+      // Update database to remove logo URL
+      if (settings?.id) {
+        console.log('[Logo Upload] Updating database to remove logo URL');
+        const { error: updateError } = await supabase
+          .from('organization_settings')
+          .update({
+            logo_url: '',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', settings.id);
+
+        if (updateError) {
+          console.error('[Logo Upload] Database update error:', updateError);
+          throw new Error('Failed to remove logo from database');
+        }
+        
+        console.log('[Logo Upload] Database updated successfully');
+      } else {
+        // If no settings exist yet, create with empty logo
+        console.log('[Logo Upload] Creating settings with empty logo');
+        const { error: insertError } = await supabase
+          .from('organization_settings')
+          .insert({
+            organization_id: profile.organizationId,
+            logo_url: '',
+            color_theme: 'default'
+          });
+
+        if (insertError) {
+          console.error('[Logo Upload] Database insert error:', insertError);
+          throw new Error('Failed to save settings');
+        }
+      }
+
+      // Update local state
+      console.log('[Logo Upload] Updating local state');
+      setLogoUrl('');
+      setLogoPreview('');
+      setLogoFile(null);
+      setRemoveLogo(false);
+      setHasLogoChanges(false);
+      
+      setMessage({ type: 'success', text: 'Logo removed successfully! Refreshing...' });
+      
+      // Reload page to update sidebar
+      setTimeout(() => {
+        console.log('[Logo Upload] Reloading page');
+        window.location.reload();
+      }, 1000);
+      
+    } catch (error) {
+      console.error('[Logo Upload] Error removing logo:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to remove logo. Please try again.';
+      setMessage({ type: 'error', text: errorMessage });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Handle saving logo changes only
+  const handleSaveLogo = async () => {
+    if (!profile?.organizationId || !logoFile) return;
+
+    setSaving(true);
+    setMessage({ type: '', text: '' });
+
+    try {
+      console.log('[Logo Upload] Saving logo changes');
+      
+      let oldLogoPath = null;
+
+      // Extract old logo path for cleanup if it exists
+      if (logoUrl && logoUrl.includes('organization_assets')) {
+        const urlParts = logoUrl.split('/organization_assets/');
+        if (urlParts.length > 1) {
+          oldLogoPath = urlParts[1].split('?')[0];
+          console.log('[Logo Upload] Old logo path extracted:', oldLogoPath);
+        }
+      }
+
+      // Upload new logo
+      const fileExtension = logoFile.name.split('.').pop();
+      const fileName = `org_logo_${profile.organizationId}_${Date.now()}.${fileExtension}`;
+      
+      console.log('[Logo Upload] Uploading new logo:', fileName);
+      
+      const { error: uploadError, data: uploadData } = await supabase.storage
+        .from('organization_assets')
+        .upload(fileName, logoFile);
+
+      if (uploadError) {
+        console.error('[Logo Upload] Upload error:', uploadError);
+        throw new Error('Failed to upload logo. Please try again.');
+      }
+
+      console.log('[Logo Upload] Upload successful:', uploadData);
+
+      // Get public URL for the uploaded file
+      const { data: publicUrlData } = supabase.storage
+        .from('organization_assets')
+        .getPublicUrl(fileName);
+
+      const updatedLogoUrl = publicUrlData.publicUrl;
+      console.log('[Logo Upload] Public URL generated:', updatedLogoUrl);
+
+      // Update database
+      if (settings?.id) {
+        console.log('[Logo Upload] Updating settings with new logo');
+        const { error: updateError } = await supabase
+          .from('organization_settings')
+          .update({
+            logo_url: updatedLogoUrl,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', settings.id);
+
+        if (updateError) {
+          console.error('[Logo Upload] Update error:', updateError);
+          throw updateError;
+        }
+      } else {
+        // Create new settings
+        console.log('[Logo Upload] Creating new settings with logo');
+        const { error: insertError } = await supabase
+          .from('organization_settings')
+          .insert({
+            organization_id: profile.organizationId,
+            logo_url: updatedLogoUrl,
+            color_theme: 'default'
+          });
+
+        if (insertError) {
+          console.error('[Logo Upload] Insert error:', insertError);
+          throw insertError;
+        }
+      }
+
+      // Clean up old logo if it exists
+      if (oldLogoPath && oldLogoPath !== fileName) {
+        try {
+          console.log('[Logo Upload] Cleaning up old logo:', oldLogoPath);
+          await supabase.storage
+            .from('organization_assets')
+            .remove([oldLogoPath]);
+          console.log('[Logo Upload] Old logo cleaned up successfully');
+        } catch (cleanupError) {
+          console.warn('[Logo Upload] Failed to cleanup old logo:', cleanupError);
+        }
+      }
+
+      // Update local state
+      console.log('[Logo Upload] Updating local state with new logo URL:', updatedLogoUrl);
+      setLogoUrl(updatedLogoUrl);
+      setLogoPreview(updatedLogoUrl);
+      setLogoFile(null);
+      setHasLogoChanges(false);
+      
+      console.log('[Logo Upload] Logo saved successfully');
+      setMessage({ type: 'success', text: 'Logo saved successfully! Refreshing...' });
+      
+      // Reload the page to apply changes to sidebar
+      setTimeout(() => {
+        console.log('[Logo Upload] Reloading page');
+        window.location.reload();
+      }, 1000);
+      
+    } catch (error) {
+      console.error('[Logo Upload] Error saving logo:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save logo. Please try again.';
+      setMessage({ type: 'error', text: errorMessage });
+      
+      // Reset logo preview on error
+      setLogoPreview(logoUrl || '');
+      setLogoFile(null);
+      setHasLogoChanges(false);
+    } finally {
+      setSaving(false);
+    }
   };
 
   // Handle form submission
@@ -178,6 +401,14 @@ export default function OrganizationSettings() {
     setMessage({ type: '', text: '' });
 
     try {
+      console.log('[Logo Upload] Starting save process', {
+        hasLogoFile: !!logoFile,
+        removeLogo,
+        currentLogoUrl: logoUrl,
+        role: profile?.role,
+        organizationId: profile?.organizationId
+      });
+
       let updatedLogoUrl = logoUrl;
       let oldLogoPath = null;
 
@@ -186,6 +417,7 @@ export default function OrganizationSettings() {
         const urlParts = logoUrl.split('/organization_assets/');
         if (urlParts.length > 1) {
           oldLogoPath = urlParts[1].split('?')[0]; // Remove query params
+          console.log('[Logo Upload] Old logo path extracted:', oldLogoPath);
         }
       }
 
@@ -194,14 +426,18 @@ export default function OrganizationSettings() {
         const fileExtension = logoFile.name.split('.').pop();
         const fileName = `org_logo_${profile.organizationId}_${Date.now()}.${fileExtension}`;
         
-        const { error: uploadError } = await supabase.storage
+        console.log('[Logo Upload] Uploading new logo:', fileName);
+        
+        const { error: uploadError, data: uploadData } = await supabase.storage
           .from('organization_assets')
           .upload(fileName, logoFile);
 
         if (uploadError) {
-          console.error('Upload error:', uploadError);
+          console.error('[Logo Upload] Upload error:', uploadError);
           throw new Error('Failed to upload logo. Please try again.');
         }
+
+        console.log('[Logo Upload] Upload successful:', uploadData);
 
         // Get public URL for the uploaded file
         const { data: publicUrlData } = supabase.storage
@@ -209,15 +445,18 @@ export default function OrganizationSettings() {
           .getPublicUrl(fileName);
 
         updatedLogoUrl = publicUrlData.publicUrl;
+        console.log('[Logo Upload] Public URL generated:', updatedLogoUrl);
 
         // Clean up old logo if it exists and upload was successful
         if (oldLogoPath && oldLogoPath !== fileName) {
           try {
+            console.log('[Logo Upload] Cleaning up old logo:', oldLogoPath);
             await supabase.storage
               .from('organization_assets')
               .remove([oldLogoPath]);
+            console.log('[Logo Upload] Old logo cleaned up successfully');
           } catch (cleanupError) {
-            console.warn('Failed to cleanup old logo:', cleanupError);
+            console.warn('[Logo Upload] Failed to cleanup old logo:', cleanupError);
             // Don't fail the entire operation for cleanup failure
           }
         }
@@ -227,7 +466,7 @@ export default function OrganizationSettings() {
       if (settings?.id) {
         // Update existing settings
         const updateData: Record<string, string> = {
-          color_theme: selectedTheme,
+          color_theme: 'default',
           updated_at: new Date().toISOString()
         };
         
@@ -236,17 +475,24 @@ export default function OrganizationSettings() {
           updateData.logo_url = updatedLogoUrl;
         }
         
+        console.log('[Logo Upload] Updating settings:', { id: settings.id, updateData });
+        
         const { error: updateError } = await supabase
           .from('organization_settings')
           .update(updateData)
           .eq('id', settings.id);
 
-        if (updateError) throw updateError;
+        if (updateError) {
+          console.error('[Logo Upload] Update error:', updateError);
+          throw updateError;
+        }
+        
+        console.log('[Logo Upload] Settings updated successfully');
       } else {
         // Create new settings
         const insertData: Record<string, string> = {
           organization_id: profile.organizationId,
-          color_theme: selectedTheme
+          color_theme: 'default'
         };
         
         // Only include logo if user is organization owner
@@ -254,23 +500,37 @@ export default function OrganizationSettings() {
           insertData.logo_url = updatedLogoUrl;
         }
         
+        console.log('[Logo Upload] Creating new settings:', insertData);
+        
         const { error: insertError } = await supabase
           .from('organization_settings')
           .insert(insertData);
 
-        if (insertError) throw insertError;
+        if (insertError) {
+          console.error('[Logo Upload] Insert error:', insertError);
+          throw insertError;
+        }
+        
+        console.log('[Logo Upload] Settings created successfully');
       }
 
       // Only update logo URL state if user is organization owner
       if (profile?.role === 'organization_owner') {
+        console.log('[Logo Upload] Updating local state with new logo URL:', updatedLogoUrl);
         setLogoUrl(updatedLogoUrl);
+        setLogoPreview(updatedLogoUrl);
+        setLogoFile(null);
+        setRemoveLogo(false);
       }
+      
+      console.log('[Logo Upload] Save completed successfully');
       setMessage({ type: 'success', text: 'Settings saved successfully!' });
       
-      // Refresh the page to apply changes
+      // Reload the page to apply changes
       setTimeout(() => {
-        router.refresh();
-      }, 1500);
+        console.log('[Logo Upload] Reloading page');
+        window.location.reload();
+      }, 1000);
     } catch (error) {
       console.error('Error saving settings:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to save settings. Please try again.';
@@ -284,34 +544,6 @@ export default function OrganizationSettings() {
     } finally {
       setSaving(false);
     }
-  };
-
-  // Render theme option
-  const renderThemeOption = (themeKey: string) => {
-    const theme = COLOR_THEMES[themeKey as keyof typeof COLOR_THEMES];
-    const isSelected = selectedTheme === themeKey;
-    
-    return (
-      <div 
-        key={themeKey}
-        className={`relative p-4 border rounded-xl transition-all cursor-pointer ${
-          isSelected 
-            ? 'border-2 border-blue-500 shadow-md' 
-            : 'border-gray-200 hover:border-gray-300'
-        }`}
-        onClick={() => setSelectedTheme(themeKey)}
-      >
-        <div className={`h-16 rounded-lg bg-gradient-to-r ${theme.gradient} mb-3`}></div>
-        <div className="text-sm font-medium">{theme.name}</div>
-        {isSelected && (
-          <div className="absolute top-2 right-2 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-        )}
-      </div>
-    );
   };
 
   return (
@@ -518,6 +750,166 @@ export default function OrganizationSettings() {
                   </div>
                 </div>
                 
+                {/* Dealer Business Information Section */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-8">
+                  <div className="p-6 border-b border-gray-100">
+                    <h2 className="text-lg font-semibold text-gray-800">Dealer Business Information</h2>
+                  </div>
+                  
+                  <div className="p-6">
+                    {profile?.role === 'organization_owner' && (
+                      <div className="mb-4 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingBusiness(!isEditingBusiness)}
+                          className="text-sm text-green-600 hover:text-green-700 font-medium"
+                        >
+                          {isEditingBusiness ? 'Cancel' : 'Edit Information'}
+                        </button>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Dealer License Number</label>
+                        <input
+                          type="text"
+                          value={isEditingBusiness ? editedBusiness.dealer_license_number : organization?.dealer_license_number || 'Not provided'}
+                          onChange={(e) => setEditedBusiness({ ...editedBusiness, dealer_license_number: e.target.value })}
+                          disabled={!isEditingBusiness}
+                          className={`w-full px-4 py-2 border rounded-lg ${
+                            isEditingBusiness 
+                              ? 'border-gray-300 bg-white text-gray-900' 
+                              : 'border-gray-300 bg-gray-50 text-gray-500'
+                          }`}
+                          placeholder="DL123456"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">EIN Number</label>
+                        <input
+                          type="text"
+                          value={isEditingBusiness ? editedBusiness.ein_number : organization?.ein_number || 'Not provided'}
+                          onChange={(e) => setEditedBusiness({ ...editedBusiness, ein_number: e.target.value })}
+                          disabled={!isEditingBusiness}
+                          className={`w-full px-4 py-2 border rounded-lg ${
+                            isEditingBusiness 
+                              ? 'border-gray-300 bg-white text-gray-900' 
+                              : 'border-gray-300 bg-gray-50 text-gray-500'
+                          }`}
+                          placeholder="12-3456789"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Business Phone Number</label>
+                        <input
+                          type="tel"
+                          value={isEditingBusiness ? editedBusiness.phone : organization?.phone || 'Not provided'}
+                          onChange={(e) => setEditedBusiness({ ...editedBusiness, phone: e.target.value })}
+                          disabled={!isEditingBusiness}
+                          className={`w-full px-4 py-2 border rounded-lg ${
+                            isEditingBusiness 
+                              ? 'border-gray-300 bg-white text-gray-900' 
+                              : 'border-gray-300 bg-gray-50 text-gray-500'
+                          }`}
+                          placeholder="(555) 987-6543"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Cell Phone Number</label>
+                        <input
+                          type="tel"
+                          value={isEditingBusiness ? editedBusiness.cell_phone : userProfile?.cell_phone || 'Not provided'}
+                          onChange={(e) => setEditedBusiness({ ...editedBusiness, cell_phone: e.target.value })}
+                          disabled={!isEditingBusiness}
+                          className={`w-full px-4 py-2 border rounded-lg ${
+                            isEditingBusiness 
+                              ? 'border-gray-300 bg-white text-gray-900' 
+                              : 'border-gray-300 bg-gray-50 text-gray-500'
+                          }`}
+                          placeholder="(555) 123-4567"
+                        />
+                      </div>
+                    </div>
+                    
+                    {isEditingBusiness && profile?.role === 'organization_owner' && (
+                      <div className="mt-6 flex justify-end gap-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsEditingBusiness(false);
+                            setEditedBusiness({
+                              dealer_license_number: organization?.dealer_license_number || '',
+                              ein_number: organization?.ein_number || '',
+                              phone: organization?.phone || '',
+                              cell_phone: userProfile?.cell_phone || ''
+                            });
+                          }}
+                          className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              setSaving(true);
+                              
+                              // Update organization fields
+                              const { error: orgError } = await supabase
+                                .from('organizations')
+                                .update({
+                                  dealer_license_number: editedBusiness.dealer_license_number,
+                                  ein_number: editedBusiness.ein_number,
+                                  phone: editedBusiness.phone,
+                                  updated_at: new Date().toISOString()
+                                })
+                                .eq('id', organization?.id);
+                              
+                              if (orgError) throw orgError;
+                              
+                              // Update profile cell phone
+                              const { error: profileError } = await supabase
+                                .from('profiles')
+                                .update({
+                                  cell_phone: editedBusiness.cell_phone
+                                })
+                                .eq('id', profile.id);
+                              
+                              if (profileError) throw profileError;
+                              
+                              // Update local state
+                              setOrganization({ 
+                                ...organization!, 
+                                dealer_license_number: editedBusiness.dealer_license_number,
+                                ein_number: editedBusiness.ein_number,
+                                phone: editedBusiness.phone
+                              });
+                              setUserProfile({ cell_phone: editedBusiness.cell_phone });
+                              setIsEditingBusiness(false);
+                              setMessage({ type: 'success', text: 'Business information updated successfully!' });
+                              
+                              // Dispatch event to trigger onboarding re-check
+                              window.dispatchEvent(new Event('onboardingUpdated'));
+                            } catch (error) {
+                              console.error('Error updating business information:', error);
+                              setMessage({ type: 'error', text: 'Failed to update business information.' });
+                            } finally {
+                              setSaving(false);
+                            }
+                          }}
+                          disabled={saving}
+                          className="px-4 py-2 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-lg hover:from-green-600 hover:to-teal-600 disabled:opacity-50"
+                        >
+                          {saving ? 'Saving...' : 'Save Changes'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
                 {profile?.role === 'organization_owner' && (
                   <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-8">
                     <div className="p-6 border-b border-gray-100">
@@ -545,26 +937,61 @@ export default function OrganizationSettings() {
                             />
                             <p className="mt-1 text-xs text-gray-500">Recommended size: 200x200px. Max 2MB. Supports JPEG, PNG, WebP, GIF.</p>
                           </div>
+                          
+                          <div className="flex gap-3">
+                            {(logoUrl || logoPreview) && (
+                              <button
+                                type="button"
+                                onClick={handleRemoveLogo}
+                                disabled={saving}
+                                className="px-4 py-2 text-sm text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {saving ? 'Removing...' : 'Remove Logo'}
+                              </button>
+                            )}
+                            
+                            <button
+                              type="button"
+                              onClick={handleSaveLogo}
+                              disabled={!hasLogoChanges || saving}
+                              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                                hasLogoChanges && !saving
+                                  ? 'bg-gradient-to-r from-green-500 to-teal-500 text-white hover:from-green-600 hover:to-teal-600'
+                                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                              }`}
+                            >
+                              {saving ? 'Saving...' : 'Save Changes'}
+                            </button>
+                          </div>
                         </div>
                         
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">Preview</label>
                           <div className="w-full h-48 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-center overflow-hidden">
-                            {logoPreview ? (
+                            {logoPreview || logoUrl ? (
                               <Image
-                                src={logoPreview}
+                                src={logoPreview || logoUrl}
                                 alt="Logo Preview"
                                 width={200}
                                 height={200}
                                 className="rounded-xl shadow-lg object-contain"
                                 unoptimized
                                 onError={(e) => {
-                                  console.error('Image load error:', e);
+                                  console.error('[Logo Upload] Image load error:', e);
                                   setLogoPreview('');
                                 }}
                               />
                             ) : (
-                              <div className="text-gray-400 text-sm">No logo selected</div>
+                              <div className="flex flex-col items-center">
+                                <Image
+                                  src="/logoMain.png"
+                                  alt="Default iOpes Logo"
+                                  width={150}
+                                  height={150}
+                                  className="object-contain opacity-50"
+                                />
+                                <p className="text-gray-400 text-sm mt-2">Default logo (iOpes)</p>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -596,35 +1023,6 @@ export default function OrganizationSettings() {
                     </div>
                   </div>
                 )}
-                
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-8">
-                  <div className="p-6 border-b border-gray-100">
-                    <h2 className="text-lg font-semibold text-gray-800">Dashboard Color Theme</h2>
-                    <p className="text-sm text-gray-500 mt-1">
-                      Choose a color theme for your dashboard highlights
-                    </p>
-                  </div>
-                  
-                  <div className="p-6">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                      {Object.keys(COLOR_THEMES).map(themeKey => renderThemeOption(themeKey))}
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex justify-end">
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className={`px-6 py-2 rounded-lg text-white font-medium ${
-                      saving 
-                        ? 'bg-gray-400 cursor-not-allowed' 
-                        : 'bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 shadow-md'
-                    }`}
-                  >
-                    {saving ? 'Saving...' : 'Save Changes'}
-                  </button>
-                </div>
               </form>
             )}
           </div>
