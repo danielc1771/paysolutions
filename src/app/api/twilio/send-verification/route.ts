@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
+import { createClient as createAdminClient } from '@/utils/supabase/admin';
 import { z } from 'zod';
 import twilio from 'twilio';
 
@@ -11,10 +11,13 @@ const verifySid = process.env.TWILIO_VERIFY_SERVICE_SID;
 // Initialize Twilio client
 const twilioClient = twilio(accountSid, authToken);
 
-// Request schema
+// Request schema - supports both loanId and verificationId
 const sendVerificationSchema = z.object({
   phoneNumber: z.string().min(1, "Phone number is required"),
-  loanId: z.string().uuid("Invalid loan ID"),
+  loanId: z.string().uuid("Invalid loan ID").optional(),
+  verificationId: z.string().uuid("Invalid verification ID").optional(),
+}).refine(data => data.loanId || data.verificationId, {
+  message: "Either loanId or verificationId is required",
 });
 
 /**
@@ -73,28 +76,46 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { phoneNumber, loanId } = validationResult.data;
+    const { phoneNumber, loanId, verificationId } = validationResult.data;
     const formattedPhone = formatPhoneNumber(phoneNumber);
-    
+    const isStandaloneVerification = !!verificationId;
+
     console.log('📱 Sending verification to:', formattedPhone);
-    console.log('🆔 Loan ID:', loanId);
+    console.log('🆔 Type:', isStandaloneVerification ? 'Standalone Verification' : 'Loan');
+    console.log('🆔 ID:', isStandaloneVerification ? verificationId : loanId);
 
-    // Create Supabase client
-    const supabase = await createClient();
+    // Use admin client to bypass RLS
+    const supabase = await createAdminClient();
 
-    // Verify loan exists and get current status
-    const { data: loan, error: loanError } = await supabase
-      .from('loans')
-      .select('id, phone_verification_status')
-      .eq('id', loanId)
-      .single();
+    // Verify the record exists
+    if (isStandaloneVerification) {
+      const { data: verification, error: verificationError } = await supabase
+        .from('verifications')
+        .select('id, phone_verification_status')
+        .eq('id', verificationId)
+        .single();
 
-    if (loanError || !loan) {
-      console.error('❌ Loan not found:', loanError);
-      return NextResponse.json(
-        { error: 'Loan not found' },
-        { status: 404 }
-      );
+      if (verificationError || !verification) {
+        console.error('❌ Verification not found:', verificationError);
+        return NextResponse.json(
+          { error: 'Verification not found' },
+          { status: 404 }
+        );
+      }
+    } else {
+      const { data: loan, error: loanError } = await supabase
+        .from('loans')
+        .select('id, phone_verification_status')
+        .eq('id', loanId)
+        .single();
+
+      if (loanError || !loan) {
+        console.error('❌ Loan not found:', loanError);
+        return NextResponse.json(
+          { error: 'Loan not found' },
+          { status: 404 }
+        );
+      }
     }
 
     // Call Twilio Verify API using SDK
@@ -108,20 +129,34 @@ export async function POST(request: NextRequest) {
 
       console.log('✅ Twilio verification created:', verification.sid);
 
-      // Update loan with verification session ID and status
-      const { error: updateError } = await supabase
-        .from('loans')
-        .update({
-          phone_verification_session_id: verification.sid,
-          phone_verification_status: 'sent',
-          verified_phone_number: formattedPhone,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', loanId);
+      // Update the appropriate record with verification session ID and status
+      if (isStandaloneVerification) {
+        const { error: updateError } = await supabase
+          .from('verifications')
+          .update({
+            phone_verification_session_id: verification.sid,
+            phone_verification_status: 'sent',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', verificationId);
 
-      if (updateError) {
-        console.error('❌ Failed to update loan:', updateError);
-        // Don't fail the request since verification was sent
+        if (updateError) {
+          console.error('❌ Failed to update verification:', updateError);
+        }
+      } else {
+        const { error: updateError } = await supabase
+          .from('loans')
+          .update({
+            phone_verification_session_id: verification.sid,
+            phone_verification_status: 'sent',
+            verified_phone_number: formattedPhone,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', loanId);
+
+        if (updateError) {
+          console.error('❌ Failed to update loan:', updateError);
+        }
       }
 
       return NextResponse.json({
@@ -134,7 +169,7 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       const twilioError = error as  { code: number; message: string; status: number };
       console.error('❌ Twilio request failed:', twilioError);
-      
+
       // Handle specific Twilio errors
       if (twilioError.code === 60200) {
         return NextResponse.json(
@@ -142,7 +177,7 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-      
+
       return NextResponse.json(
         { error: twilioError.message || 'Failed to send verification code' },
         { status: twilioError.status || 500 }

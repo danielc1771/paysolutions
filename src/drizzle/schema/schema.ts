@@ -31,6 +31,16 @@ export const loanStatusEnum = pgEnum('loan_status', [
 ]);
 
 export const derogatoryTypeEnum = pgEnum('derogatory_type', ['manual', 'automatic']);
+export const verificationStatusEnum = pgEnum('verification_status', [
+  'pending',
+  'email_sent',
+  'in_progress',
+  'identity_verified',
+  'phone_verified',
+  'completed',
+  'failed',
+  'expired'
+]);
 
 export const organization = pgTable("organizations", {
 	id: uuid("id").defaultRandom().primaryKey(),
@@ -256,6 +266,9 @@ export const organizationSettings = pgTable("organization_settings", {
 	notificationsEnabled: boolean("notifications_enabled").default(true),
 	logoUrl: varchar("logo_url", { length: 255 }),
 	colorTheme: varchar("color_theme", { length: 50 }).default('default'),
+	enableLoans: boolean("enable_loans").default(true),
+	enableStandaloneVerifications: boolean("enable_standalone_verifications").default(false),
+	verificationsRequirePhone: boolean("verifications_require_phone").default(true),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 }, (table) => [
@@ -294,5 +307,74 @@ export const borrowerNotes = pgTable("borrower_notes", {
 		foreignColumns: [profiles.id],
 		name: "borrower_notes_created_by_fkey"
 	}).onDelete("cascade"),
+	pgPolicy("Enable all operations for service role", { as: "permissive", for: "all", to: ["public"], using: sql`true` }),
+]);
+
+export const verifications = pgTable("verifications", {
+	id: uuid("id").defaultRandom().primaryKey().notNull(),
+	organizationId: uuid("organization_id").references(() => organization.id).notNull(),
+	createdBy: uuid("created_by").references(() => profiles.id),
+
+	// Person Information
+	firstName: varchar("first_name", { length: 255 }).notNull(),
+	lastName: varchar("last_name", { length: 255 }).notNull(),
+	email: varchar("email", { length: 255 }).notNull(),
+	phone: varchar("phone", { length: 20 }),
+	dateOfBirth: date("date_of_birth"),
+
+	// Address (captured during verification)
+	address: varchar("address", { length: 255 }),
+	city: varchar("city", { length: 100 }),
+	state: varchar("state", { length: 50 }),
+	zipCode: varchar("zip_code", { length: 10 }),
+	country: varchar("country", { length: 2 }).default('US'),
+
+	// Stripe Identity Verification
+	stripeVerificationSessionId: varchar("stripe_verification_session_id", { length: 255 }),
+	stripeVerificationStatus: stripeVerificationStatusEnum('stripe_verification_status').default('pending'),
+	stripeVerifiedAt: timestamp("stripe_verified_at", { withTimezone: true, mode: 'string' }),
+	stripeVerificationUrl: text("stripe_verification_url"),
+
+	// Phone Verification (Twilio)
+	phoneVerificationSessionId: varchar("phone_verification_session_id", { length: 255 }),
+	phoneVerificationStatus: phoneVerificationStatusEnum('phone_verification_status').default('pending'),
+	verifiedPhoneNumber: varchar("verified_phone_number", { length: 20 }),
+	phoneVerifiedAt: timestamp("phone_verified_at", { withTimezone: true, mode: 'string' }),
+
+	// Verification Results (from Stripe)
+	verificationResultData: text("verification_result_data"), // JSON field with full Stripe response
+	documentType: varchar("document_type", { length: 50 }), // e.g., "passport", "driving_license", "id_card"
+
+	// Status and Metadata
+	status: verificationStatusEnum('status').default('pending'),
+	purpose: text("purpose"), // Optional: why this verification was requested
+	verificationToken: varchar("verification_token", { length: 255 }), // Unique token for public access link
+	expiresAt: timestamp("expires_at", { withTimezone: true, mode: 'string' }),
+	completedAt: timestamp("completed_at", { withTimezone: true, mode: 'string' }),
+
+	// Email tracking
+	emailSentAt: timestamp("email_sent_at", { withTimezone: true, mode: 'string' }),
+	emailSentCount: integer("email_sent_count").default(0),
+
+	// Audit
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_verifications_organization_id").using("btree", table.organizationId.asc().nullsLast().op("uuid_ops")),
+	index("idx_verifications_email").using("btree", table.email.asc().nullsLast().op("text_ops")),
+	index("idx_verifications_status").using("btree", table.status.asc().nullsLast()),
+	index("idx_verifications_created_at").using("btree", table.createdAt.desc().nullsLast()),
+	index("idx_verifications_token").using("btree", table.verificationToken.asc().nullsLast().op("text_ops")),
+	unique("verifications_verification_token_key").on(table.verificationToken),
+	foreignKey({
+		columns: [table.organizationId],
+		foreignColumns: [organization.id],
+		name: "verifications_organization_id_fkey"
+	}).onDelete("cascade"),
+	foreignKey({
+		columns: [table.createdBy],
+		foreignColumns: [profiles.id],
+		name: "verifications_created_by_fkey"
+	}).onDelete("set null"),
 	pgPolicy("Enable all operations for service role", { as: "permissive", for: "all", to: ["public"], using: sql`true` }),
 ]);

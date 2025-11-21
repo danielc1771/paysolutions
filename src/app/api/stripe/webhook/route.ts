@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { createClient } from '@/utils/supabase/server';
+import { createClient as createAdminClient } from '@/utils/supabase/admin';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-09-30.clover',
@@ -9,6 +9,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 /**
  * Handle Identity Verification Updates
  * Updates the database with verification status changes
+ * Supports both loans and standalone verifications
  */
 async function handleIdentityVerification(verificationSession: Stripe.Identity.VerificationSession, status: string) {
   try {
@@ -18,34 +19,101 @@ async function handleIdentityVerification(verificationSession: Stripe.Identity.V
       metadata: verificationSession.metadata
     });
 
-    const supabase = await createClient();
+    const supabase = await createAdminClient();
     const loanId = verificationSession.metadata?.loan_id;
+    const verificationId = verificationSession.metadata?.verification_id;
 
-    if (!loanId) {
-      console.error('❌ No loan_id found in verification session metadata');
+    // Handle standalone verification
+    if (verificationId) {
+      console.log('📋 Processing standalone verification:', verificationId);
+
+      // Get current verification to check phone status
+      const { data: currentVerification } = await supabase
+        .from('verifications')
+        .select('phone_verification_status, phone')
+        .eq('id', verificationId)
+        .single();
+
+      const isPhoneVerified = currentVerification?.phone_verification_status === 'verified';
+      const requiresPhone = !!currentVerification?.phone;
+
+      // Determine the new status
+      let newStatus = 'in_progress';
+      if (status === 'verified') {
+        if (!requiresPhone || isPhoneVerified) {
+          // Fully completed if no phone required or phone already verified
+          newStatus = 'completed';
+        } else {
+          // Identity verified, waiting for phone
+          newStatus = 'identity_verified';
+        }
+      } else if (status === 'requires_action') {
+        newStatus = 'in_progress';
+      } else if (status === 'canceled') {
+        newStatus = 'failed';
+      }
+
+      const updateData: Record<string, string | null> = {
+        stripe_verification_status: status,
+        stripe_verification_session_id: verificationSession.id,
+        status: newStatus,
+        updated_at: new Date().toISOString(),
+      };
+
+      // Add completion timestamp if verified
+      if (status === 'verified') {
+        updateData.stripe_verified_at = new Date().toISOString();
+        if (newStatus === 'completed') {
+          updateData.completed_at = new Date().toISOString();
+        }
+      }
+
+      const { error } = await supabase
+        .from('verifications')
+        .update(updateData)
+        .eq('id', verificationId);
+
+      if (error) {
+        console.error('❌ Failed to update verification status:', error);
+        throw error;
+      }
+
+      console.log('✅ Successfully updated standalone verification status:', {
+        verificationId,
+        status,
+        newStatus,
+        sessionId: verificationSession.id
+      });
+
       return;
     }
 
-    // Update loan record with verification status
-    const { error } = await supabase
-      .from('loans')
-      .update({
-        stripe_verification_status: status,
-        stripe_verification_session_id: verificationSession.id,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', loanId);
+    // Handle loan verification (original behavior)
+    if (loanId) {
+      const { error } = await supabase
+        .from('loans')
+        .update({
+          stripe_verification_status: status,
+          stripe_verification_session_id: verificationSession.id,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', loanId);
 
-    if (error) {
-      console.error('❌ Failed to update loan verification status:', error);
-      throw error;
+      if (error) {
+        console.error('❌ Failed to update loan verification status:', error);
+        throw error;
+      }
+
+      console.log('✅ Successfully updated loan verification status:', {
+        loanId,
+        status,
+        sessionId: verificationSession.id
+      });
+
+      return;
     }
 
-    console.log('✅ Successfully updated loan verification status:', {
-      loanId,
-      status,
-      sessionId: verificationSession.id
-    });
+    console.error('❌ No loan_id or verification_id found in verification session metadata');
 
   } catch (error) {
     console.error('❌ Error in handleIdentityVerification:', error);
@@ -71,7 +139,7 @@ async function handleInvoicePayment(invoice: Stripe.Invoice & {
       paymentNumber: invoice.metadata?.payment_number
     });
 
-    const supabase = await createClient();
+    const supabase = await createAdminClient();
 
     // Get loan ID from invoice metadata
     const loanId = invoice.metadata?.loan_id;

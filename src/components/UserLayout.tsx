@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { createClient } from '@/utils/supabase/client';
-import { LayoutDashboard, FileText, Plus, Users, Bell, UserPlus, Building2, Menu, X } from 'lucide-react';
+import { LayoutDashboard, FileText, Plus, Users, Bell, UserPlus, Building2, Menu, X, ShieldCheck } from 'lucide-react';
 import { useUserProfile } from '@/components/auth/RoleRedirect';
 import OnboardingModal from '@/components/dashboard/OnboardingModal';
 import OnboardingBanner from '@/components/dashboard/OnboardingBanner';
@@ -52,7 +52,11 @@ export default function UserLayout({ children }: UserLayoutProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [user, setUser] = useState<any>(null);
   // Removed unused notification state variables
-  // orgSettings is used for fetching but not directly rendered
+  // Organization settings for feature flags
+  const [orgSettings, setOrgSettings] = useState<{
+    enableLoans: boolean;
+    enableStandaloneVerifications: boolean;
+  }>({ enableLoans: true, enableStandaloneVerifications: false });
   const [logoUrl, setLogoUrl] = useState('/logoMain.png'); // Default logo
   const [colorTheme, setColorTheme] = useState('default'); // Default theme
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
@@ -123,8 +127,18 @@ export default function UserLayout({ children }: UserLayoutProps) {
         }
         
         console.log('[UserLayout] Organization settings fetched:', data);
-        
+
         if (data) {
+          // Set feature flags
+          setOrgSettings({
+            enableLoans: data.enable_loans !== false, // Default to true if not set
+            enableStandaloneVerifications: data.enable_standalone_verifications === true,
+          });
+          console.log('[UserLayout] Feature flags:', {
+            enableLoans: data.enable_loans,
+            enableStandaloneVerifications: data.enable_standalone_verifications,
+          });
+
           // Set logo if available, otherwise keep default
           if (data.logo_url) {
             console.log('[UserLayout] Setting custom logo:', data.logo_url);
@@ -132,7 +146,7 @@ export default function UserLayout({ children }: UserLayoutProps) {
           } else {
             console.log('[UserLayout] No custom logo, using default /logoMain.png');
           }
-          
+
           // Set color theme if available, otherwise keep default
           if (data.color_theme && COLOR_THEMES[data.color_theme]) {
             console.log('[UserLayout] Setting color theme:', data.color_theme);
@@ -256,49 +270,71 @@ export default function UserLayout({ children }: UserLayoutProps) {
     router.push('/login');
   };
 
-  // Navigation items - filtered based on user role
-  const getAllNavigation = () => [
-    {
-      name: 'Create Loan',
-      href: '/dashboard/loans/create',
-      icon: <Plus className="w-5 h-5" />,
-      // Only show for organization users, not admin
-      roles: ['user', 'organization_owner', 'team_member'],
-    },
-    {
-      name: 'Dashboard',
-      href: '/dashboard',
-      icon: <LayoutDashboard className="w-5 h-5" />,
-    },
-    {
-      name: 'Loans',
-      href: '/dashboard/loans',
-      icon: <FileText className="w-5 h-5" />,
-    },
-    {
-      name: 'Borrowers',
-      href: '/dashboard/borrowers',
-      icon: <Users className="w-5 h-5" />,
-    },
-    {
-      name: 'Organizations',
-      href: '/dashboard/organizations',
-      icon: <Building2 className="w-5 h-5" />,
-      // Only show for admins
-      roles: ['admin'],
-    },
-    {
-      name: profile?.role === 'admin' ? 'Administrators' : 'Team',
-      href: '/dashboard/team',
-      icon: <UserPlus className="w-5 h-5" />,
-      // Only show for admins, users and organization owners, not team members
-      roles: ['admin', 'user', 'organization_owner'],
-    },
-  ];
+  // Navigation items - filtered based on user role AND organization settings
+  const getAllNavigation = () => {
+    const isAdmin = profile?.role === 'admin';
 
-  const navigation = getAllNavigation().filter(item => 
-    !item.roles || !profile?.role || item.roles.includes(profile.role)
-  );
+    return [
+      // Create Loan - only if loans enabled
+      {
+        name: 'Create Loan',
+        href: '/dashboard/loans/create',
+        icon: <Plus className="w-5 h-5" />,
+        roles: ['user', 'organization_owner', 'team_member'],
+        show: isAdmin || orgSettings.enableLoans, // Admin always sees, others need flag
+      },
+      {
+        name: 'Dashboard',
+        href: '/dashboard',
+        icon: <LayoutDashboard className="w-5 h-5" />,
+        show: true,
+      },
+      // Loans - only if loans enabled
+      {
+        name: 'Loans',
+        href: '/dashboard/loans',
+        icon: <FileText className="w-5 h-5" />,
+        show: isAdmin || orgSettings.enableLoans,
+      },
+      // Verifications - only if verifications enabled
+      {
+        name: 'Verifications',
+        href: '/dashboard/verifications',
+        icon: <ShieldCheck className="w-5 h-5" />,
+        show: isAdmin || orgSettings.enableStandaloneVerifications,
+      },
+      // Borrowers - only if loans enabled (borrowers are loan-related)
+      {
+        name: 'Borrowers',
+        href: '/dashboard/borrowers',
+        icon: <Users className="w-5 h-5" />,
+        show: isAdmin || orgSettings.enableLoans,
+      },
+      {
+        name: 'Organizations',
+        href: '/dashboard/organizations',
+        icon: <Building2 className="w-5 h-5" />,
+        roles: ['admin'],
+        show: true,
+      },
+      {
+        name: profile?.role === 'admin' ? 'Administrators' : 'Team',
+        href: '/dashboard/team',
+        icon: <UserPlus className="w-5 h-5" />,
+        roles: ['admin', 'user', 'organization_owner'],
+        show: true,
+      },
+    ];
+  };
+
+  const navigation = getAllNavigation().filter(item => {
+    // Check role access
+    const hasRoleAccess = !item.roles || !profile?.role || item.roles.includes(profile.role);
+    // Check feature flag
+    const hasFeatureAccess = item.show !== false;
+
+    return hasRoleAccess && hasFeatureAccess;
+  });
 
   if (loading) {
     return (
@@ -406,12 +442,14 @@ export default function UserLayout({ children }: UserLayoutProps) {
                 </button>
                 
                 <h1 className="text-lg sm:text-xl font-semibold text-gray-700">
-                  {pathname === '/dashboard' ? 'Dashboard' : 
+                  {pathname === '/dashboard' ? 'Dashboard' :
                    pathname === '/dashboard/loans' ? 'Loans' :
+                   pathname === '/dashboard/verifications' ? 'Verifications' :
                    pathname === '/dashboard/borrowers' ? 'Borrowers' :
                    pathname === '/dashboard/organizations' ? 'Organizations' :
                    pathname === '/dashboard/team' ? (profile?.role === 'admin' ? 'Administrators' : 'Team Management') :
                    pathname.includes('/dashboard/loans/') ? 'Loan Details' :
+                   pathname.includes('/dashboard/verifications/') ? 'Verification Details' :
                    pathname.includes('/dashboard/borrowers/') ? 'Borrower Details' :
                    'Dashboard'}
                 </h1>
