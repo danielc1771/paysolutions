@@ -57,6 +57,7 @@ export default function CreateVerification() {
           }
 
           if (profile?.organizations) {
+            const organization = profile.organizations as unknown as { name: string };
             // Fetch organization settings for phone requirement
             const { data: settings } = await supabase
               .from('organization_settings')
@@ -66,7 +67,7 @@ export default function CreateVerification() {
 
             const orgInfo = {
               id: profile.organization_id,
-              name: profile.organizations[0].name,
+              name: organization.name,
               verifications_require_phone: settings?.verifications_require_phone ?? true,
             };
             console.log('✅ Organization info loaded:', orgInfo);
