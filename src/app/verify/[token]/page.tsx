@@ -40,10 +40,13 @@ export default function VerifyPage() {
   const [stripe, setStripe] = useState<StripeWithIdentity | null>(null);
   const [identityVerificationStatus, setIdentityVerificationStatus] = useState<string>('not_started');
 
-  // Load Stripe.js
+  // Load Stripe.js with verification-specific key (allows test mode for verification)
   useEffect(() => {
     const loadStripe = async () => {
-      const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+      // Use separate key for verification flows (test mode) if available
+      const publishableKey = process.env.NEXT_PUBLIC_STRIPE_VERIFICATION_PUBLISHABLE_KEY
+        || process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+
       if (!publishableKey) {
         console.error('Stripe publishable key not found');
         return;
