@@ -2,11 +2,9 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient } from '@/utils/supabase/admin';
 
-// Use separate Stripe keys for identity verification (allows test mode while payments are in production)
-const stripeVerification = new Stripe(
-  process.env.STRIPE_VERIFICATION_SECRET_KEY || process.env.STRIPE_SECRET_KEY!,
-  { apiVersion: '2025-09-30.clover' }
-);
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2025-09-30.clover',
+});
 
 export async function POST(request: Request) {
   try {
@@ -55,7 +53,7 @@ export async function POST(request: Request) {
     }
 
     // Create the verification session with selfie check
-    const verificationSession = await stripeVerification.identity.verificationSessions.create({
+    const verificationSession = await stripe.identity.verificationSessions.create({
       type: 'document',
       provided_details: {
         email: verificationEmail,

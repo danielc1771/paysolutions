@@ -2,16 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient as createAdminClient } from '@/utils/supabase/admin';
 
-// Main Stripe client for payments
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-09-30.clover',
 });
-
-// Verification Stripe client (may use test keys)
-const stripeVerification = new Stripe(
-  process.env.STRIPE_VERIFICATION_SECRET_KEY || process.env.STRIPE_SECRET_KEY!,
-  { apiVersion: '2025-09-30.clover' }
-);
 
 /**
  * Handle Identity Verification Updates
@@ -266,56 +259,32 @@ async function handleInvoicePayment(invoice: Stripe.Invoice & {
 
 /**
  * Stripe Webhook Handler
- *
+ * 
  * Handles Stripe webhook events for payment processing and identity verification
- * Supports separate webhook secrets for production payments and test verification
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.text();
     const signature = request.headers.get('stripe-signature')!;
 
-    // Try to verify with primary webhook secret first, then verification secret
-    let event: Stripe.Event | null = null;
-    let verifiedWith: 'primary' | 'verification' = 'primary';
-
-    // Try primary webhook secret (for production payments)
+    
+    // Verify webhook signature
+    let event: Stripe.Event;
     try {
       event = stripe.webhooks.constructEvent(
         body,
         signature,
         process.env.STRIPE_WEBHOOK_SECRET!
       );
-      verifiedWith = 'primary';
-    } catch {
-      // If primary fails and we have a separate verification secret, try that
-      const verificationWebhookSecret = process.env.STRIPE_VERIFICATION_WEBHOOK_SECRET;
-      if (verificationWebhookSecret) {
-        try {
-          event = stripeVerification.webhooks.constructEvent(
-            body,
-            signature,
-            verificationWebhookSecret
-          );
-          verifiedWith = 'verification';
-        } catch (verificationErr) {
-          console.error('❌ Both webhook signature verifications failed');
-          console.error('Primary error and verification error:', verificationErr);
-          return NextResponse.json(
-            { error: 'Webhook signature verification failed' },
-            { status: 400 }
-          );
-        }
-      } else {
-        console.error('❌ Webhook signature verification failed (no verification secret configured)');
-        return NextResponse.json(
-          { error: 'Webhook signature verification failed' },
-          { status: 400 }
-        );
-      }
+    } catch (err) {
+      console.error('❌ Webhook signature verification failed:', err);
+      return NextResponse.json(
+        { error: 'Webhook signature verification failed' },
+        { status: 400 }
+      );
     }
 
-    console.log('✅ Webhook event verified:', event.type, `(using ${verifiedWith} secret)`);
+    console.log('✅ Webhook event verified:', event.type);
 
     // Handle different event types
     switch (event.type) {
