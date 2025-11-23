@@ -91,7 +91,6 @@ export async function GET(request: NextRequest) {
     }
 
     const { data: verifications, error, count } = await query;
-    console.log('GET /api/verifications:', { verifications: verifications?.length, error, count });
 
     if (error) {
       console.error('Error fetching verifications:', error);

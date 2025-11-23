@@ -150,7 +150,7 @@ export default function LoanDetail({ params }: LoanDetailProps) {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ loanId: loan.id }),
+          body: JSON.stringify({ loanId: loan.id, abc: 123 }),
         });
 
         const createData = await createResponse.json();

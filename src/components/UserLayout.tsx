@@ -564,7 +564,7 @@ export default function UserLayout({ children }: UserLayoutProps) {
 
         {/* Page content */}
         <main className="flex-1 overflow-y-auto">
-          <div className="p-6">
+          <div >
             {/* Onboarding Banner */}
             {showOnboardingBanner && !onboardingComplete && profile?.role === 'organization_owner' && (
               <OnboardingBanner

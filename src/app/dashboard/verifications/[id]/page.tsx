@@ -2,11 +2,12 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Mail, Link as LinkIcon, Trash2, CheckCircle, Phone } from 'lucide-react';
+import { ArrowLeft, Mail, Link as LinkIcon, Trash2, CheckCircle, Phone, Download } from 'lucide-react';
 import { VerificationWithCreator } from '@/types/verification';
 import { useUserProfile } from '@/components/auth/RoleRedirect';
 import VerificationStatusBadge from '@/components/verifications/VerificationStatusBadge';
 import VerificationTimeline from '@/components/verifications/VerificationTimeline';
+import { generateVerificationPDF } from '@/utils/pdf/generateVerificationPDF';
 
 interface VerificationDetailProps {
   params: Promise<{ id: string }>;
@@ -22,6 +23,7 @@ export default function VerificationDetail({ params }: VerificationDetailProps) 
   const [successMessage, setSuccessMessage] = useState('');
   const [copiedLink, setCopiedLink] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [generatingPDF, setGeneratingPDF] = useState(false);
   const { profile } = useUserProfile();
   const isAdmin = profile?.role === 'admin';
 
@@ -130,6 +132,21 @@ export default function VerificationDetail({ params }: VerificationDetailProps) 
   const isExpired = verification && verification.expires_at && new Date(verification.expires_at) < new Date();
   const canResendEmail = verification && verification.status !== 'completed';
   const canDelete = verification && verification.status !== 'completed';
+  const isCompleted = verification && verification.status === 'completed';
+
+  const handleDownloadPDF = async () => {
+    if (!verification || verification.status !== 'completed') return;
+
+    setGeneratingPDF(true);
+    try {
+      await generateVerificationPDF(verification);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Failed to generate PDF. Please try again.');
+    } finally {
+      setGeneratingPDF(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -222,7 +239,7 @@ export default function VerificationDetail({ params }: VerificationDetailProps) 
                   )}
                   <button
                     onClick={handleCopyLink}
-                    className="px-3 py-1.5 bg-purple-50 text-purple-700 rounded-lg text-xs font-medium hover:bg-purple-100 transition-colors flex items-center space-x-1"
+                    className="cursor-pointer px-3 py-1.5 bg-purple-50 text-purple-700 rounded-lg text-xs font-medium hover:bg-purple-100 transition-colors flex items-center space-x-1"
                   >
                     {copiedLink ? (
                       <>
@@ -236,6 +253,57 @@ export default function VerificationDetail({ params }: VerificationDetailProps) 
                       </>
                     )}
                   </button>
+                  {/* Resend Email Button */}
+                  {canResendEmail && (
+                    <button
+                      onClick={handleResendEmail}
+                      disabled={resendingEmail}
+                      className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
+                    >
+                      {resendingEmail ? (
+                        <>
+                          <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-blue-700"></div>
+                          <span>Sending...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Mail className="w-3.5 h-3.5" />
+                          <span>Resend Email</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                  {/* Download PDF Button */}
+                  {isCompleted && (
+                    <button
+                      onClick={handleDownloadPDF}
+                      disabled={generatingPDF}
+                      className="cursor-pointer px-3 py-1.5 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-lg text-xs font-semibold hover:from-green-600 hover:to-teal-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1 shadow-sm"
+                    >
+                      {generatingPDF ? (
+                        <>
+                          <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white"></div>
+                          <span>Generating...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Download className="w-3.5 h-3.5" />
+                          <span>Download Certificate</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                  {/* Delete Button */}
+                  {canDelete && (
+                    <button
+                      onClick={() => setShowDeleteConfirm(true)}
+                      disabled={deleting}
+                      className="px-3 py-1.5 bg-red-50 text-red-700 rounded-lg text-xs font-medium hover:bg-red-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete</span>
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -382,44 +450,6 @@ export default function VerificationDetail({ params }: VerificationDetailProps) 
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Actions</h3>
-          <div className="flex flex-wrap gap-3">
-            {canResendEmail && (
-              <button
-                onClick={handleResendEmail}
-                disabled={resendingEmail}
-                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-2xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-              >
-                {resendingEmail ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    <span>Sending...</span>
-                  </>
-                ) : (
-                  <>
-                    <Mail className="w-4 h-4" />
-                    <span>Resend Email</span>
-                  </>
-                )}
-              </button>
-            )}
-            {canDelete && (
-              <button
-                onClick={() => setShowDeleteConfirm(true)}
-                disabled={deleting}
-                className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-2xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-              >
-                <Trash2 className="w-4 h-4" />
-                <span>Delete Verification</span>
-              </button>
-            )}
-            {!canDelete && (
-              <p className="text-sm text-gray-500 italic py-3">Completed verifications cannot be deleted.</p>
-            )}
-          </div>
-        </div>
       </div>
 
       {/* Success Modal */}

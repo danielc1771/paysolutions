@@ -303,7 +303,7 @@ export default function VerificationsPage() {
   });
 
   return (
-    <div className={`min-h-screen ${isAdmin ? 'bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100' : 'bg-gradient-to-br from-blue-50 via-cyan-50 to-teal-100'}`}>
+    <div className={`min-h-screen`}>
       <div className="p-8">
         {/* Header */}
         <div className="mb-8">

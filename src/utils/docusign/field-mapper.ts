@@ -100,13 +100,6 @@ export function mapLoanDataToDocuSignFields(loan: LoanApplicationData): Record<s
   const interestRate = Number(loan.interest_rate || 0);
   const termWeeks = Number(loan.term_weeks || 16);
   
-  // Debug: Log annual income value and type
-  console.log('📊 Annual Income Debug:', {
-    value: borrower.annual_income,
-    type: typeof borrower.annual_income,
-    asString: borrower.annual_income ? String(borrower.annual_income) : 'empty'
-  });
-  
   // Calculate total with interest
   // If payment schedule exists, use the sum of all payments for accuracy
   let totalWithInterest: number;

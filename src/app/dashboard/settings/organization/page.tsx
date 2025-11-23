@@ -136,12 +136,6 @@ export default function OrganizationSettings() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    console.log('[Logo Upload] File selected:', {
-      name: file.name,
-      type: file.type,
-      size: file.size,
-      sizeInMB: (file.size / (1024 * 1024)).toFixed(2)
-    });
 
     // Validate file type - industry standard formats
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
@@ -167,7 +161,6 @@ export default function OrganizationSettings() {
     // Create preview
     const reader = new FileReader();
     reader.onloadend = () => {
-      console.log('[Logo Upload] Preview created');
       setLogoPreview(reader.result as string);
     };
     reader.readAsDataURL(file);
@@ -182,7 +175,6 @@ export default function OrganizationSettings() {
       return;
     }
 
-    console.log('[Logo Upload] Removing logo immediately');
     setSaving(true);
     setMessage({ type: '', text: '' });
 
@@ -194,27 +186,18 @@ export default function OrganizationSettings() {
         const urlParts = logoUrl.split('/organization_assets/');
         if (urlParts.length > 1) {
           oldLogoPath = urlParts[1].split('?')[0];
-          console.log('[Logo Upload] Old logo path to delete:', oldLogoPath);
         }
       }
 
       // Delete from storage if exists
       if (oldLogoPath) {
-        console.log('[Logo Upload] Deleting logo from storage:', oldLogoPath);
-        const { error: deleteError } = await supabase.storage
+        await supabase.storage
           .from('organization_assets')
           .remove([oldLogoPath]);
-        
-        if (deleteError) {
-          console.warn('[Logo Upload] Failed to delete logo from storage:', deleteError);
-        } else {
-          console.log('[Logo Upload] Logo deleted from storage successfully');
-        }
       }
 
       // Update database to remove logo URL
       if (settings?.id) {
-        console.log('[Logo Upload] Updating database to remove logo URL');
         const { error: updateError } = await supabase
           .from('organization_settings')
           .update({
@@ -227,11 +210,8 @@ export default function OrganizationSettings() {
           console.error('[Logo Upload] Database update error:', updateError);
           throw new Error('Failed to remove logo from database');
         }
-        
-        console.log('[Logo Upload] Database updated successfully');
       } else {
         // If no settings exist yet, create with empty logo
-        console.log('[Logo Upload] Creating settings with empty logo');
         const { error: insertError } = await supabase
           .from('organization_settings')
           .insert({
@@ -247,7 +227,6 @@ export default function OrganizationSettings() {
       }
 
       // Update local state
-      console.log('[Logo Upload] Updating local state');
       setLogoUrl('');
       setLogoPreview('');
       setLogoFile(null);
@@ -258,7 +237,6 @@ export default function OrganizationSettings() {
       
       // Reload page to update sidebar
       setTimeout(() => {
-        console.log('[Logo Upload] Reloading page');
         window.location.reload();
       }, 1000);
       
@@ -279,7 +257,6 @@ export default function OrganizationSettings() {
     setMessage({ type: '', text: '' });
 
     try {
-      console.log('[Logo Upload] Saving logo changes');
       
       let oldLogoPath = null;
 
@@ -288,7 +265,6 @@ export default function OrganizationSettings() {
         const urlParts = logoUrl.split('/organization_assets/');
         if (urlParts.length > 1) {
           oldLogoPath = urlParts[1].split('?')[0];
-          console.log('[Logo Upload] Old logo path extracted:', oldLogoPath);
         }
       }
 
@@ -296,7 +272,7 @@ export default function OrganizationSettings() {
       const fileExtension = logoFile.name.split('.').pop();
       const fileName = `org_logo_${profile.organizationId}_${Date.now()}.${fileExtension}`;
       
-      console.log('[Logo Upload] Uploading new logo:', fileName);
+      
       
       const { error: uploadError, data: uploadData } = await supabase.storage
         .from('organization_assets')

@@ -75,7 +75,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ loan
       .single();
 
     if (loanError)  {
-      console.log('❌ Loan query error:', loanError);
       throw new Error('Loan not found');
     }
     
@@ -146,16 +145,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ loa
 
   try {
     const body = await request.json();
-    console.log('📋 Final submission body:', JSON.stringify(body, null, 2));
     
     const validation = loanApplicationSchema.safeParse(body);
 
     if (!validation.success) {
-      console.log('❌ Final submission validation errors:', validation.error.issues);
       return new NextResponse(JSON.stringify({ message: 'Invalid form data.', errors: validation.error.issues }), { status: 400 });
     }
-
-    console.log('✅ Final submission validation passed');
 
     const { data: loan } = await supabase
       .from('loans')
@@ -163,31 +158,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ loa
       .eq('id', loanId)
       .single();
 
-    console.log('🔍 Loan data for submission:', loan);
-
     if (!loan) {
       throw new Error('Loan not found.');
     }
 
     // Allow updates for applications that are in progress or sent
     if (loan.status !== 'application_sent' && loan.status !== 'application_in_progress') {
-      console.log(`❌ Invalid loan status for submission: ${loan.status}`);
       throw new Error(`This application has already been completed or is invalid. Current status: ${loan.status}`);
     }
 
-    console.log('✅ Loan status is valid for submission:', loan.status);
 
     // Safely parse annual income
     const annualIncomeValue = typeof validation.data.annualIncome === 'string' 
       ? parseFloat(validation.data.annualIncome) 
       : validation.data.annualIncome;
     
-    console.log('💰 Annual Income Processing:', {
-      original: validation.data.annualIncome,
-      type: typeof validation.data.annualIncome,
-      parsed: annualIncomeValue
-    });
-
     // Prepare communication consent data
     const consentData = {
       consentToContact: validation.data.consentToContact,
