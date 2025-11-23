@@ -1,64 +1,46 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { createClient } from '@/utils/supabase/admin';
 
-// Use separate Stripe keys for identity verification (allows test mode while payments are in production)
-const stripeVerification = new Stripe(
-  process.env.STRIPE_VERIFICATION_SECRET_KEY || process.env.STRIPE_SECRET_KEY!,
-  { apiVersion: '2025-09-30.clover' }
-);
+// Use production Stripe keys for loan verification (existing flow)
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2025-09-30.clover',
+});
 
+/**
+ * Create Stripe Identity Verification Session for LOANS only
+ * This endpoint uses production Stripe keys and is used by /apply/[loanId]
+ *
+ * For standalone verifications, use /api/verifications/identity-session instead
+ */
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { email, firstName, lastName, loanId, verificationId, returnUrl } = body;
+    const { email, firstName, lastName, loanId, returnUrl } = body;
 
-    // Determine if this is a loan verification or standalone verification
-    const isStandaloneVerification = !!verificationId;
+    if (!loanId) {
+      return NextResponse.json(
+        { error: 'loanId is required' },
+        { status: 400 }
+      );
+    }
 
-    console.log('🚀 Creating verification session:', {
-      type: isStandaloneVerification ? 'standalone' : 'loan',
-      id: isStandaloneVerification ? verificationId : loanId,
-    });
+    console.log('🚀 Creating loan verification session:', { loanId });
 
-    // Build metadata based on verification type
+    // Build metadata for loan verification
     const metadata: Record<string, string> = {
+      loan_id: loanId,
+      first_name: firstName || '',
+      last_name: lastName || '',
+      type: 'loan_verification',
       domain: request.headers.get('host') || 'unknown',
       created_at: new Date().toISOString(),
     };
 
-    if (isStandaloneVerification) {
-      metadata.verification_id = verificationId;
-      metadata.type = 'standalone_verification';
-    } else {
-      metadata.loan_id = loanId;
-      metadata.first_name = firstName || '';
-      metadata.last_name = lastName || '';
-      metadata.type = 'loan_verification';
-    }
-
-    // For standalone verifications, get the person's info from the database
-    let verificationEmail = email;
-    if (isStandaloneVerification && !email) {
-      const supabase = await createClient();
-      const { data: verification } = await supabase
-        .from('verifications')
-        .select('email, first_name, last_name')
-        .eq('id', verificationId)
-        .single();
-
-      if (verification) {
-        verificationEmail = verification.email;
-        metadata.first_name = verification.first_name;
-        metadata.last_name = verification.last_name;
-      }
-    }
-
     // Create the verification session with selfie check
-    const verificationSession = await stripeVerification.identity.verificationSessions.create({
+    const verificationSession = await stripe.identity.verificationSessions.create({
       type: 'document',
       provided_details: {
-        email: verificationEmail,
+        email: email,
       },
       options: {
         document: {
@@ -69,36 +51,21 @@ export async function POST(request: Request) {
       return_url: returnUrl || undefined,
     });
 
-    console.log('✅ Created verification session:', {
+    console.log('✅ Created loan verification session:', {
       sessionId: verificationSession.id,
-      type: isStandaloneVerification ? 'standalone' : 'loan',
+      loanId,
       status: verificationSession.status,
-      url: verificationSession.url,
     });
 
-    // For standalone verifications, update the database with the session ID
-    if (isStandaloneVerification) {
-      const supabase = await createClient();
-      await supabase
-        .from('verifications')
-        .update({
-          stripe_verification_session_id: verificationSession.id,
-          stripe_verification_status: 'pending',
-          status: 'in_progress',
-        })
-        .eq('id', verificationId);
-    }
-
-    // Return response - include URL for standalone verifications (redirect flow)
     return NextResponse.json({
       success: true,
       client_secret: verificationSession.client_secret,
       verification_session_id: verificationSession.id,
-      url: verificationSession.url, // For redirect-based flow
+      url: verificationSession.url,
     });
 
   } catch (error: unknown) {
-    console.error('❌ Error creating verification session:', {
+    console.error('❌ Error creating loan verification session:', {
       error: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined,
     });

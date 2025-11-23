@@ -122,13 +122,12 @@ export default function VerifyPage() {
     setError(null);
 
     try {
-      // Create verification session on the server
-      const response = await fetch('/api/stripe/create-verification-session', {
+      // Create verification session on the server (using standalone verification endpoint)
+      const response = await fetch('/api/verifications/identity-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           verificationId: verification.id,
-          email: verification.email,
         }),
       });
 
@@ -157,7 +156,8 @@ export default function VerifyPage() {
 
         const pollStatus = async () => {
           try {
-            const statusResponse = await fetch(`/api/stripe/verification-status/${sessionId}`);
+            // Use standalone verification status endpoint (uses test keys)
+            const statusResponse = await fetch(`/api/verifications/identity-status/${sessionId}`);
             const statusData = await statusResponse.json();
             console.log('📊 Verification status:', statusData.status);
 
