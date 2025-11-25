@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createAdminClient } from '@/utils/supabase/admin';
 import { z } from 'zod';
 import twilio from 'twilio';
+import { reportVerificationUsage } from '@/utils/stripe/verification-billing';
 
 // Twilio credentials
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
@@ -154,7 +155,7 @@ export async function POST(request: NextRequest) {
           // Check if identity is also verified to mark as completed
           const { data: verificationData } = await supabase
             .from('verifications')
-            .select('stripe_verification_status')
+            .select('stripe_verification_status, organization_id')
             .eq('id', verificationId)
             .single();
 
@@ -178,6 +179,17 @@ export async function POST(request: NextRequest) {
 
           if (updateError) {
             console.error('❌ Failed to update verification:', updateError);
+          }
+
+          // Report usage for billing when verification is completed
+          if (isIdentityVerified && verificationData?.organization_id) {
+            try {
+              await reportVerificationUsage(verificationData.organization_id, verificationId!);
+              console.log('📊 Reported verification usage for billing (phone completed verification)');
+            } catch (billingError) {
+              console.error('Error reporting verification usage:', billingError);
+              // Don't fail the verification if billing fails
+            }
           }
         } else {
           const { error: updateError } = await supabase

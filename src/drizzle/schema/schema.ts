@@ -66,6 +66,12 @@ export const organization = pgTable("organizations", {
 	totalUsersLimit: integer("total_users_limit").default(10),
 	isActive: boolean("is_active").default(true),
 	missedPaymentThreshold: integer("missed_payment_threshold").default(2),
+	stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
+	// Verification billing fields
+	stripeVerificationSubscriptionId: varchar("stripe_verification_subscription_id", { length: 255 }),
+	stripeVerificationSubscriptionItemId: varchar("stripe_verification_subscription_item_id", { length: 255 }),
+	stripeVerificationPriceId: varchar("stripe_verification_price_id", { length: 255 }),
+	verificationBillingStatus: varchar("verification_billing_status", { length: 50 }).default('inactive'),
 });
 
 // This table stores user-specific data, linking them to an organization and a role.
@@ -376,5 +382,39 @@ export const verifications = pgTable("verifications", {
 		foreignColumns: [profiles.id],
 		name: "verifications_created_by_fkey"
 	}).onDelete("set null"),
+	pgPolicy("Enable all operations for service role", { as: "permissive", for: "all", to: ["public"], using: sql`true` }),
+]);
+
+// Verification usage tracking for metered billing
+export const verificationUsage = pgTable("verification_usage", {
+	id: uuid("id").defaultRandom().primaryKey().notNull(),
+	organizationId: uuid("organization_id").references(() => organization.id).notNull(),
+	verificationId: uuid("verification_id").references(() => verifications.id).notNull(),
+
+	// Stripe usage record tracking
+	stripeUsageRecordId: varchar("stripe_usage_record_id", { length: 255 }),
+	reportedAt: timestamp("reported_at", { withTimezone: true, mode: 'string' }),
+
+	// Usage metadata
+	quantity: integer("quantity").default(1),
+	billingPeriodStart: timestamp("billing_period_start", { withTimezone: true, mode: 'string' }),
+	billingPeriodEnd: timestamp("billing_period_end", { withTimezone: true, mode: 'string' }),
+
+	// Audit
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_verification_usage_organization_id").using("btree", table.organizationId.asc().nullsLast().op("uuid_ops")),
+	index("idx_verification_usage_reported_at").using("btree", table.reportedAt.desc().nullsLast()),
+	unique("verification_usage_verification_id_key").on(table.verificationId),
+	foreignKey({
+		columns: [table.organizationId],
+		foreignColumns: [organization.id],
+		name: "verification_usage_organization_id_fkey"
+	}).onDelete("cascade"),
+	foreignKey({
+		columns: [table.verificationId],
+		foreignColumns: [verifications.id],
+		name: "verification_usage_verification_id_fkey"
+	}).onDelete("cascade"),
 	pgPolicy("Enable all operations for service role", { as: "permissive", for: "all", to: ["public"], using: sql`true` }),
 ]);

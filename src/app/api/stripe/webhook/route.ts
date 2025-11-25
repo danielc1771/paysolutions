@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient as createAdminClient } from '@/utils/supabase/admin';
+import { reportVerificationUsage } from '@/utils/stripe/verification-billing';
 
 // Main Stripe client for payments
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -34,10 +35,10 @@ async function handleIdentityVerification(verificationSession: Stripe.Identity.V
     if (verificationId) {
       console.log('📋 Processing standalone verification:', verificationId);
 
-      // Get current verification to check phone status
+      // Get current verification to check phone status and organization
       const { data: currentVerification } = await supabase
         .from('verifications')
-        .select('phone_verification_status, phone')
+        .select('phone_verification_status, phone, organization_id')
         .eq('id', verificationId)
         .single();
 
@@ -83,6 +84,17 @@ async function handleIdentityVerification(verificationSession: Stripe.Identity.V
       if (error) {
         console.error('❌ Failed to update verification status:', error);
         throw error;
+      }
+
+      // Report usage for billing when verification is completed
+      if (newStatus === 'completed' && currentVerification?.organization_id) {
+        try {
+          await reportVerificationUsage(currentVerification.organization_id, verificationId);
+          console.log('📊 Reported verification usage for billing');
+        } catch (billingError) {
+          console.error('Error reporting verification usage:', billingError);
+          // Don't fail webhook if billing fails
+        }
       }
 
       console.log('✅ Successfully updated standalone verification status:', {

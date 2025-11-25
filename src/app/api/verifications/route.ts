@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { createClient as createAdminClient } from '@/utils/supabase/admin';
 import { randomBytes } from 'crypto';
+import { sendVerificationEmail } from '@/utils/mailer';
 
 // Helper to generate unique verification token
 function generateVerificationToken(): string {
@@ -232,36 +233,32 @@ export async function POST(request: NextRequest) {
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
     const verificationUrl = `${baseUrl}/verify/${verificationToken}`;
 
-    // Send verification email
+    // Send verification email directly using mailer
     try {
-      const emailResponse = await fetch(`${baseUrl}/api/verifications/${verification.id}/send-email`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          verificationUrl,
-          organizationName: organization?.name || 'Our Organization',
-        }),
+      await sendVerificationEmail({
+        to: email.toLowerCase().trim(),
+        firstName: first_name,
+        verificationUrl,
+        organizationName: organization?.name || 'Our Organization',
       });
 
-      if (emailResponse.ok) {
-        // Update email_sent_at and status
-        await adminClient
-          .from('verifications')
-          .update({
-            email_sent_at: new Date().toISOString(),
-            email_sent_count: 1,
-            status: 'email_sent',
-          })
-          .eq('id', verification.id);
-      } else {
-        console.warn('Failed to send verification email');
-      }
+      // Update email_sent_at and status
+      await adminClient
+        .from('verifications')
+        .update({
+          email_sent_at: new Date().toISOString(),
+          email_sent_count: 1,
+          status: 'email_sent',
+        })
+        .eq('id', verification.id);
+
+      console.log('Verification email sent successfully to:', email);
     } catch (emailError) {
       console.error('Error sending verification email:', emailError);
       // Don't fail the request if email fails
     }
+
+    // Note: Usage is tracked on completion, not creation (see webhook and verify-code routes)
 
     return NextResponse.json({
       success: true,

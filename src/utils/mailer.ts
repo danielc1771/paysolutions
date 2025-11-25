@@ -1,5 +1,6 @@
 import { Resend } from 'resend';
 import { LoanApplicationTemplate } from '@/components/emails/LoanApplicationTemplate';
+import { VerificationEmailTemplate } from '@/components/emails/VerificationEmailTemplate';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -43,6 +44,45 @@ export const sendLoanApplicationEmail = async ({
     return data;
   } catch (error) {
     console.error('Error sending loan application email:', error);
+    throw error;
+  }
+};
+
+// Verification Email
+interface VerificationEmailData {
+  to: string;
+  firstName: string;
+  verificationUrl: string;
+  organizationName: string;
+}
+
+export const sendVerificationEmail = async ({
+  to,
+  firstName,
+  verificationUrl,
+  organizationName,
+}: VerificationEmailData) => {
+  try {
+    const { data, error } = await resend.emails.send({
+      from: 'iOpes Verification <noreply@mail.ipayus.net>',
+      to: [to],
+      subject: `Identity Verification Request from ${organizationName}`,
+      react: VerificationEmailTemplate({
+        firstName,
+        verificationUrl,
+        organizationName,
+      }),
+    });
+
+    if (error) {
+      console.error('Resend email error:', error);
+      throw new Error(error.message || 'Failed to send verification email');
+    }
+
+    console.log('Verification email sent successfully:', data);
+    return data;
+  } catch (error) {
+    console.error('Error sending verification email:', error);
     throw error;
   }
 };

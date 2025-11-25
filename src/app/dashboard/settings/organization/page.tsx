@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { createClient } from '@/utils/supabase/client';
 import { useUserProfile } from '@/components/auth/RoleRedirect';
+import VerificationBillingCard from '@/components/billing/VerificationBillingCard';
 
 export default function OrganizationSettings() {
   const [loading, setLoading] = useState(true);
@@ -984,7 +985,7 @@ export default function OrganizationSettings() {
                         Only organization owners can upload logos
                       </p>
                     </div>
-                    
+
                     <div className="p-6">
                       <div className="w-full h-48 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-center overflow-hidden">
                         <Image
@@ -998,6 +999,11 @@ export default function OrganizationSettings() {
                       </div>
                     </div>
                   </div>
+                )}
+
+                {/* Verification Billing Section - For organization owners and admins */}
+                {(profile?.role === 'organization_owner' || profile?.role === 'admin') && (
+                  <VerificationBillingCard />
                 )}
               </form>
             )}
