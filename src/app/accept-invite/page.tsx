@@ -18,7 +18,7 @@ export default function AcceptInvitePage() {
   const router = useRouter();
   const supabase = createClient();
 
-  const verifyInvite = useCallback(async (session: Record<string, unknown> | null) => {
+  const verifyInvite = useCallback(async (session: { user: { id: string } } | null) => {
     if (!session) {
       setIsValidInvite(false);
       setError('Invalid or expired invitation link.');
@@ -28,7 +28,7 @@ export default function AcceptInvitePage() {
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('status, organization_id')
-      .eq('id', (session.user as Record<string, unknown>).id)
+      .eq('id', session.user.id)
       .single();
 
     if (profileError || !profile) {
@@ -43,26 +43,40 @@ export default function AcceptInvitePage() {
   }, [supabase]);
 
   useEffect(() => {
-    const hash = window.location.hash;
-    if (hash) {
-      const params = new URLSearchParams(hash.substring(1));
-      const accessToken = params.get('access_token');
-      const refreshToken = params.get('refresh_token');
+    const checkSession = async () => {
+      const hash = window.location.hash;
+      if (hash) {
+        const params = new URLSearchParams(hash.substring(1));
+        const accessToken = params.get('access_token');
+        const refreshToken = params.get('refresh_token');
 
-      if (accessToken && refreshToken) {
-        supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken,
-        }).then(({ data: { session } }) => {
-          verifyInvite(session as Record<string, unknown> | null);
-        });
+        if (accessToken && refreshToken) {
+          const { data: { session } } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          verifyInvite(session);
+        } else {
+          setIsValidInvite(false);
+        }
+        return;
+      }
+
+      // Check for existing session (cookie-based) from auth callback
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        verifyInvite(session);
       } else {
         setIsValidInvite(false);
+        // Don't show error immediately on load if no hash, unless we expected a session
+        // But for this page, it's always accessed via invite link (redirect) or direct link
+        // If accessed directly without session, it's invalid.
+        // However, standard flow is email -> callback -> this page.
+        // So valid invite process implies session exists.
       }
-    } else {
-      setIsValidInvite(false);
-    }
+    };
 
+    checkSession();
   }, [verifyInvite, supabase.auth]);
 
   const handleAcceptInvite = async (e: React.FormEvent) => {
@@ -142,10 +156,10 @@ export default function AcceptInvitePage() {
 
       <div className="relative w-full max-w-md">
         <div className="text-center mb-4">
-          <Image 
-            src="/logoMain.png" 
-            alt="iPayUS Logo" 
-            width={200} 
+          <Image
+            src="/logoMain.png"
+            alt="iPayUS Logo"
+            width={200}
             height={200}
             className="rounded-2xl shadow-lg mx-auto"
           />
