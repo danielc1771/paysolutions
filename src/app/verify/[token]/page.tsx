@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Shield, Phone, CheckCircle, AlertCircle, Loader2, ArrowRight, ArrowLeft } from 'lucide-react';
@@ -248,7 +248,7 @@ export default function VerifyPage() {
   };
 
   // Handle Phone Verification - Verify Code
-  const handleVerifyPhoneCode = async () => {
+  const handleVerifyPhoneCode = useCallback(async () => {
     if (!verification?.phone || !phoneVerificationCode || phoneVerificationCode.length < 6) return;
 
     setVerifyingPhoneCode(true);
@@ -282,14 +282,14 @@ export default function VerifyPage() {
     } finally {
       setVerifyingPhoneCode(false);
     }
-  };
+  }, [verification, phoneVerificationCode]);
 
   // Auto-verify when OTP code is complete
   useEffect(() => {
     if (phoneVerificationCode.length === 6 && phoneCodeSent && !verifyingPhoneCode && step === 3) {
       handleVerifyPhoneCode();
     }
-  }, [phoneVerificationCode, phoneCodeSent, verifyingPhoneCode, step]);
+  }, [phoneVerificationCode, phoneCodeSent, verifyingPhoneCode, step, handleVerifyPhoneCode]);
 
   // Check if verification is expired
   const isExpired = verification && new Date(verification.expires_at) < new Date();

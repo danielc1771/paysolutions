@@ -7,7 +7,7 @@ const createOrganizationSchema = z.object({
   name: z.string().min(1, 'Organization name is required'),
   email: z.string().email('Invalid email address'),
   contactPerson: z.string().min(1, 'Contact person name is required'),
-  phone: z.string().min(1, 'Phone number is required'),
+  phone: z.string().optional().or(z.literal('')),
   subscriptionStatus: z.enum(['trial', 'active', 'suspended', 'cancelled']),
   subscriptionStartDate: z.string().optional(),
   subscriptionEndDate: z.string().optional(),
