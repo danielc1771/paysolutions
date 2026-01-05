@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { db } from '@/drizzle';
 import { loans, borrowers } from '@/drizzle/schema/schema';
-import { eq, and, or, sql } from 'drizzle-orm';
+import { eq, and, or, sql, notInArray } from 'drizzle-orm';
 
 /**
  * API endpoint to check for duplicate loans by VIN or client information
@@ -11,7 +11,7 @@ import { eq, and, or, sql } from 'drizzle-orm';
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
-    
+
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
@@ -36,11 +36,21 @@ export async function POST(request: NextRequest) {
 
     // Build conditions for duplicate checking
     const duplicateConditions = [];
-    
+
     // Check for duplicate VIN if provided
     if (vin && vin.length === 17) {
       console.log('✅ Adding VIN condition:', vin.toUpperCase());
-      duplicateConditions.push(eq(loans.vehicleVin, vin.toUpperCase()));
+      console.log('✅ Adding VIN condition:', vin.toUpperCase());
+      // Only check for active loans (exclude terminal statuses)
+      // Allow VIN reuse if previous loan is closed, settled, defaulted, or derogatory
+      const TERMINAL_STATUSES = ['closed', 'settled', 'defaulted', 'derogatory'] as const;
+
+      duplicateConditions.push(
+        and(
+          eq(loans.vehicleVin, vin.toUpperCase()),
+          notInArray(loans.status, TERMINAL_STATUSES as any)
+        )
+      );
     } else {
       console.log('❌ VIN not valid for checking:', vin);
     }
@@ -49,17 +59,17 @@ export async function POST(request: NextRequest) {
     if (email || phone || (firstName && lastName && dateOfBirth)) {
       // First, find borrowers matching the client criteria
       const borrowerConditions = [];
-      
+
       if (email) {
         borrowerConditions.push(eq(borrowers.email, email.toLowerCase()));
       }
-      
+
       if (phone) {
         // Normalize phone number (remove spaces, dashes, etc.)
         const normalizedPhone = phone.replace(/[\s\-\(\)]/g, '');
         borrowerConditions.push(eq(borrowers.phone, normalizedPhone));
       }
-      
+
       if (firstName && lastName && dateOfBirth) {
         borrowerConditions.push(
           and(
