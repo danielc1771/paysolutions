@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
 
     // Fetch loan data from Supabase with payment schedule
     const supabase = await createClient();
-    
+
     const { data: loan, error: loanError } = await supabase
       .from('loans')
       .select(`
@@ -120,6 +120,8 @@ export async function POST(request: NextRequest) {
       .from('loans')
       .update({
         docusign_envelope_id: result.envelopeId,
+        docusign_org_email: orgOwner.email,
+        docusign_org_name: orgOwner.fullName,
         status: 'pending_ipay_signature',
         updated_at: new Date().toISOString()
       })

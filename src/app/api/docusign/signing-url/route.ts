@@ -69,27 +69,38 @@ export async function POST(request: NextRequest) {
         });
         break;
       case 'organization':
-        // Lookup organization owner email dynamically
-        console.log('🔍 Looking up organization owner for loan:', loanId);
+        // PREFERRED: Use stored signer details to ensure match
+        if (loan.docusign_org_email && loan.docusign_org_name) {
+          console.log('✅ Using stored organization signer details:', {
+            signerEmail: loan.docusign_org_email,
+            signerName: loan.docusign_org_name
+          });
+          signerEmail = loan.docusign_org_email;
+          signerName = loan.docusign_org_name;
+          clientUserId = `${INTEGRATION_KEY}-organization`;
+        } else {
+          // FALLBACK: Lookup mechanism (existing logic) for older envelopes
+          console.log('🔍 Looking up organization owner for loan (fallback):', loanId);
 
-        const orgOwner = await getOrganizationOwnerByLoanId(loanId);
+          const orgOwner = await getOrganizationOwnerByLoanId(loanId);
 
-        if (!orgOwner || !orgOwner.email) {
-          return NextResponse.json({
-            success: false,
-            error: 'Organization owner not found. Please ensure an organization owner is assigned to this loan.'
-          }, { status: 400 });
+          if (!orgOwner || !orgOwner.email) {
+            return NextResponse.json({
+              success: false,
+              error: 'Organization owner not found. Please ensure an organization owner is assigned to this loan.'
+            }, { status: 400 });
+          }
+
+          signerEmail = orgOwner.email;
+          signerName = orgOwner.fullName || 'Organization Representative';
+          clientUserId = `${INTEGRATION_KEY}-organization`;
+          console.log('🔍 Organization signer details (fallback):', {
+            signerEmail,
+            signerName,
+            clientUserId,
+            organizationId: orgOwner.organizationId
+          });
         }
-
-        signerEmail = orgOwner.email;
-        signerName = orgOwner.fullName || 'Organization Representative';
-        clientUserId = `${INTEGRATION_KEY}-organization`;
-        console.log('🔍 Organization signer details:', {
-          signerEmail,
-          signerName,
-          clientUserId,
-          organizationId: orgOwner.organizationId
-        });
         break;
       case 'borrower':
         // Fetch borrower info
@@ -148,7 +159,7 @@ export async function POST(request: NextRequest) {
     } catch (embedError: unknown) {
       console.error('⚠️ Recipient view failed for', signerType);
       console.error('Error details:', embedError);
-      
+
       // Log more details if available
       if (embedError && typeof embedError === 'object' && 'response' in embedError) {
         const errorResponse = (embedError as { response?: { body?: unknown } }).response;
