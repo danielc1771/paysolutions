@@ -5,7 +5,7 @@ import { LucideIcon } from 'lucide-react';
 
 export interface Column<T> {
   key: string;
-  label: string;
+  label: string | ReactNode;
   render: (item: T) => ReactNode;
   mobileRender?: (item: T) => ReactNode;
   className?: string;
@@ -46,7 +46,7 @@ export default function DataTable<T>({
   mobileCardRender,
   getItemKey,
 }: DataTableProps<T>) {
-  
+
   const getActionColor = (color: string = 'gray') => {
     const colors = {
       blue: 'text-gray-400 hover:text-blue-500 hover:bg-blue-50',
@@ -142,7 +142,7 @@ export default function DataTable<T>({
                       {actions.map((action, idx) => {
                         const shouldShow = action.show ? action.show(item) : true;
                         if (!shouldShow) return null;
-                        
+
                         const Icon = action.icon;
                         return (
                           <button
@@ -182,7 +182,7 @@ export default function DataTable<T>({
                     {actions.map((action, idx) => {
                       const shouldShow = action.show ? action.show(item) : true;
                       if (!shouldShow) return null;
-                      
+
                       const Icon = action.icon;
                       return (
                         <button

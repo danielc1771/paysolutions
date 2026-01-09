@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { createClient } from '@/utils/supabase/client';
-import { LayoutDashboard, FileText, Plus, Users, Bell, UserPlus, Building2, Menu, X, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, FileText, Plus, Users, Bell, UserPlus, Building2, Menu, X, ShieldCheck, BarChart3 } from 'lucide-react';
 import { useUserProfile } from '@/components/auth/RoleRedirect';
 import OnboardingModal from '@/components/dashboard/OnboardingModal';
 import OnboardingBanner from '@/components/dashboard/OnboardingBanner';
@@ -66,7 +66,7 @@ export default function UserLayout({ children }: UserLayoutProps) {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
   const supabase = useMemo(() => createClient(), []);
-  
+
   // Use the new role system
   const { profile, loading } = useUserProfile();
 
@@ -76,7 +76,7 @@ export default function UserLayout({ children }: UserLayoutProps) {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
     };
-    
+
     getUser();
 
     // Listen for auth changes
@@ -90,7 +90,7 @@ export default function UserLayout({ children }: UserLayoutProps) {
 
     return () => subscription.unsubscribe();
   }, [router, supabase]);
-  
+
   // Fetch organization settings
   useEffect(() => {
     const fetchOrgSettings = async () => {
@@ -105,12 +105,12 @@ export default function UserLayout({ children }: UserLayoutProps) {
         setColorTheme('purple');
         return;
       }
-      
+
       if (!profile?.organizationId) {
         console.log('[UserLayout] No organization ID, skipping settings fetch');
         return;
       }
-      
+
       try {
         // Fetch organization settings
         console.log('[UserLayout] Querying organization_settings for org:', profile.organizationId);
@@ -119,13 +119,13 @@ export default function UserLayout({ children }: UserLayoutProps) {
           .select('*')
           .eq('organization_id', profile.organizationId)
           .single();
-        
+
         if (error && error.code !== 'PGRST116') {
           console.error('[UserLayout] Error fetching organization settings:', error);
           // Continue with defaults on error
           return;
         }
-        
+
         console.log('[UserLayout] Organization settings fetched:', data);
 
         if (data) {
@@ -162,7 +162,7 @@ export default function UserLayout({ children }: UserLayoutProps) {
         // Keep defaults on error - no additional action needed
       }
     };
-    
+
     fetchOrgSettings();
   }, [profile?.organizationId, profile?.role, supabase]);
 
@@ -311,6 +311,13 @@ export default function UserLayout({ children }: UserLayoutProps) {
         show: isAdmin || orgSettings.enableLoans,
       },
       {
+        name: 'Reports',
+        href: '/dashboard/reports',
+        icon: <BarChart3 className="w-5 h-5" />,
+        roles: ['admin', 'organization_owner', 'team_member'],
+        show: true,
+      },
+      {
         name: 'Organizations',
         href: '/dashboard/organizations',
         icon: <Building2 className="w-5 h-5" />,
@@ -354,27 +361,26 @@ export default function UserLayout({ children }: UserLayoutProps) {
 
   // Get current theme colors
   const currentTheme = COLOR_THEMES[colorTheme] || COLOR_THEMES.default;
-  
+
   return (
     <div className={`flex h-screen bg-gradient-to-br ${currentTheme.bgGradient}`}>
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
-      
+
       {/* Sidebar */}
-      <div className={`fixed lg:static inset-y-0 left-0 z-50 w-72 bg-white/20 backdrop-blur-xl border-r border-white/30 flex flex-col transform transition-transform duration-300 ease-in-out ${
-        sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-      }`}>
+      <div className={`fixed lg:static inset-y-0 left-0 z-50 w-72 bg-white/20 backdrop-blur-xl border-r border-white/30 flex flex-col transform transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        }`}>
         {/* Logo and Close Button */}
         <div className="flex items-center justify-between h-24 px-6 pt-6 border-b border-white/20">
-          <Image 
-            src={logoUrl} 
-            alt="Organization Logo" 
-            width={150} 
+          <Image
+            src={logoUrl}
+            alt="Organization Logo"
+            width={150}
             height={150}
             className="rounded-xl shadow-lg object-contain"
             unoptimized
@@ -396,23 +402,21 @@ export default function UserLayout({ children }: UserLayoutProps) {
         <nav className="flex-1 p-6 space-y-3">
           {navigation.map((item) => {
             const isActive = pathname === item.href;
-            
+
             return (
               <Link
                 key={item.name}
                 href={item.href}
                 onClick={() => setSidebarOpen(false)}
-                className={`group flex items-center px-4 py-4 text-sm font-semibold rounded-2xl transition-all duration-300 ${
-                  isActive
-                    ? `bg-gradient-to-r ${currentTheme.gradient} text-white shadow-lg ${currentTheme.shadow}`
-                    : 'text-gray-700 hover:bg-white/60 hover:backdrop-blur-sm hover:shadow-lg'
-                }`}
+                className={`group flex items-center px-4 py-4 text-sm font-semibold rounded-2xl transition-all duration-300 ${isActive
+                  ? `bg-gradient-to-r ${currentTheme.gradient} text-white shadow-lg ${currentTheme.shadow}`
+                  : 'text-gray-700 hover:bg-white/60 hover:backdrop-blur-sm hover:shadow-lg'
+                  }`}
               >
-                <span className={`mr-4 p-2 rounded-xl transition-all duration-300 ${
-                  isActive 
-                    ? 'bg-white/20' 
-                    : 'bg-gray-100 group-hover:bg-white group-hover:shadow-md'
-                }`}>
+                <span className={`mr-4 p-2 rounded-xl transition-all duration-300 ${isActive
+                  ? 'bg-white/20'
+                  : 'bg-gray-100 group-hover:bg-white group-hover:shadow-md'
+                  }`}>
                   {item.icon}
                 </span>
                 <span className="font-medium">{item.name}</span>
@@ -440,24 +444,25 @@ export default function UserLayout({ children }: UserLayoutProps) {
                 >
                   <Menu className="w-6 h-6 text-gray-700" />
                 </button>
-                
+
                 <h1 className="text-lg sm:text-xl font-semibold text-gray-700">
                   {pathname === '/dashboard' ? 'Dashboard' :
-                   pathname === '/dashboard/loans' ? 'Loans' :
-                   pathname === '/dashboard/verifications' ? 'Verifications' :
-                   pathname === '/dashboard/borrowers' ? 'Borrowers' :
-                   pathname === '/dashboard/organizations' ? 'Organizations' :
-                   pathname === '/dashboard/team' ? (profile?.role === 'admin' ? 'Administrators' : 'Team Management') :
-                   pathname.includes('/dashboard/loans/') ? 'Loan Details' :
-                   pathname.includes('/dashboard/verifications/') ? 'Verification Details' :
-                   pathname.includes('/dashboard/borrowers/') ? 'Borrower Details' :
-                   'Dashboard'}
+                    pathname === '/dashboard/loans' ? 'Loans' :
+                      pathname === '/dashboard/verifications' ? 'Verifications' :
+                        pathname === '/dashboard/borrowers' ? 'Borrowers' :
+                          pathname === '/dashboard/organizations' ? 'Organizations' :
+                            pathname === '/dashboard/team' ? (profile?.role === 'admin' ? 'Administrators' : 'Team Management') :
+                              pathname === '/dashboard/reports' ? 'Reports' :
+                                pathname.includes('/dashboard/loans/') ? 'Loan Details' :
+                                  pathname.includes('/dashboard/verifications/') ? 'Verification Details' :
+                                    pathname.includes('/dashboard/borrowers/') ? 'Borrower Details' :
+                                      'Dashboard'}
                 </h1>
-                
+
                 {/* Search - Hidden on mobile */}
                 <div className="relative hidden md:block">
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     placeholder="Search..."
                     className="pl-10 pr-4 py-2 w-64 lg:w-80 rounded-2xl border-0 bg-white/60 backdrop-blur-sm shadow-sm focus:ring-2 focus:ring-green-500 focus:outline-none text-sm text-gray-900 placeholder-gray-500"
                   />
@@ -474,16 +479,16 @@ export default function UserLayout({ children }: UserLayoutProps) {
                   <div className="hidden lg:block bg-white/60 backdrop-blur-sm rounded-xl px-4 py-2 shadow-sm">
                     <p className="text-xs text-gray-500">Organization</p>
                     <p className="text-sm font-semibold text-gray-900">
-                      {profile.organizationId === 'ba658ea8-9ff5-498d-82a4-25a3f1c60f1f' ? 'easycar' : 
-                       profile.organizationId === 'cb758fa9-8ff5-498d-82a4-25a3f1c60f2f' ? 'Test Dealership 2' : 
-                       'Your Organization'}
+                      {profile.organizationId === 'ba658ea8-9ff5-498d-82a4-25a3f1c60f1f' ? 'easycar' :
+                        profile.organizationId === 'cb758fa9-8ff5-498d-82a4-25a3f1c60f2f' ? 'Test Dealership 2' :
+                          'Your Organization'}
                     </p>
                   </div>
                 )}
 
                 {/* Notifications */}
                 <div className="relative" ref={notificationRef}>
-                  <button 
+                  <button
                     onClick={() => setShowNotifications(!showNotifications)}
                     className="p-2 text-gray-600 hover:text-gray-800 bg-white/60 backdrop-blur-sm rounded-xl hover:bg-white/80 transition-all duration-300 relative"
                   >
@@ -494,7 +499,7 @@ export default function UserLayout({ children }: UserLayoutProps) {
 
                 {/* User Account Dropdown */}
                 <div className="relative z-50" ref={dropdownRef}>
-                  <button 
+                  <button
                     onClick={() => setShowAccountDropdown(!showAccountDropdown)}
                     className="flex items-center space-x-3 p-2 bg-white/60 backdrop-blur-sm rounded-xl hover:bg-white/80 transition-all duration-300"
                   >
@@ -544,7 +549,7 @@ export default function UserLayout({ children }: UserLayoutProps) {
                           </Link>
                         )}
                         <hr className="my-2 border-gray-200/50" />
-                        <button 
+                        <button
                           onClick={handleSignOut}
                           className="flex items-center w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50/50 rounded-xl transition-colors"
                         >
@@ -575,7 +580,7 @@ export default function UserLayout({ children }: UserLayoutProps) {
                 onDismiss={() => setShowOnboardingBanner(false)}
               />
             )}
-            
+
             {children}
           </div>
         </main>

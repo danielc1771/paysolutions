@@ -1,4 +1,4 @@
-import { pgTable, index, unique, pgPolicy, uuid, varchar, date, numeric, timestamp, foreignKey, integer, text, check, pgEnum, boolean } from "drizzle-orm/pg-core"
+import { pgTable, index, unique, pgPolicy, uuid, varchar, date, numeric, timestamp, foreignKey, integer, text, check, pgEnum, boolean, json } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 // import { organization } from "./auth";
 
@@ -9,37 +9,37 @@ export const subscriptionStatusEnum = pgEnum('subscription_status', ['trial', 'a
 export const stripeVerificationStatusEnum = pgEnum('stripe_verification_status', ['pending', 'requires_action', 'verified', 'canceled', 'unverified', 'processing', 'completed']);
 export const phoneVerificationStatusEnum = pgEnum('phone_verification_status', ['pending', 'sent', 'verified', 'failed', 'expired']);
 export const loanStatusEnum = pgEnum('loan_status', [
-  'new', 
-  'application_sent', 
-  'application_in_progress', 
-  'application_completed',
-  'pending_ipay_signature',
-  'pending_org_signature',
-  'pending_borrower_signature',
-  'ipay_approved',
-  'dealer_approved', 
-  'fully_signed',
-  'review',
-  'approved', 
-  'funded', 
-  'active',
-  'pending_derogatory_review',
-  'derogatory',
-  'settled',
-  'closed', 
-  'defaulted'
+	'new',
+	'application_sent',
+	'application_in_progress',
+	'application_completed',
+	'pending_ipay_signature',
+	'pending_org_signature',
+	'pending_borrower_signature',
+	'ipay_approved',
+	'dealer_approved',
+	'fully_signed',
+	'review',
+	'approved',
+	'funded',
+	'active',
+	'pending_derogatory_review',
+	'derogatory',
+	'settled',
+	'closed',
+	'defaulted'
 ]);
 
 export const derogatoryTypeEnum = pgEnum('derogatory_type', ['manual', 'automatic']);
 export const verificationStatusEnum = pgEnum('verification_status', [
-  'pending',
-  'email_sent',
-  'in_progress',
-  'identity_verified',
-  'phone_verified',
-  'completed',
-  'failed',
-  'expired'
+	'pending',
+	'email_sent',
+	'in_progress',
+	'identity_verified',
+	'phone_verified',
+	'completed',
+	'failed',
+	'expired'
 ]);
 
 export const organization = pgTable("organizations", {
@@ -100,7 +100,7 @@ export const borrowers = pgTable("borrowers", {
 	zipCode: varchar("zip_code", { length: 10 }),
 	country: varchar("country", { length: 2 }).default('US'), // ISO country code
 	employmentStatus: varchar("employment_status", { length: 50 }),
-	annualIncome: numeric("annual_income", { precision: 12, scale:  2 }),
+	annualIncome: numeric("annual_income", { precision: 12, scale: 2 }),
 	currentEmployerName: varchar("current_employer_name", { length: 255 }),
 	employerState: varchar("employer_state", { length: 50 }), // State where employer is located
 	timeWithEmployment: varchar("time_with_employment", { length: 50 }),
@@ -133,22 +133,22 @@ export const paymentSchedules = pgTable("payment_schedules", {
 	loanId: uuid("loan_id"),
 	paymentNumber: integer("payment_number").notNull(),
 	dueDate: date("due_date").notNull(),
-	principalAmount: numeric("principal_amount", { precision: 10, scale:  2 }).notNull(),
-	interestAmount: numeric("interest_amount", { precision: 10, scale:  2 }).notNull(),
-	totalAmount: numeric("total_amount", { precision: 10, scale:  2 }).notNull(),
-	remainingBalance: numeric("remaining_balance", { precision: 12, scale:  2 }).notNull(),
+	principalAmount: numeric("principal_amount", { precision: 10, scale: 2 }).notNull(),
+	interestAmount: numeric("interest_amount", { precision: 10, scale: 2 }).notNull(),
+	totalAmount: numeric("total_amount", { precision: 10, scale: 2 }).notNull(),
+	remainingBalance: numeric("remaining_balance", { precision: 12, scale: 2 }).notNull(),
 	status: varchar({ length: 50 }).default('pending'),
 	paidDate: date("paid_date"),
-	paidAmount: numeric("paid_amount", { precision: 10, scale:  2 }),
+	paidAmount: numeric("paid_amount", { precision: 10, scale: 2 }),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 }, (table) => [
 	index("idx_payment_schedules_loan_id").using("btree", table.loanId.asc().nullsLast().op("uuid_ops")),
 	foreignKey({
-			columns: [table.loanId],
-			foreignColumns: [loans.id],
-			name: "payment_schedules_loan_id_fkey"
-		}).onDelete("cascade"),
+		columns: [table.loanId],
+		foreignColumns: [loans.id],
+		name: "payment_schedules_loan_id_fkey"
+	}).onDelete("cascade"),
 	pgPolicy("Enable all operations for service role", { as: "permissive", for: "all", to: ["public"], using: sql`true` }),
 ]);
 
@@ -156,7 +156,7 @@ export const payments = pgTable("payments", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	loanId: uuid("loan_id"),
 	paymentScheduleId: uuid("payment_schedule_id"),
-	amount: numeric({ precision: 10, scale:  2 }).notNull(),
+	amount: numeric({ precision: 10, scale: 2 }).notNull(),
 	paymentDate: date("payment_date").notNull(),
 	paymentMethod: varchar("payment_method", { length: 50 }),
 	stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
@@ -167,15 +167,15 @@ export const payments = pgTable("payments", {
 }, (table) => [
 	index("idx_payments_loan_id").using("btree", table.loanId.asc().nullsLast().op("uuid_ops")),
 	foreignKey({
-			columns: [table.loanId],
-			foreignColumns: [loans.id],
-			name: "payments_loan_id_fkey"
-		}).onDelete("cascade"),
+		columns: [table.loanId],
+		foreignColumns: [loans.id],
+		name: "payments_loan_id_fkey"
+	}).onDelete("cascade"),
 	foreignKey({
-			columns: [table.paymentScheduleId],
-			foreignColumns: [paymentSchedules.id],
-			name: "payments_payment_schedule_id_fkey"
-		}),
+		columns: [table.paymentScheduleId],
+		foreignColumns: [paymentSchedules.id],
+		name: "payments_payment_schedule_id_fkey"
+	}),
 	pgPolicy("Enable all operations for service role", { as: "permissive", for: "all", to: ["public"], using: sql`true` }),
 ]);
 
@@ -183,18 +183,18 @@ export const loans = pgTable("loans", { // Added vehicle fields
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	loanNumber: varchar("loan_number", { length: 50 }).notNull(),
 	borrowerId: uuid("borrower_id"),
-	principalAmount: numeric("principal_amount", { precision: 12, scale:  2 }).notNull(),
-	amount: numeric("amount", { precision: 12, scale:  2 }), // Alias for principalAmount for DocuSign compatibility
-	interestRate: numeric("interest_rate", { precision: 5, scale:  4 }).notNull(),
+	principalAmount: numeric("principal_amount", { precision: 12, scale: 2 }).notNull(),
+	amount: numeric("amount", { precision: 12, scale: 2 }), // Alias for principalAmount for DocuSign compatibility
+	interestRate: numeric("interest_rate", { precision: 5, scale: 4 }).notNull(),
 	termWeeks: integer("term_weeks").notNull(),
 	termMonths: integer("term_months"), // Term in months for display/DocuSign
-	weeklyPayment: numeric("weekly_payment", { precision: 10, scale:  2 }).notNull(),
-	monthlyPayment: numeric("monthly_payment", { precision: 10, scale:  2 }), // Monthly payment for display/DocuSign
+	weeklyPayment: numeric("weekly_payment", { precision: 10, scale: 2 }).notNull(),
+	monthlyPayment: numeric("monthly_payment", { precision: 10, scale: 2 }), // Monthly payment for display/DocuSign
 	loanType: varchar("loan_type", { length: 100 }), // Type of loan (Auto, Personal, etc.)
 	purpose: text(),
 	status: loanStatusEnum('status').default('new'),
 	fundingDate: date("funding_date"),
-	remainingBalance: numeric("remaining_balance", { precision: 12, scale:  2 }),
+	remainingBalance: numeric("remaining_balance", { precision: 12, scale: 2 }),
 	docusignEnvelopeId: varchar("docusign_envelope_id", { length: 255 }),
 	docusignCompletedAt: timestamp("docusign_completed_at", { withTimezone: true, mode: 'string' }),
 	// DocuSign signer emails (stored for reference)
@@ -250,10 +250,10 @@ export const loans = pgTable("loans", { // Added vehicle fields
 	index("idx_loans_loan_number").using("btree", table.loanNumber.asc().nullsLast().op("text_ops")),
 	index("idx_loans_status").using("btree", table.status.asc().nullsLast().op("text_ops")),
 	foreignKey({
-			columns: [table.borrowerId],
-			foreignColumns: [borrowers.id],
-			name: "loans_borrower_id_fkey"
-		}).onDelete("cascade"),
+		columns: [table.borrowerId],
+		foreignColumns: [borrowers.id],
+		name: "loans_borrower_id_fkey"
+	}).onDelete("cascade"),
 	unique("loans_loan_number_key").on(table.loanNumber),
 	pgPolicy("Enable all operations for service role", { as: "permissive", for: "all", to: ["public"], using: sql`true` }),
 	check("check_positive_amounts", sql`(principal_amount > (0)::numeric) AND (interest_rate >= (0)::numeric) AND (term_weeks > 0) AND (weekly_payment > (0)::numeric)`),
