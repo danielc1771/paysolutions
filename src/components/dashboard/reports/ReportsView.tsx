@@ -315,6 +315,12 @@ export default function ReportsView() {
             render: (loan) => <span className="text-gray-900">{loan.borrower?.first_name} {loan.borrower?.last_name}</span>
         },
         {
+            key: 'organization',
+            label: 'Organization',
+            render: (loan) => <span className="text-sm text-gray-600">{loan.organization?.name || 'N/A'}</span>,
+            show: () => isAdmin && selectedOrgId === 'all'
+        },
+        {
             key: 'amount',
             label: 'Funded Amount',
             render: (loan) => <span className="font-bold text-gray-900">${parseFloat(loan.principal_amount).toLocaleString()}</span>
@@ -329,6 +335,17 @@ export default function ReportsView() {
             render: (payment) => <span className="text-sm text-gray-900">{new Date(payment.payment_date).toLocaleDateString()}</span>
         },
         {
+            key: 'organization', // Need to join organization name to payment data or fetch it
+            label: 'Organization',
+            render: (payment) => {
+                // We need to look up the organization from the loans array since payments don't have it directly in this interface
+                // This is a bit inefficient but works for now given the data structure
+                const loan = loans.find(l => l.id === payment.loan_id);
+                return <span className="text-sm text-gray-600">{loan?.organization?.name || 'N/A'}</span>
+            },
+            show: () => isAdmin && selectedOrgId === 'all'
+        },
+        {
             key: 'amount',
             label: 'Amount Collected',
             render: (payment) => <span className="font-bold text-green-600">+${parseFloat(payment.amount).toLocaleString()}</span>
@@ -340,12 +357,14 @@ export default function ReportsView() {
         }
     ];
 
+
+
     // Filter & Sort State
     const [searchQuery, setSearchQuery] = useState('');
     const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
     const [statusFilter, setStatusFilter] = useState('all');
     const [riskFilter, setRiskFilter] = useState('all');
-    const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+    const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>({ key: 'date', direction: 'desc' }); // Default sort
 
     const handleSort = (key: string) => {
         let direction: 'asc' | 'desc' = 'asc';
@@ -353,6 +372,12 @@ export default function ReportsView() {
             direction = 'desc';
         }
         setSortConfig({ key, direction });
+    };
+
+    // Helper to handle "Sort By" dropdown
+    const handleSortChange = (value: string) => {
+        const [key, direction] = value.split('-');
+        setSortConfig({ key, direction: direction as 'asc' | 'desc' });
     };
 
     // Derived Data
@@ -389,8 +414,6 @@ export default function ReportsView() {
                 filtered = filtered.filter(l => {
                     const days = l.days_overdue || 0;
                     if (['active', 'active_late'].includes(l.status) || days > 0) {
-                        if (riskFilter === 'low') return days === 0 || days <= 15; // Defining Low as Green/Yellow broadly or split? 
-                        // Let's match strict: Green=Low, Yellow=Medium, Red=High
                         if (riskFilter === 'green') return days === 0;
                         if (riskFilter === 'yellow') return days >= 1 && days <= 15;
                         if (riskFilter === 'high') return days >= 16;
@@ -406,19 +429,25 @@ export default function ReportsView() {
                 let aValue: any = a[sortConfig.key as keyof LoanData];
                 let bValue: any = b[sortConfig.key as keyof LoanData];
 
-                // Special handling for nested or specific keys
-                if (sortConfig.key === 'borrower') {
+                const key = sortConfig.key;
+
+                // Map sort keys from dropdown/columns to actual data fields
+                if (key === 'borrower') {
                     aValue = `${a.borrower?.last_name} ${a.borrower?.first_name}`;
                     bValue = `${b.borrower?.last_name} ${b.borrower?.first_name}`;
-                } else if (sortConfig.key === 'organization') {
+                } else if (key === 'organization' || key === 'org') {
                     aValue = a.organization?.name || '';
                     bValue = b.organization?.name || '';
-                } else if (sortConfig.key === 'risk') {
+                } else if (key === 'risk') {
                     aValue = a.days_overdue || 0;
                     bValue = b.days_overdue || 0;
-                } else if (sortConfig.key === 'amount' || sortConfig.key === 'balance') {
-                    aValue = parseFloat(sortConfig.key === 'amount' ? a.principal_amount : a.remaining_balance);
-                    bValue = parseFloat(sortConfig.key === 'amount' ? b.principal_amount : b.remaining_balance);
+                } else if (key === 'amount' || key === 'balance') {
+                    aValue = parseFloat(key === 'amount' ? a.principal_amount : a.remaining_balance);
+                    bValue = parseFloat(key === 'amount' ? b.principal_amount : b.remaining_balance);
+                } else if (key === 'date' || key === 'funding_date') {
+                    // Start/Funded Date
+                    aValue = activeTab === 'status' ? a.created_at : (a.funding_date || '');
+                    bValue = activeTab === 'status' ? b.created_at : (b.funding_date || '');
                 }
 
                 if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
@@ -445,12 +474,20 @@ export default function ReportsView() {
                 let aValue: any = a[sortConfig.key as keyof PaymentData];
                 let bValue: any = b[sortConfig.key as keyof PaymentData];
 
-                if (sortConfig.key === 'amount') {
+                const key = sortConfig.key;
+
+                if (key === 'amount') {
                     aValue = parseFloat(a.amount);
                     bValue = parseFloat(b.amount);
-                } else if (sortConfig.key === 'date') {
+                } else if (key === 'date') {
                     aValue = a.payment_date;
                     bValue = b.payment_date;
+                } else if (key === 'organization') {
+                    // Sort payments by organization name (requires lookup)
+                    const loanA = loans.find(l => l.id === a.loan_id);
+                    const loanB = loans.find(l => l.id === b.loan_id);
+                    aValue = loanA?.organization?.name || '';
+                    bValue = loanB?.organization?.name || '';
                 }
 
                 if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
@@ -489,6 +526,78 @@ export default function ReportsView() {
     }));
 
 
+    const handleExport = () => {
+        let data: any[] = [];
+        let filename = 'report.csv';
+        let headers: string[] = [];
+
+        if (activeTab === 'funding') {
+            data = getFilteredAndSortedLoans();
+            filename = `funding_history_${new Date().toISOString().split('T')[0]}.csv`;
+            headers = ['Funded Date', 'Loan #', 'Borrower', 'Organization', 'Amount'];
+        } else if (activeTab === 'collections') {
+            data = getFilteredAndSortedPayments();
+            filename = `collection_history_${new Date().toISOString().split('T')[0]}.csv`;
+            headers = ['Payment Date', 'Organization', 'Amount', 'Status'];
+        } else if (activeTab === 'status') {
+            data = getFilteredAndSortedLoans();
+            filename = `account_status_${new Date().toISOString().split('T')[0]}.csv`;
+            headers = ['Loan #', 'Created Date', 'Borrower', 'Organization', 'Status', 'Risk Level', 'Days Overdue', 'Balance'];
+        }
+
+        if (!data.length) return;
+
+        const csvContent = [
+            headers.join(','),
+            ...data.map(item => {
+                if (activeTab === 'funding') {
+                    const l = item as LoanData;
+                    return [
+                        l.funding_date || '',
+                        l.loan_number,
+                        `"${l.borrower?.first_name} ${l.borrower?.last_name}"`,
+                        `"${l.organization?.name || ''}"`,
+                        l.principal_amount
+                    ].join(',');
+                } else if (activeTab === 'collections') {
+                    const p = item as PaymentData;
+                    const loan = loans.find(l => l.id === p.loan_id);
+                    const orgName = loan?.organization?.name || '';
+                    return [
+                        p.payment_date,
+                        `"${orgName}"`,
+                        p.amount,
+                        p.status
+                    ].join(',');
+                } else {
+                    const l = item as LoanData;
+                    return [
+                        l.loan_number,
+                        l.created_at,
+                        `"${l.borrower?.first_name} ${l.borrower?.last_name}"`,
+                        `"${l.organization?.name || ''}"`,
+                        l.status,
+                        l.days_overdue === 0 ? 'Low' : l.days_overdue <= 15 ? 'Medium' : 'High',
+                        l.days_overdue,
+                        l.remaining_balance
+                    ].join(',');
+                }
+            })
+        ].join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        if (link.download !== undefined) {
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-gray-50/50 p-8 space-y-8">
             {/* Header & Controls */}
@@ -523,9 +632,12 @@ export default function ReportsView() {
                         </select>
                     )}
 
-                    <button className="flex items-center space-x-2 bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-xl hover:bg-gray-50 transition-colors">
+                    <button
+                        onClick={handleExport}
+                        className="flex items-center space-x-2 bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-xl hover:bg-gray-50 transition-colors"
+                    >
                         <Download className="w-4 h-4" />
-                        <span>Export</span>
+                        <span>Export CSV</span>
                     </button>
                 </div>
             </div>
@@ -579,7 +691,7 @@ export default function ReportsView() {
                 <div className="border-b border-gray-100">
                     <nav className="flex space-x-8 px-6" aria-label="Tabs">
                         <button
-                            onClick={() => { setActiveTab('funding'); setSortConfig(null); }}
+                            onClick={() => { setActiveTab('funding'); setSortConfig({ key: 'date', direction: 'desc' }); }}
                             className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'funding'
                                 ? 'border-indigo-500 text-indigo-600'
                                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -588,7 +700,7 @@ export default function ReportsView() {
                             Funding History
                         </button>
                         <button
-                            onClick={() => { setActiveTab('collections'); setSortConfig(null); }}
+                            onClick={() => { setActiveTab('collections'); setSortConfig({ key: 'date', direction: 'desc' }); }}
                             className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'collections'
                                 ? 'border-indigo-500 text-indigo-600'
                                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -597,7 +709,7 @@ export default function ReportsView() {
                             Collection History
                         </button>
                         <button
-                            onClick={() => { setActiveTab('status'); setSortConfig(null); }}
+                            onClick={() => { setActiveTab('status'); setSortConfig({ key: 'date', direction: 'desc' }); }}
                             className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'status'
                                 ? 'border-indigo-500 text-indigo-600'
                                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -614,6 +726,21 @@ export default function ReportsView() {
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                                 <h3 className="text-lg font-bold text-gray-900">Funding History</h3>
                                 <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 mr-4">
+                                        <span className="text-sm text-gray-500">Sort by:</span>
+                                        <select
+                                            className="border-gray-200 rounded-lg text-sm text-gray-900"
+                                            value={`${sortConfig?.key}-${sortConfig?.direction}`}
+                                            onChange={(e) => handleSortChange(e.target.value)}
+                                        >
+                                            <option value="date-desc">Newest First</option>
+                                            <option value="date-asc">Oldest First</option>
+                                            <option value="amount-desc">Amount (High-Low)</option>
+                                            <option value="amount-asc">Amount (Low-High)</option>
+                                            {(isAdmin && selectedOrgId === 'all') && <option value="organization-asc">Organization (A-Z)</option>}
+                                        </select>
+                                    </div>
+
                                     <span className="text-sm text-gray-500">Date:</span>
                                     <input
                                         type="date"
@@ -645,6 +772,21 @@ export default function ReportsView() {
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                                 <h3 className="text-lg font-bold text-gray-900">Collection History</h3>
                                 <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 mr-4">
+                                        <span className="text-sm text-gray-500">Sort by:</span>
+                                        <select
+                                            className="border-gray-200 rounded-lg text-sm text-gray-900"
+                                            value={`${sortConfig?.key}-${sortConfig?.direction}`}
+                                            onChange={(e) => handleSortChange(e.target.value)}
+                                        >
+                                            <option value="date-desc">Newest First</option>
+                                            <option value="date-asc">Oldest First</option>
+                                            <option value="amount-desc">Amount (High-Low)</option>
+                                            <option value="amount-asc">Amount (Low-High)</option>
+                                            {(isAdmin && selectedOrgId === 'all') && <option value="organization-asc">Organization (A-Z)</option>}
+                                        </select>
+                                    </div>
+
                                     <span className="text-sm text-gray-500">Date:</span>
                                     <input
                                         type="date"
@@ -718,11 +860,33 @@ export default function ReportsView() {
                                         <option value="yellow">Medium Risk (Yellow)</option>
                                         <option value="high">High Risk (Red)</option>
                                     </select>
+
+                                    {/* Explicit Sort Dropdown for Status View */}
+                                    <select
+                                        className="border-gray-200 rounded-lg text-sm text-gray-900 bg-white"
+                                        value={`${sortConfig?.key}-${sortConfig?.direction}`}
+                                        onChange={(e) => handleSortChange(e.target.value)}
+                                    >
+                                        <option value="date-desc">Newest First</option>
+                                        <option value="date-asc">Oldest First</option>
+                                        <option value="borrower-asc">Borrower (A-Z)</option>
+                                        <option value="borrower-desc">Borrower (Z-A)</option>
+                                        {(isAdmin && selectedOrgId === 'all') && <option value="organization-asc">Organization (A-Z)</option>}
+                                        <option value="balance-desc">Balance (High-Low)</option>
+                                        <option value="balance-asc">Balance (Low-High)</option>
+                                    </select>
+
                                     <button
                                         onClick={() => { setSearchQuery(''); setStatusFilter('all'); setRiskFilter('all'); }}
                                         className="text-sm text-gray-500 hover:text-gray-700 px-2"
                                     >
                                         Clear
+                                    </button>
+                                    <button
+                                        onClick={handleExport}
+                                        className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                    >
+                                        Export
                                     </button>
                                 </div>
                             </div>
